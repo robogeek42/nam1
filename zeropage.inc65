@@ -1,0 +1,33 @@
+; Zeropage variables
+RES      = $20
+R0       = $22
+R1       = $24
+TMP0     = $26
+TMP1     = $28
+TMP2     = $2A
+MACROTMP = $2C
+
+ZP_TMP0  = $2D
+ZP_TMP1  = $2E
+;ZP_TMP2  = $2F
+
+;-----------------------------------------------------------
+; VDP - 16 bytes
+ZP_VDP_REGS = $30 ;; 8 registers
+ZP_VDP_MODE = $38
+ZP_VDP_CHAR_WIDTH = $39
+ZP_VDP_SAB  = $3a ;; Sprite Attribute table Base addr (2 bytes)
+
+; 2 bytes for cursor position (in terms of name table)
+ZP_VDP_CURS = $3c  ; 2 bytes
+ZP_VDP_XPOS = $3e
+ZP_VDP_YPOS = $3f
+
+;-----------------------------------------------------------
+; Sprite movement
+ZP_SPR_NUM = $40
+
+; ZP_TMP2/3 currently only used by VDP blit
+ZP_TMP2    = $42
+ZP_TMP3    = $43
+

@@ -1,0 +1,10 @@
+; TMS9918 VDP chip address defines
+VDP_BASE      = $7F60
+VDP_ADDR_SET  = $7F61
+
+VDP_WR_VRAM   = $7F60
+VDP_WR_REG    = $7F61
+VDP_RD_VRAM   = $7F62
+VDP_RD_STATUS = $7F63
+
+

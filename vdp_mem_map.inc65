@@ -1,0 +1,274 @@
+;Name Table. 
+;	Register 2 * 0x400
+;	Max (GI,GII 32*24=768 bytes) (Text 40*24=960 bytes). 1k boundaries
+;Color Table 
+;	Register 3 * 0x40
+;	- need max 64 bytes - for 256 characters. 64 byte boundaries
+;Pattern generator Table. 
+;	Register 4 * 0x800
+;	Max 256*8=2k. 2k boundaries. 
+;Sprite Attribute Table. 
+;	Register 5 * 0x80
+;	Max 32*4=128 bytes.  128 byte boundaries
+;Sprite Generator Table. 
+;	Register 6 * 0x800
+;	Max 2k. 2k boundaries
+;
+;
+;Mode 0: Text - no sprites
+;----------------------------
+;
+;Map:
+;0000 |------------------|
+;     |  Pattern Table   |
+;     |   256 chars      |
+;     |   2048 bytes     |
+;     |                  |
+;     |                  |
+;0400 |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;0800 +------------------+
+;     |  Name Table      |
+;     |    960 bytes     |
+;     |                  |
+;0bc0 |------------------|
+;     |                  |
+;0C00 +------------------+
+;     |                  |
+;     ~                  ~
+;     |                  |
+;4000 +------------------+
+;
+;Could move Name table up to 0x400 if want only 128 chars
+;but I want top 128 chars for inverse of 1st 128 - cursor flash
+;
+;VDP Registers:
+; 0 00 : GII off, Ext VDP Off
+; 1 D0 : 16K | Active | Int off |  Text mode (bit 5,4=1,0) | Size 0 | Mag 0
+; 2 02 : Name Table 0800
+; 3 00 : Col Table  ----
+; 4 00 : Patt Table 0000
+; 5 00 : Spr Attrib ----
+; 6 00 : Spr Patt   ----
+; 7 f0 : Black text on white
+
+VDP_MODES:
+VDP_SETUP_MODE0: .byte $00, $D0, $02, $00, $00, $00, $00, $F0
+
+;
+;Mode 1/2: Graphics I - small/large sprites
+;----------------------------------
+;0000 +------------------+
+;     |  Pattern Table   |
+;     |   256 chars      |
+;     |   2048 bytes     |
+;     |                  |
+;     |                  |
+;0400 |   127 ascii and  |
+;     |    inverse for   |
+;     |     cursor       |
+;     |                  |
+;     |                  |
+;     |                  |
+;0800 |------------------|
+;     |  Name Table      |
+;     |    768 bytes     |
+;     |                  |
+;0b00 |------------------|
+;     |     unused       |
+;0c00 |------------------|
+;     | Col table 64b    |
+;0c40 |------------------|
+;     |     unused       |
+;     |                  |
+;     |                  |
+;1000 |------------------|
+;     |  Sprite Patterns |
+;     |  32x8 = 256bytes |
+;1100 | -  -  -  -  -  - |
+;     |   or 32x32 = 1k  |
+;     |                  |
+;     |                  |
+;1400 |------------------|
+;     | Spr Attrib 128b  |
+;1480 |------------------|
+;     ~                  ~
+;     |                  |
+;4000 +------------------+
+;VDP Registers:
+; 0 00 : GII Off, Ext VDP Off
+; 1 C0 : 16K | Active | Int off |  Graphics I | Size 0 | Mag 0
+; 2 02 : Name Table 0800
+; 3 30 : Col Table  0c00
+; 4 00 : Patt Table 0000
+; 5 28 : Spr Attrib 1400
+; 6 02 : Spr Patt   1000
+; 7 b4 : Yellow text on blue
+
+VDP_SETUP_MODE1: .byte $00, $c0, $02, $30, $00, $28, $02, $b4
+
+;Mode 2: Graphics II 
+;      : equivalent to "MSX1 SCREEN 2"
+;----------------------------------
+;0000 +------------------+
+;     |  Pattern Table   |
+;     |     768 chars    |
+;     |                  |
+;     |                  |
+;     |                  |
+;0400 |    Segment 1     |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;0800 + - - - - - - - - -+
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;0c00 |    Segment 2     |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;1000 + - - - - - - - - -+
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;1400 |    Segment 3     |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;1800 +------------------+
+;     | Name Table 768b  |
+;     |    Segment 1     |
+;     |                  |
+;     |    Segment 2     |
+;     |                  |
+;     |    Segment 3     |
+;1b00 |------------------|
+;     |     unused       |
+;     |                  |
+;2000 |------------------|
+;     |  Color Table Gii |
+;     |   768 patterns   |
+;     |                  |
+;     |                  |
+;     |                  |
+;2400 |    Segment 1     |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;2800 + - - - - - - - - -+
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;2c00 |    Segment 2     |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;3000 + - - - - - - - - -+
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;3400 |    Segment 3     |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;3800 |------------------|
+;     |  Sprite Patterns |
+;     |  32x8 = 256 bytes|
+;     |-  -  -  -  -  -  |
+;     |  or 32x32 = 1k   |
+;     |                  |
+;     |                  |
+;3c00 |------------------|
+;     | Spr Attrib 128b  |
+;3c80 |------------------|
+;     |                  |
+;     ~                  ~
+;     |                  |
+;4000 +------------------+
+;VDP Registers:
+; 0 02 : Graphics II On, Ext VDP Off
+; 1 C0 : 16K | Active | Int off |  Graphics I/II (00) | Size 0 | Mag 0
+; 2 06 : Name Table 1800
+; 3 FF : Col Table  2000 - special, set all bits to 1 as it is in upper half
+; 4 03 : Patt Table 0000 - special again, 3 bits 011 (0 means lower half, other bits must be 1)
+; 5 78 : Spr Attrib 3c00
+; 6 07 : Spr Patt   3800
+; 7 F4 - White text on Blue
+
+VDP_SETUP_MODE2: .byte $02, $c0, $06, $ff, $03, $78, $07, $f4
+ 
+;Mode 3: Multicolor
+;----------------------------------
+;0000 +------------------+
+;     |  Pattern Table   |
+;     |                  |
+;     |   2048 bytes     |
+;     |                  |
+;     |                  |
+;0400 |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;0800 |------------------|
+;     |  Name Table      |
+;     |    768 bytes     |
+;     |                  |
+;0b00 |------------------|
+;     | Spr Attrib 128b  |
+;0b80 |------------------|
+;     |                  |
+;0bc0 |                  |
+;     |                  |
+;     |                  |
+;     |                  |
+;1000 |------------------|
+;     |  Sprite Patterns |
+;     |  32x8 = 256bytes |
+;1100 | -  -  -  -  -  - |
+;     |   or 32x32 = 1k  |
+;     |                  |
+;     |                  |
+;1400 |------------------|
+;     ~                  ~
+;     |                  |
+;4000 +------------------+
+;
+;VDP Registers:
+; 0 00 : GII Off, Ext VDP Off
+; 1 C8 : 16K | Active | Int off |  Multicolor (01) | Size 0 | Mag 0
+; 2 02 : Name Table 0800
+; 3 00 : Col Table  0000
+; 4 00 : Patt Table 0000
+; 5 16 : Spr Attrib 0b00
+; 6 02 : Spr Patt   1000
+; 7 F0 - White text on Black
+;
+
+VDP_SETUP_MODE3: .byte $00, $c8, $02, $00, $00, $16, $02, $f0

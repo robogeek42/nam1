@@ -1,0 +1,31 @@
+		.setcpu "6502"
+        .include "zeropage.inc65"
+        .include "macros.inc65"
+		.include "video_registers.inc65"
+		.include "video_common.inc65"
+        .include "video.inc65"
+
+        .export vdp_load_mc_pic
+
+.code
+
+
+vdp_load_mc_pic:
+                JSR vdp_load_mc_standard_name_table
+                JSR vdp_setaddr_pattern_table
+                ld16 R0,MC_PATTERN_BLK
+                LDX #8
+                LDY #0
+@loop:          LDA (R0),Y
+                STA VDP_WR_VRAM
+                INY
+                BNE @loop
+                INC R0+1
+                DEX
+                BNE @loop
+
+                RTS
+
+
+.include "resources/mode3_example.inc65"
+

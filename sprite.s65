@@ -1,0 +1,61 @@
+		.setcpu "6502"
+        .include "zeropage.inc65"
+        .include "macros.inc65"
+		.include "video_common.inc65"
+		.include "video_registers.inc65"
+        .export spr_set_small
+        .export spr_set_large
+        .export spr_set_mag_on
+        .export spr_set_mag_off
+
+;.bss
+
+; sprite movement table (not animated)
+; struct {
+;           byte pattern;
+;           byte xpos;
+;           byte ypos;
+;           byte xspeed; 
+;           byte yspeed;
+;        }
+;spr_tab:    .res 4*32, 0
+
+.code
+
+;; Sprite routines
+
+spr_set_small:
+                ;; set small sprites in registers
+                LDA ZP_VDP_REGS+1
+                AND #$FD
+                STA ZP_VDP_REGS+1
+                LDY #$81            ;; register 1
+                JSR vdp_regwrite
+                RTS
+                
+spr_set_large:
+                ;; set large sprites in registers
+                LDA ZP_VDP_REGS+1
+                ORA #$02
+                STA ZP_VDP_REGS+1
+                LDY #$81            ;; register 1
+                JSR vdp_regwrite
+                RTS                
+
+spr_set_mag_on:
+                LDA ZP_VDP_REGS+1
+                ORA #$01
+                STA ZP_VDP_REGS+1
+                LDY #$81            ;; register 1
+                JSR vdp_regwrite
+                RTS                
+
+spr_set_mag_off:
+                LDA ZP_VDP_REGS+1
+                AND #$FE
+                STA ZP_VDP_REGS+1
+                LDY #$81            ;; register 1
+                JSR vdp_regwrite
+                RTS                
+
+

@@ -1,0 +1,5 @@
+.import spr_set_small
+.import spr_set_large
+.import spr_set_mag_on
+.import spr_set_mag_off
+

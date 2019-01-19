@@ -1,0 +1,13 @@
+.import vdp_set_mode
+.import vdp_clear_screen
+.import vdp_load_chars
+.import vdp_load_g1_col
+.import vdp_write_char
+.import vdp_write_text
+.import vdp_backspace
+.import vdp_init_sprites
+.import vdp_load_flat_colors
+.import vdp_set_base_colors
+.import vdp_load_number_name_table
+.import vdp_load_mc_standard_name_table
+.import vdp_copy
