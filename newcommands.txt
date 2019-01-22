@@ -1,0 +1,79 @@
+VDP General Commands
+--------------------
+CLS
+	Clear current screen
+
+MODE <mode>
+	Change graphics mode to <mode>
+	Valid <mode> is 0-3
+		0 = 40x24 text mode
+		1 = Graphics Mode I with 32x24 text
+		2 = Graphics Mode II with 32x24 text
+		3 = Multicolor graphics mode
+
+TEXTCOL <FG>,<BG>
+	Change foreground and background colours of a text
+	based screen (modes 0,1,2)
+	FG and BG are integers 0-15
+
+SD card FAT16 access
+--------------------
+The FAT16 file structure is flat and does not have subdirectories
+
+SDDIR
+	Get directory listing from SD card
+
+SDLOAD <"filename">
+	Load basic program from file "filename" 
+
+SDSAVE <"filename">
+	Save current basic program to file "filename" 
+
+SDDEL <"filename">
+	Delete file "filename"
+
+
+Sprite commands
+---------------
+SPR_ENABLE <N>
+	Enable N Sprites (0 -> N-1). Max N is 32
+	N=0 disable all sprites
+
+SPR_SET_TYPE <T>
+	Set type for all sprites to T
+	T=0  8x8   unmagnified
+	T=1  16x16 unmagnified
+	T=2  8x8   double sized
+	T=3  16x16 double sized
+
+SPR_PATTERN <S>, <P>
+	Sprite S set to use pattern P
+	S range 0-31
+	P range 0-64 (Large sprites take 4 patterns)
+
+SPR_POS <S>, <X>, <Y>
+	Set sprite S position to X,Y
+
+SPR_EARLY <S>
+	Set Early CLock bit for Sprite S  -(move position 32 pix to left)
+
+SPR_COLOUR <S>, <C>
+	Set colour of sprite S to C 
+	C range 0-15
+
+SPR_LOADP <P>
+	Load either 8 (Type=0,2) or 32 (Type=1,3) bytes into sprite
+	pattern table position P from current DATA pointer
+
+Image Load commands
+-------------------
+IMG_LOAD
+	Load data from current DATA pointer to Pattern Table assuming standard Name Table layout
+	Amount of data loaded is dependent on graphics MODE
+	Valid for modes 2 (Graphics II) and 3 (Multicolor) only
+
+IMG_SDLOAD <filename>
+	Load data from file <filename> to Pattern Table assuming standard Name Table layout
+	Amount of data loaded is dependent on graphics MODE
+	Valid for modes 2 (Graphics II) and 3 (Multicolor) only
+

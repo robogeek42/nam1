@@ -1,0 +1,7 @@
+;.import sd_sendcmd16
+.import sd_sendcmd17
+.import sd_sendcmd24
+;.import sd_sendcmd41
+;.import sd_sendcmd55
+.import sd_buf
+

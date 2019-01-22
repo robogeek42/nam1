@@ -39,7 +39,7 @@ nums_2		= nums_1+1	; number to bin/hex string convert
 nums_3		= nums_1+2	; number to bin/hex string convert LSB
 
 ;-----------------------------------------
-; Keep $20 - $4F free for my monitor
+; Keep $20 - $5A free for my monitor, sd-card and video
 ;-----------------------------------------
 
 Srchc			= $5B		; search character
@@ -272,16 +272,16 @@ IrqBase		= $DF		; IRQ handler enabled/setup/triggered flags
 
 ;			= $DE		; unused
 ;			= $DF		; unused
-;			= $E0		; unused
-;			= $E1		; unused
-;			= $E2		; unused
-;			= $E3		; unused
-;			= $E4		; unused
-;			= $E5		; unused
-;			= $E6		; unused
-;			= $E7		; unused
-;			= $E8		; unused
-;			= $E9		; unused
+;			= $E0		; sd card sd_slo
+;			= $E1		; sd card sd_shi
+;			= $E2		; sd card sd_sect
+;			= $E3		; sd card
+;			= $E4		; sd card
+;			= $E5		; sd card
+;			= $E6		; sd card sd_addr
+;			= $E7		; sd card
+;			= $E8		; sd card
+;			= $E9		; sd card
 ;			= $EA		; unused
 ;			= $EB		; unused
 ;			= $EC		; unused
@@ -341,7 +341,12 @@ TK_BITCLR		= TK_BITSET+1	; BITCLR token
 TK_IRQ		= TK_BITCLR+1	; IRQ token
 TK_MODE		= TK_IRQ+1		; VDP MODE token
 TK_CLS		= TK_MODE+1		; VDP CLS token
-TK_NMI		= TK_CLS+1		; NMI token
+TK_TEXTCOL		= TK_CLS+1		; VDP TEXTCOL token
+TK_SDLOAD	= TK_TEXTCOL+1		; SD SDLOAD
+TK_SDSAVE	= TK_SDLOAD+1		; SD SDSAVE
+TK_SDDEL	= TK_SDSAVE+1		; SD SDDEL
+TK_SDDIR	= TK_SDDEL+1		; SD SDDIR
+TK_NMI		= TK_SDDIR+1		; NMI token
 
 ; secondary command tokens, can't start a statement
 
@@ -443,7 +448,7 @@ Ibuffs		= IRQ_vec+$14
 Ibuffe		= Ibuffs+$47; end of input buffer
 
 Ram_base		= $0300	; start of user RAM (set as needed, should be page aligned)
-Ram_top		= $7D00	; end of user RAM+1 (set as needed, should be page aligned)
+Ram_top		= $7B00	; end of user RAM+1 (set as needed, should be page aligned)
 
 ; This start can be changed to suit your system
 ;	.org	$5000
@@ -7537,8 +7542,22 @@ LAB_CLS
 	JSR vdp_clear_screen
 	RTS
 
-; perform WIDTH
+; perform TEXTCOL <FGCol>,<BGCol>
+LAB_TEXTCOL
+	JSR LAB_GADB		; get 2 integers seperated by comma
+						; 1st integer (FGCol) in Itempl/h, 2nd in X
+	STX Itemph			; put X (BGCol) int hi byte of temp integer for now
+	LDA Itempl			; FG Col (put int upper nibble)
+	CLC
+	ASL
+	ASL
+	ASL
+	ASL
+	ORA Itemph			; A now has FGCol|BGCol
+	JSR vdp_set_base_colors
+	RTS
 
+; perform WIDTH
 LAB_WDTH
 	CMP	#','			; is next byte ","
 	BEQ	LAB_TBSZ		; if so do tab size
@@ -7615,6 +7634,34 @@ LAB_NOSQ
 
 TabErr
 	JMP	LAB_FCER		; do function call error then warm start
+
+; perform SDLOAD <filename>
+LAB_SDLOAD
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef		; test data type flag, $FF=string, $00=numeric
+	BPL	SDL_NOTSTR		; branch if not string
+	JSR	LAB_18C6		; print string from Sutill/Sutilh
+SDL_NOTSTR
+	RTS
+; perform SDSAVE <filename>
+LAB_SDSAVE
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef		; test data type flag, $FF=string, $00=numeric
+	BPL	SDS_NOTSTR		; branch if not string
+	JSR	LAB_18C6		; print string from Sutill/Sutilh
+SDS_NOTSTR
+	RTS
+; perform SDDEL <filename>
+LAB_SDDEL
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef		; test data type flag, $FF=string, $00=numeric
+	BPL	SDD_NOTSTR		; branch if not string
+	JSR	LAB_18C6		; print string from Sutill/Sutilh
+SDD_NOTSTR
+	RTS
+; perform SDDIR
+LAB_SDDIR
+	RTS
 
 ; perform SQR()
 
@@ -8001,6 +8048,11 @@ LAB_CTBL
 	.word	LAB_IRQ-1		; IRQ			new command
 	.word	LAB_MODE-1		; MODE			VDP command
 	.word	LAB_CLS-1		; CLS			VDP command
+	.word	LAB_TEXTCOL-1	; TEXTCOL		VDP command
+	.word	LAB_SDLOAD-1	; SDLOAD		SD command
+	.word	LAB_SDSAVE-1	; SDSAVE		SD command
+	.word	LAB_SDDEL-1		; SDDEL		SD command
+	.word	LAB_SDDIR-1		; SDDIR		SD command
 	.word	LAB_NMI-1		; NMI			new command
 
 ; function pre process routine table
@@ -8392,6 +8444,14 @@ LBB_SADD
 	.byte	"ADD(",TK_SADD	; SADD(
 LBB_SAVE
 	.byte	"AVE",TK_SAVE	; SAVE
+LBB_SDDEL
+	.byte	"DDEL",TK_SDDEL	; SDDEL
+LBB_SDDIR
+	.byte	"DDIR",TK_SDDIR	; SDDIR
+LBB_SDLOAD
+	.byte	"DLOAD",TK_SDLOAD	; SDLOAD
+LBB_SDSAVE
+	.byte	"DSAVE",TK_SDSAVE	; SDSAVE
 LBB_SGN
 	.byte	"GN(",TK_SGN	; SGN(
 LBB_SIN
@@ -8414,6 +8474,8 @@ LBB_TAB
 	.byte	"AB(",TK_TAB	; TAB(
 LBB_TAN
 	.byte	"AN(",TK_TAN	; TAN(
+LBB_TEXTCOL
+	.byte	"EXTCOL",TK_TEXTCOL ; TEXTCOL
 LBB_THEN
 	.byte	"HEN",TK_THEN	; THEN
 LBB_TO
@@ -8538,13 +8600,23 @@ LAB_KEYT
 	.byte	6,'B'
 	.word	LBB_BITCLR		; BITCLR
 	.byte	3,'I'
-	.word	LBB_IRQ		; IRQ
+	.word	LBB_IRQ			; IRQ
 	.byte	4,'M'
-	.word	LBB_MODE	; VDP MODE
+	.word	LBB_MODE		; VDP MODE
 	.byte	3,'C'
-	.word	LBB_CLS		; VDP CLS
+	.word	LBB_CLS			; VDP CLS
+	.byte	7,'T'
+	.word	LBB_TEXTCOL		; VDP TEXTCOL
+	.byte	6,'S'
+	.word	LBB_SDLOAD		; SD SDLOAD
+	.byte	6,'S'
+	.word	LBB_SDSAVE		; SD SDSAVE
+	.byte	5,'S'
+	.word	LBB_SDDEL		; SD SDDEL
+	.byte	5,'S'
+	.word	LBB_SDDIR		; SD SDDIR
 	.byte	3,'N'
-	.word	LBB_NMI		; NMI
+	.word	LBB_NMI			; NMI
 
 ; secondary commands (can't start a statement)
 

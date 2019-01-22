@@ -4,7 +4,9 @@ string.s65 \
 video_common.s65 \
 video.s65 \
 main.s65 \
-print_util.s65
+print_util.s65 \
+sdcard.s65 \
+sd_fs.s65
 
 # May need to set CC65_LIB to path to compiler libs
 ifdef CC65_LIB
@@ -19,7 +21,7 @@ endif
 all: firmware
 
 firmware: $(SOURCES:.s65=.o)
-	cl65 -C firmware.cfg $(LIBS) -t none -o $@ -m map $^
+	cl65 -vm -C firmware.cfg $(LIBS) -t none -o $@ -m map $^
 
 clean:
 	 rm -f firmware *.o *.lst

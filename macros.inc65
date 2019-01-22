@@ -72,11 +72,17 @@
 .endmacro
 
 
+;.macro inc16 reg
+;            inc reg
+;            bne _mlbl_done
+;            inc reg+1
+;_mlbl_done: equ *
+;.endmacro
 .macro inc16 reg
             inc reg
-            bne _mlbl_done
+            bne @_mlbl_done
             inc reg+1
-_mlbl_done: equ *
+@_mlbl_done:
 .endmacro
 
 .macro dec16 reg
@@ -98,3 +104,9 @@ _mlbl_skip: dec reg
     STA reg+1
 .endmacro
 
+.macro cpyword worda,wordb
+	lda worda
+	sta wordb
+	lda worda+1
+	sta wordb+1
+.endmacro

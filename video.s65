@@ -242,12 +242,23 @@ vis_loop:       STX VDP_WR_VRAM
 ;================================================================
 ; Set base colors (VDP reg 7) 
 vdp_set_base_colors:
+				STA TMP0
+				STX TMP1
+				STY TMP2
                 ; save color in ZP regs
                 STA ZP_VDP_REGS+7
                 ; set BG/FG Col
                 LDY #$87
                 JSR vdp_regwrite    ;; write value of Acc to Reg 7 (Col)
-                RTS
+				LDA ZP_VDP_MODE
+				BEQ @done_set_base_cols	; Mode 0 we are done
+				LDA TMP0
+				JSR vdp_load_flat_colors
+@done_set_base_cols: 
+				LDA TMP0
+				LDX TMP1
+				LDY TMP2
+				RTS
 ;----------------------------------------------------------------
 
 ;================================================================
@@ -458,7 +469,8 @@ vdp_write_char:
 				RTS
 @check_bksp:    CMP #$08			;; Backspace
 				BNE vwc_write_char
-vdp_backspace:  JSR vdp_move_back_char ;; move back
+vdp_backspace:  
+				JSR vdp_move_back_char ;; move back
                 JSR vdp_start_str_w
 				LDA #$20			;; and write a space
 				STA VDP_WR_VRAM
@@ -468,6 +480,26 @@ vwc_write_char:
 				STA VDP_WR_VRAM		;; write the char
                 JSR vdp_inc_pos
 				RTS
+
+vdp_draw_cursor:
+				pha
+				LDA ZP_CURSOR
+				BEQ @nocursor
+				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
+				;LDA #$1D
+				STA VDP_WR_VRAM
+				pla
+@nocursor:		RTS
+
+vdp_clear_cursor:
+				pha
+				LDA ZP_CURSOR
+				BEQ @nocursor
+				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
+				LDA #$20
+				STA VDP_WR_VRAM
+				pla
+@nocursor:		RTS
 ;===============================================================================
 
 ;------------------------------------------------------

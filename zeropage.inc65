@@ -31,3 +31,22 @@ ZP_SPR_NUM = $40
 ZP_TMP2    = $42
 ZP_TMP3    = $43
 
+ZP_CURSOR  = $44
+
+;-----------------------------------------------------------
+; for Dolo Miah's SD card and FAT16 driver
+; SD card driver parameters
+sd_slo		= $E0		; 1 Sector pointer low
+sd_shi		= $E1		; 1 Sector pointer high
+sd_sect		= $E2		; 4 SD Card sector address
+sd_addr		= $E6		; 4 SD Card byte address
+
+; File system parameters
+fs_bootsect	= $44		; 4 Start of partition (usually 0x0000)
+fs_fatsect	= $48		; 4 Start of FAT tables
+fs_rootsect	= $4C		; 4 Start of Root Directory
+fs_datasect	= $50		; 4 Start of Data Area
+fs_dirsect	= $54		; 4 Current directory
+;-----------------------------------------------------------
+
+
