@@ -805,6 +805,8 @@ LAB_1274
 
 ; wait for Basic command (no "Ready")
 WAIT_CMD:
+	JSR vdp_cursor_on
+
 	LDA #<LAB_PROMPT
 	LDY #>LAB_PROMPT
 	JSR	LAB_18C3		; go do print string
@@ -816,6 +818,8 @@ LAB_1280
 	STY	Bpntrh		; set BASIC execute pointer high byte
 	JSR	LAB_GBYT		; scan memory
 	BEQ	WAIT_CMD		; loop while null
+
+	JSR vdp_cursor_off
 
 ; got to interpret input line now ..
 

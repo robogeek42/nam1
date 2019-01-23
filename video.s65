@@ -23,7 +23,8 @@
         .export vdp_load_number_name_table
         .export vdp_load_mc_standard_name_table
         .export vdp_copy
-
+		.export vdp_cursor_on
+		.export vdp_cursor_off
 
 .bss
 page_buffer:    .res 256, 0
@@ -57,6 +58,9 @@ vdp_sm_loop:    LDA (ZP_TMP0), Y        ; Load register value from mode tab
                 INX
                 CPY #8
                 BNE vdp_sm_loop
+
+				;LDA #0
+				;STA ZP_CURSOR
 
                 ;; set some mode specific vars
                 LDA ZP_VDP_MODE
@@ -461,24 +465,31 @@ vdp_move_back_char:
 vdp_write_char:
                 CMP #$0A            ;; Line feed
 				BNE @check_cr
+				JSR vdp_clear_cursor
 				JSR vdp_move_line_down
+				JSR vdp_cursor_off
 				RTS
 @check_cr:      CMP #$0D            ;; Carriage return
 				BNE @check_bksp
+				JSR vdp_clear_cursor
 				JSR vdp_move_to_start_line
+				JSR vdp_cursor_off
 				RTS
 @check_bksp:    CMP #$08			;; Backspace
 				BNE vwc_write_char
 vdp_backspace:  
+				JSR vdp_clear_cursor
 				JSR vdp_move_back_char ;; move back
                 JSR vdp_start_str_w
 				LDA #$20			;; and write a space
 				STA VDP_WR_VRAM
+				JSR vdp_draw_cursor
 				RTS
 vwc_write_char: 
 				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
 				STA VDP_WR_VRAM		;; write the char
                 JSR vdp_inc_pos
+				JSR vdp_draw_cursor
 				RTS
 
 vdp_draw_cursor:
@@ -488,18 +499,30 @@ vdp_draw_cursor:
 				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
 				;LDA #$1D
 				STA VDP_WR_VRAM
-				pla
-@nocursor:		RTS
+@nocursor:		pla
+				RTS
 
 vdp_clear_cursor:
 				pha
 				LDA ZP_CURSOR
-				BEQ @nocursor
+				BEQ @nocursor2
 				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
 				LDA #$20
 				STA VDP_WR_VRAM
+@nocursor2:		pla
+				RTS
+vdp_cursor_on:
+				pha
+				LDA #$1D
+				STA ZP_CURSOR
 				pla
-@nocursor:		RTS
+				RTS
+vdp_cursor_off:
+				pha
+				LDA #0
+				STA ZP_CURSOR
+				pla
+				RTS
 ;===============================================================================
 
 ;------------------------------------------------------

@@ -9,7 +9,8 @@ MACROTMP = $2C
 
 ZP_TMP0  = $2D
 ZP_TMP1  = $2E
-;ZP_TMP2  = $2F
+
+ZP_CURSOR  = $2F	; Cursor char to print 0=cursor off
 
 ;-----------------------------------------------------------
 ; VDP - 16 bytes
@@ -31,7 +32,6 @@ ZP_SPR_NUM = $40
 ZP_TMP2    = $42
 ZP_TMP3    = $43
 
-ZP_CURSOR  = $44
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver

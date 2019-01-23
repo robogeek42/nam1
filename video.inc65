@@ -11,3 +11,5 @@
 .import vdp_load_number_name_table
 .import vdp_load_mc_standard_name_table
 .import vdp_copy
+.import vdp_cursor_on
+.import vdp_cursor_off
