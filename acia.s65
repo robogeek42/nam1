@@ -1,4 +1,4 @@
-.setcpu "6502"
+.setcpu "65C02"
 .include "zeropage.inc65"
 .include "io.inc65"
 .include "macros.inc65"

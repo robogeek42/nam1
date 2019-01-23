@@ -1,4 +1,4 @@
-		.setcpu "6502"
+		.setcpu "65C02"
         .include "zeropage.inc65"
         .include "acia.inc65"
         .include "string.inc65"

@@ -1,6 +1,6 @@
 ; TMS9918A/9929A Video Control
 ;
-        .setcpu "6502"
+        .setcpu "65C02"
         .include "zeropage.inc65"
         .include "acia.inc65"
         .include "string.inc65"
@@ -9,6 +9,7 @@
 		.include "video_registers.inc65"
 		.include "video_common.inc65"
 		.include "video_chartable_1.inc65"
+		.include "sprite.inc65"
 
         .export vdp_set_mode
         .export vdp_clear_screen
@@ -17,7 +18,6 @@
 		.export vdp_write_char
         .export vdp_write_text
 		.export vdp_backspace
-        .export vdp_init_sprites
         .export vdp_load_flat_colors
         .export vdp_set_base_colors
         .export vdp_load_number_name_table
@@ -218,29 +218,6 @@ lgc2_loop:      STA VDP_WR_VRAM
                 DEX
                 BNE lgc2_loop_outer
                 RTS
-
-;================================================================
-; Initialise sprites - all off
-vdp_init_sprites:
-                LDY ZP_VDP_SAB
-                LDA ZP_VDP_SAB+1
-                JSR vdp_set_addr_w
-                ;; 32 sprites 4 bytes each = 128
-                LDY #128
-                LDX #$D0    ;; D0 in vertical pos turns off sprite processing
-                LDA #0      ;; zero in other 3 fields
-vis_loop:       STX VDP_WR_VRAM
-                DEY             ;; 2 cycles = 2us at 1MHz
-                STA VDP_WR_VRAM
-                DEY
-                STA VDP_WR_VRAM
-                DEY
-                STA VDP_WR_VRAM
-                DEY
-                BNE vis_loop
-                RTS
-
-;----------------------------------------------------------------
 
 
 ;================================================================

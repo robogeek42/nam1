@@ -5,7 +5,6 @@
 .import vdp_write_char
 .import vdp_write_text
 .import vdp_backspace
-.import vdp_init_sprites
 .import vdp_load_flat_colors
 .import vdp_set_base_colors
 .import vdp_load_number_name_table

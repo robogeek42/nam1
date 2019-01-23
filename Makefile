@@ -5,6 +5,7 @@ video_common.s65 \
 video.s65 \
 main.s65 \
 print_util.s65 \
+sprite.s65 \
 sdcard.s65 \
 sd_fs.s65
 

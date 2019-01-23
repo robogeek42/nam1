@@ -1,4 +1,4 @@
-		.setcpu "6502"
+		.setcpu "65C02"
         .include "zeropage.inc65"
         .include "macros.inc65"
 		.include "video_common.inc65"
@@ -7,6 +7,7 @@
         .export spr_set_large
         .export spr_set_mag_on
         .export spr_set_mag_off
+        .export vdp_init_sprites
 
 ;.bss
 
@@ -22,40 +23,72 @@
 
 .code
 
+;================================================================
 ;; Sprite routines
 
-spr_set_small:
-                ;; set small sprites in registers
+spr_set_small: ;; set small sprites in registers
+				phay
                 LDA ZP_VDP_REGS+1
                 AND #$FD
                 STA ZP_VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
+				play
                 RTS
                 
-spr_set_large:
-                ;; set large sprites in registers
+spr_set_large: ;; set large sprites in registers
+				phay
                 LDA ZP_VDP_REGS+1
                 ORA #$02
                 STA ZP_VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
+				play
                 RTS                
 
-spr_set_mag_on:
+spr_set_mag_on: 
+				phay
                 LDA ZP_VDP_REGS+1
                 ORA #$01
                 STA ZP_VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
+				play
                 RTS                
 
 spr_set_mag_off:
+				phay
                 LDA ZP_VDP_REGS+1
                 AND #$FE
                 STA ZP_VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
+				play
                 RTS                
 
+
+;----------------------------------------------------------------
+; Initialise sprites - all off
+vdp_init_sprites:
+				phay
+                LDY ZP_VDP_SAB
+                LDA ZP_VDP_SAB+1
+                JSR vdp_set_addr_w
+                ;; 32 sprites 4 bytes each = 128
+                LDY #128
+                LDX #$D0    ;; D0 in vertical pos turns off sprite processing
+                LDA #0      ;; zero in other 3 fields
+vis_loop:       STX VDP_WR_VRAM
+                DEY             ;; 2 cycles = 2us at 1MHz
+                STA VDP_WR_VRAM
+                DEY
+                STA VDP_WR_VRAM
+                DEY
+                STA VDP_WR_VRAM
+                DEY
+                BNE vis_loop
+				play
+                RTS
+
+;----------------------------------------------------------------
 
