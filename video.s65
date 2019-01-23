@@ -59,8 +59,8 @@ vdp_sm_loop:    LDA (ZP_TMP0), Y        ; Load register value from mode tab
                 CPY #8
                 BNE vdp_sm_loop
 
-				;LDA #0
-				;STA ZP_CURSOR
+				LDA #0
+				STA ZP_CURSOR
 
                 ;; set some mode specific vars
                 LDA ZP_VDP_MODE

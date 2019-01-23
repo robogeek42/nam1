@@ -91,4 +91,30 @@ vis_loop:       STX VDP_WR_VRAM
                 RTS
 
 ;----------------------------------------------------------------
-
+; Enable first N sprites (N in Acc)
+; only write name - don't affect other numbers (i.e. pos/col)
+; Max N is 32, 0 = Disable all
+; SAB is on 128 byte boundary so sprite address can be added to 
+; LSB of SAB table address without doing 16bit add
+vdp_enable_sprites:
+				phaxy
+				STA TMP0			; save N
+				LDX #32				; counter (all 32)
+				LDY ZP_VDP_SAB		; SAB lo
+ves_loop:		LDA ZP_VDP_SAB+1	; hi
+                JSR vdp_set_addr_w
+				DEX
+				CPX TMP0
+				BCC @enable			; Branch if X < TMP0
+				LDA #$D0
+				JMP @dowrite
+@enable:		LDA #0 
+@dowrite:		STA VDP_WR_VRAM
+				INY
+				INY
+				INY
+				INY
+				CPX #0
+				BNE ves_loop
+				plaxy
+				RTS
