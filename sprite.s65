@@ -8,6 +8,12 @@
         .export spr_set_mag_on
         .export spr_set_mag_off
         .export vdp_init_sprites
+		.export vdp_enable_sprites
+		.export vdp_set_sprite_pos
+		.export vdp_set_sprite_col
+		.export vdp_set_sprite_early
+		.export vdp_set_sprite_pattern
+		.export vdp_load_sprite_data_from_mem
 
 ;.bss
 
@@ -69,8 +75,13 @@ spr_set_mag_off:
 
 ;----------------------------------------------------------------
 ; Initialise sprites - all off
+; 	VPosY    = $D0
+; 	VPosX    = $00
+; 	Pattern  = $00
+; 	EClk/Col = $00
+;
 vdp_init_sprites:
-				phay
+				phaxy
                 LDY ZP_VDP_SAB
                 LDA ZP_VDP_SAB+1
                 JSR vdp_set_addr_w
@@ -87,34 +98,145 @@ vis_loop:       STX VDP_WR_VRAM
                 STA VDP_WR_VRAM
                 DEY
                 BNE vis_loop
-				play
+				plaxy
                 RTS
 
 ;----------------------------------------------------------------
 ; Enable first N sprites (N in Acc)
-; only write name - don't affect other numbers (i.e. pos/col)
+; only write posy - don't affect other numbers (i.e. posx/pattern/col)
 ; Max N is 32, 0 = Disable all
 ; SAB is on 128 byte boundary so sprite address can be added to 
 ; LSB of SAB table address without doing 16bit add
 vdp_enable_sprites:
 				phaxy
-				STA TMP0			; save N
-				LDX #32				; counter (all 32)
+				LDX #0				; counter (all 32)
 				LDY ZP_VDP_SAB		; SAB lo
 ves_loop:		LDA ZP_VDP_SAB+1	; hi
                 JSR vdp_set_addr_w
-				DEX
-				CPX TMP0
-				BCC @enable			; Branch if X < TMP0
+				CPX ZP_TMP0			; ZP_TMP0 has N
+				BCC @enable			; Branch if X < N
 				LDA #$D0
 				JMP @dowrite
 @enable:		LDA #0 
 @dowrite:		STA VDP_WR_VRAM
+				INY					; move to next sprite
 				INY
 				INY
 				INY
-				INY
-				CPX #0
+				INX					; counter++
+				CPX #32
 				BNE ves_loop
 				plaxy
 				RTS
+
+;----------------------------------------------------------------
+; Set position of Sprite S
+; Sprite number in ZP_TMP0, Pos X in ZP_TMP1, Pos Y in ZP_TMP2
+vdp_set_sprite_pos:
+				phay
+				CLC
+				LDA ZP_TMP0			; S*4
+				ASL
+				ASL
+				ADC ZP_VDP_SAB		; add LSB of base
+                TAY
+                LDA ZP_VDP_SAB+1
+                JSR vdp_set_addr_w
+				LDA ZP_TMP1
+				STA VDP_WR_VRAM
+				LDA ZP_TMP2
+				STA VDP_WR_VRAM
+				play
+				RTS
+
+;----------------------------------------------------------------
+; Set color of Sprite S
+; Sprite number in ZP_TMP0, Color in ZP_TMP1
+vdp_set_sprite_col:
+				phay
+				CLC
+				LDA ZP_TMP0			; S*4
+				ASL
+				ASL
+				ADC ZP_VDP_SAB		; add LSB of base
+				ADC #3				; 4th member
+                TAY
+                LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_r	; read current value of colour/earlyclock
+				LDA VDP_RD_VRAM
+				AND #$F0			; preserve the clock bit
+				ORA ZP_TMP1			; and write new color
+				STA ZP_TMP1			; save
+                LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_w	; set address again - write this time
+				LDA ZP_TMP1			; write modified color to VRAM
+				STA VDP_WR_VRAM
+				play
+				RTS
+
+;----------------------------------------------------------------
+; Set Early Clock bit of Sprite S
+; Sprite number in ZP_TMP0, Clock bit in ZP_TMP1 (either $80=on or $00=off)
+vdp_set_sprite_early:
+				phay
+				CLC
+				LDA ZP_TMP0			; S*4
+				ASL
+				ASL
+				ADC ZP_VDP_SAB		; add LSB of base
+				ADC #3				; 4th member
+                TAY
+                LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_r	; read current value of colour/earlyclock
+				LDA VDP_RD_VRAM
+				AND #$0F			; preserve the colour nibble
+				ORA ZP_TMP1
+				STA ZP_TMP1			; save
+                LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_w	; set address again - write this time
+				LDA ZP_TMP1			; write modified color to VRAM
+				STA VDP_WR_VRAM
+				play
+				RTS
+
+
+;----------------------------------------------------------------
+; Set pattern of Sprite S
+; Sprite number in ZP_TMP0, Pattern name P in ZP_TMP1
+vdp_set_sprite_pattern:
+				phay
+				CLC
+				LDA ZP_TMP0			; S*4
+				ASL
+				ASL
+				ADC ZP_VDP_SAB		; add LSB of base
+				ADC #2				; 3rd member
+                TAY
+                LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_w	; set write address
+				LDA ZP_TMP1
+				STA VDP_WR_VRAM
+				play
+				RTS
+
+;----------------------------------------------------------------
+; Set data of sprite S from address in ZP
+; Sprite Pattern number in ZP_TMP0, address in ZP_TMP1/2 (low/hi)
+vdp_load_sprite_data_from_mem:
+				phay
+				CLC
+				LDA ZP_TMP0			; S*4
+				ASL
+				ASL
+				ADC ZP_VDP_SAB		; add LSB of base
+                TAY
+                LDA ZP_VDP_SAB+1
+                JSR vdp_set_addr_w
+				LDY #4
+@vssp_loop:		LDA (ZP_TMP1),Y
+				STA VDP_WR_VRAM
+				DEY
+				BNE @vssp_loop
+				play
+				RTS
+

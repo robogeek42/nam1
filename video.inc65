@@ -1,3 +1,4 @@
+.import vdp_dump_page
 .import vdp_set_mode
 .import vdp_clear_screen
 .import vdp_load_chars

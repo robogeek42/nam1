@@ -14,13 +14,14 @@ buffer:         .res BUFFER_LENGTH + 1, 0
 .code
 
 print_memory16:  
-                ; address to print is in RES,RES+1
+                ; address is in RES,RES+1
+				; address to print is in R1,R1+1
                 ; First print 4 char address
                 ld16 R0, buffer
-                lda RES + 1
+                lda R1 + 1
                 jsr fmt_hex_string
                 ld16 R0, buffer + 2
-                lda RES
+                lda R1
                 jsr fmt_hex_string
                 ld16 R0, buffer
                 jsr acia_puts

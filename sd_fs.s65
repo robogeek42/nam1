@@ -34,6 +34,19 @@
 .include "macros.inc65"
 .include "sdcard.inc65"
 
+.export init_fs
+.export sdfs_file_to_fh
+.export sdfs_set_dir_ptr
+.export sdfs_set_dir_filesize_ptr
+.export fs_put_byte
+.export fs_get_next_byte
+.export fs_dir_root_start
+.export fs_dir_find_entry
+.export fs_delete
+.export fs_open_read
+.export fs_open_write
+.export fs_close
+
 ;* The FileHandle stucture is key to
 ;* accessing the file system
 	.struct FileHandle
@@ -58,6 +71,33 @@ fh_dir:		.tag FileHandle
 
 ; ROM code
 .code
+
+;-----------------------------------------
+; BASIC linkage - Assif
+; copy filename string to filehandle
+sdfs_file_to_fh:
+	ldy #0
+_sdfs_copy_fn
+	lda (ZP_TMP2),y
+	bit #$40				; If 0x40 bit not set
+	beq _sdfs_fname_case	; then not an alpha char
+	and #$df				; Else mask out 0x20 bit to make upper case
+_sdfs_fname_case	
+	sta fh_handle,y
+	iny
+	cmp #0
+	bne _sdfs_copy_fn
+	rts
+
+sdfs_set_dir_ptr:
+	LDX #<fh_dir
+	LDA #>fh_dir
+	RTS
+sdfs_set_dir_filesize_ptr:
+	LDX fh_dir+FileHandle::FH_Size			; Low byte of size
+	LDA fh_dir+FileHandle::FH_Size+1		; High byte of size
+	RTS
+;-----------------------------------------
 
 ;****************************************
 ;* init_fs

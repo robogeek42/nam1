@@ -1,0 +1,12 @@
+.import init_fs
+.import sdfs_file_to_fh
+.import sdfs_set_dir_ptr
+.import sdfs_set_dir_filesize_ptr
+.import fs_put_byte
+.import fs_get_next_byte
+.import fs_dir_root_start
+.import fs_dir_find_entry
+.import fs_delete
+.import fs_open_read
+.import fs_open_write
+.import fs_close

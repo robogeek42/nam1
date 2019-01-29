@@ -10,7 +10,9 @@
 		.include "video_common.inc65"
 		.include "video_chartable_1.inc65"
 		.include "sprite.inc65"
+		.include "print_util.inc65"
 
+		.export vdp_dump_page
         .export vdp_set_mode
         .export vdp_clear_screen
         .export vdp_load_chars
@@ -291,6 +293,34 @@ cs_loop1:       STA VDP_WR_VRAM
                 BNE cs_loop1
                 JMP cs_reset_cursor
 ;----------------------------------------------------------------
+
+;================================================================
+; Dump VRAM page 
+vdp_dump_page:
+                ; read back to CPU memory
+                ld16 RES, page_buffer   ;; set read-back address
+                LDY #0                  ;; set VDP VRAM read address (and test 256 bytes)
+				LDA ZP_TMP0				;; page
+                JSR vdp_set_addr_r
+vt1_loop1:      LDA VDP_RD_VRAM         ;; read back
+                STA (RES),Y
+                INY
+                BNE vt1_loop1
+
+                ; print out the page
+                LDX #$10            ;; 16*16 bytes
+				LDA ZP_TMP0 
+				STA R1+1
+				LDA #0
+				STA R1
+vt1_loop2:      JSR print_memory16  ;; print 16 bytes from (RES) and inc RES by 16
+				CLC
+				LDA #16
+				ADC R1
+				STA R1
+                DEX
+                BNE vt1_loop2
+                RTS
 
 ;================================================================
 ; Write char and string
@@ -693,3 +723,4 @@ vdp_copy:
                 BNE @loop2
 
                 RTS
+

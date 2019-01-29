@@ -1,15 +1,18 @@
 .setcpu "65C02"
 
-.include "basic.asm"
-.include "zeropage.inc65"
-.include "io.inc65"
-.include "acia.inc65"
-.include "string.inc65"
 .include "macros.inc65"
+.include "zeropage.inc65"
+.include "acia.inc65"
+.include "basic.asm"
+.include "io.inc65"
+.include "string.inc65"
 .include "print_util.inc65"
 .include "video.inc65"
 .include "video_common.inc65"
 .include "video_registers.inc65"
+.include "sprite.inc65"
+.include "sdcard.inc65"
+.include "sd_fs.inc65"
 ;.include "video_test.inc65"
 
 IRQ_vec	= VEC_SV+2		; IRQ code vector
@@ -47,6 +50,15 @@ LAB_stlp:
                 ; initialise ACIA serial comms
                 JSR acia_init
 
+.ifdef SDIO
+				; SD Card and filesystem
+				LDA #(SD_CLK | SD_CS | SD_DI)	; Set output pins
+				sta VIA2 + VIA_DDRB				; SD card is attached to PortB of VIA2
+	
+				JSR init_sdcard
+				JSR init_fs
+.endif
+
                 ; display welcome message in the Serial Console
                 ld16 R0, msg_welcome
                 JSR acia_puts
@@ -66,6 +78,7 @@ LAB_stlp:
 
 ; ---------------------------------------------------------
 ; -- Command loop
+main_monitor:
                 ; display prompt 
 loop:           ld16 R0, prompt
                 JSR acia_puts
@@ -94,10 +107,22 @@ loop:           ld16 R0, prompt
                 jmp loop
 
 @cmd_b:         cmp #'b'
-                bne @cmd_h
+				bne @cmd_vd
 				jsr cmd_basic
                 jmp loop
 
+@cmd_vd:		cmp #'v'
+				bne @end_cmd_vd
+				lda buffer+1
+				cmp #'d'
+				bne @end_cmd_vd
+				lda buffer+2
+				cmp #' '
+				bne @end_cmd_vd
+				jsr cmd_vram_dump
+				jmp loop
+
+@end_cmd_vd:
                 ; h = print help
 @cmd_h:         cmp #'h'
                 bne @cmd_empty
@@ -202,6 +227,15 @@ cmd_jump:         ld16 R0, buffer + 2
 
 @jump:          jmp (RES)
 
+;-----------------------------------------------------
+; vd <page> - dump 256 bytes from <page> 
+cmd_vram_dump:
+				ld16 R0, buffer+3
+                JSR scan_hex        ; scan 2 byte hex value into acc
+                STA ZP_TMP0
+				JSR vdp_dump_page
+				RTS
+				
 ;-----------------------------------------------------
 ; run Basic - b[cw]
 ;

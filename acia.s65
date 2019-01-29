@@ -33,13 +33,17 @@ wait_txd_empty:   lda ACIA_STATUS
                   rts
 
 ; Send the zero terminated string pointed to by R0
-acia_puts:        phay
+acia_puts:        ;phay
+				  pha
+				  phy
                   ldy #$ff
 next_char:        iny
                   lda (R0),y
                   jsr acia_putc
                   bne next_char
-                  play
+                  ;play
+				  ply
+				  pla
                   rts
 
 ; ACIA entry point

@@ -282,10 +282,10 @@ IrqBase		= $DF		; IRQ handler enabled/setup/triggered flags
 ;			= $E7		; sd card
 ;			= $E8		; sd card
 ;			= $E9		; sd card
-;			= $EA		; unused
-;			= $EB		; unused
-;			= $EC		; unused
-;			= $ED		; unused
+NAM_TMP0	= $EA		; unused
+NAM_TMP1	= $EB		; unused
+NAM_TMP2	= $EC		; unused
+NAM_TMP3	= $ED		; unused
 ;			= $EE		; unused
 
 Decss			= $EF		; number to decimal string start
@@ -339,18 +339,27 @@ TK_SWAP		= TK_GET+1		; SWAP token
 TK_BITSET		= TK_SWAP+1		; BITSET token
 TK_BITCLR		= TK_BITSET+1	; BITCLR token
 TK_IRQ		= TK_BITCLR+1	; IRQ token
-TK_MODE		= TK_IRQ+1		; VDP MODE token
+TK_NMI		= TK_IRQ+1		; NMI token
+TK_MON		= TK_NMI+1		; MON token
+TK_MODE		= TK_MON+1		; VDP MODE token
 TK_CLS		= TK_MODE+1		; VDP CLS token
 TK_TEXTCOL		= TK_CLS+1		; VDP TEXTCOL token
 TK_SDLOAD	= TK_TEXTCOL+1		; SD SDLOAD
 TK_SDSAVE	= TK_SDLOAD+1		; SD SDSAVE
 TK_SDDEL	= TK_SDSAVE+1		; SD SDDEL
 TK_SDDIR	= TK_SDDEL+1		; SD SDDIR
-TK_NMI		= TK_SDDIR+1		; NMI token
+TK_SPR_COLOUR		= TK_SDDIR+1			; SPR_COLOUR
+TK_SPR_EARLY_OFF 	= TK_SPR_COLOUR+1		; SPR_EARLY_OFF
+TK_SPR_EARLY_ON		= TK_SPR_EARLY_OFF+1	; SPR_EARLY_ON
+TK_SPR_ENABLE 		= TK_SPR_EARLY_ON+1		; SPR_ENABLE 
+TK_SPR_LOADP 		= TK_SPR_ENABLE+1		; SPR_LOADP
+TK_SPR_PATTERN 		= TK_SPR_LOADP+1		; SPR_PATTERN
+TK_SPR_POS 			= TK_SPR_PATTERN+1		; SPR_POS
+TK_SPR_SET_TYPE 	= TK_SPR_POS+1			; SPR_SET_TYPE
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB		= TK_NMI+1		; TAB token
+TK_TAB		= TK_SPR_SET_TYPE+1		; TAB token
 TK_ELSE		= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -785,10 +794,12 @@ LAB_1269
 	JSR	LAB_18C3		; print null terminated string from memory
 	LDY	Clineh		; get current line high byte
 	INY				; increment it
-	BEQ	LAB_1274		; go do warm start (was immediate mode)
+	BEQ	LAB_WARM_CRLF		; go do warm start (was immediate mode)
 
 					; else print line number
 	JSR	LAB_2953		; print " in line [LINE #]"
+LAB_WARM_CRLF
+	JSR LAB_CRLF
 
 ; BASIC warm start entry point
 ; wait for Basic command
@@ -1405,6 +1416,7 @@ LAB_1519
 	BNE	LAB_14E2		; go do next line if not [EOT]
 					; else ..
 LAB_152B
+	JSR LAB_CRLF	;; extra CR/LF at end because Ready no longer does
 	RTS
 
 LAB_152E
@@ -7532,6 +7544,10 @@ LAB_PHFA
 					; returns A=$01 if FAC1 > (AY)
 					; returns A=$FF if FAC1 < (AY)
 
+; MON - return to Monitor
+LAB_MON
+	JMP main_monitor
+
 ; perform MODE (VDP Set Mode)
 LAB_MODE
 	JSR	LAB_GTBY	; get byte parameter
@@ -7638,34 +7654,6 @@ LAB_NOSQ
 
 TabErr
 	JMP	LAB_FCER		; do function call error then warm start
-
-; perform SDLOAD <filename>
-LAB_SDLOAD
-	JSR	LAB_EVEX		; evaluate expression
-	BIT	Dtypef		; test data type flag, $FF=string, $00=numeric
-	BPL	SDL_NOTSTR		; branch if not string
-	JSR	LAB_18C6		; print string from Sutill/Sutilh
-SDL_NOTSTR
-	RTS
-; perform SDSAVE <filename>
-LAB_SDSAVE
-	JSR	LAB_EVEX		; evaluate expression
-	BIT	Dtypef		; test data type flag, $FF=string, $00=numeric
-	BPL	SDS_NOTSTR		; branch if not string
-	JSR	LAB_18C6		; print string from Sutill/Sutilh
-SDS_NOTSTR
-	RTS
-; perform SDDEL <filename>
-LAB_SDDEL
-	JSR	LAB_EVEX		; evaluate expression
-	BIT	Dtypef		; test data type flag, $FF=string, $00=numeric
-	BPL	SDD_NOTSTR		; branch if not string
-	JSR	LAB_18C6		; print string from Sutill/Sutilh
-SDD_NOTSTR
-	RTS
-; perform SDDIR
-LAB_SDDIR
-	RTS
 
 ; perform SQR()
 
@@ -7794,6 +7782,286 @@ LAB_TWOPI
 	LDY	#>LAB_2C7C		; set (2*pi) pointer high byte
 	JMP	LAB_UFAC		; unpack memory (AY) into FAC1 and return
 
+; Sprite Set type SPR_SET_TYPE <T>
+;  	T=0  8x8   unmagnified
+;	T=1  16x16 unmagnified
+;  	T=2  8x8   double sized
+;  	T=3  16x16 double sized
+LAB_SPR_SET_TYPE
+	JSR	LAB_GTBY	; get byte parameter T in X
+	TXA
+	CMP #0
+	BEQ sst_0
+	CMP #1
+	BEQ sst_1
+	CMP #2
+	BEQ sst_2
+	CMP #3
+	BEQ sst_3
+	JMP LAB_SNER	; Syntax error if none of the above
+sst_0:
+	JSR spr_set_small
+	JSR spr_set_mag_off
+	RTS
+sst_1:
+	JSR spr_set_large
+	JSR spr_set_mag_off
+	RTS
+sst_2:
+	JSR spr_set_small
+	JSR spr_set_mag_on
+	RTS
+sst_3:
+	JSR spr_set_large
+	JSR spr_set_mag_on
+	RTS
+
+; Set sprite early clock bit on or off SPR_EARLY_ON <S> or SPR_EARLY_OFF <S>
+LAB_SPR_EARLY_ON
+	;ld16 R0,MSG_SEON
+	;jsr acia_puts
+	LDA #$80		; on
+	JMP spr_eo_l
+LAB_SPR_EARLY_OFF
+	;ld16 R0,MSG_SEOF
+	;jsr acia_puts
+	LDA #$00		; off
+spr_eo_l
+	STA ZP_TMP1	
+	JSR	LAB_GTBY	; get byte parameter
+	STX ZP_TMP0		; Store Sprite index S
+	JSR vdp_set_sprite_early
+	RTS
+; Sprite Enable SPR_ENABLE <N>   : Enable N sprites
+LAB_SPR_ENABLE
+	;ld16 R0,MSG_SENA
+	;jsr acia_puts
+	JSR	LAB_GTBY	; get byte parameter
+	STX ZP_TMP0		; Store number of sprites N
+	JSR vdp_enable_sprites
+	RTS
+; Set sprite pattern SPR_PATTERN <S>, <P>
+LAB_SPR_PATTERN
+	;ld16 R0,MSG_SPAT
+	;jsr acia_puts
+	JSR LAB_GADB		; get 2 integers seperated by comma
+						; 1st integer (S) in Itempl/h, 2nd in X
+	STX ZP_TMP1
+	LDA Itempl
+	STA ZP_TMP0
+	JSR vdp_set_sprite_pattern
+	RTS
+; Set sprite colour SPR_COLOUR <S>, <C>
+LAB_SPR_COLOUR
+	;ld16 R0,MSG_SCOL
+	;jsr acia_puts
+	JSR LAB_GADB		; get 2 integers seperated by comma
+						; 1st integer (S) in Itempl/h, 2nd in X
+	STX ZP_TMP1
+	LDA Itempl
+	STA ZP_TMP0
+	JSR vdp_set_sprite_col
+	RTS
+; Load spite pattern data from Address SPR_LOADP <Addr>,<P>
+LAB_SPR_LOADP
+	;ld16 R0,MSG_SLDP
+	;jsr acia_puts
+	JSR	LAB_GADB	; get two intergers (1st can be 16bit) 2nd is 8bit
+	STX ZP_TMP0		; Store pattern number
+	LDA Itempl
+	STA ZP_TMP1
+	LDA Itemph
+	STA ZP_TMP2
+	JSR vdp_load_sprite_data_from_mem
+	RTS
+; Set sprite position SPR_POS <S>, <X>, <Y>
+LAB_SPR_POS
+	;ld16 R0,MSG_SPOS
+	;jsr acia_puts
+	; read 3 vars
+	JSR	LAB_EVNM		; evaluate expression and check is numeric,
+						; else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+; scan for "," and get byte, else do Syntax error then warm start
+	JSR	LAB_1C01		; scan for "," , else do syntax error then warm start
+	LDA	Itempl		; save temporary integer low byte
+	STA ZP_TMP1
+	JSR	LAB_EVNM		; evaluate expression and check is numeric,
+						; else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+	JSR	LAB_1C01		; scan for "," , else do syntax error then warm start
+	LDA	Itempl		; save temporary integer low byte
+	STA ZP_TMP0
+	JSR	LAB_GTBY		; get byte parameter
+	STX ZP_TMP2
+	JSR vdp_set_sprite_pos
+	RTS
+
+;-----------------------------------------------------------------
+; SD card routines
+.ifdef SDIO
+; perform SDSAVE <filename>
+LAB_SDSAVE
+	pha
+	phx
+	phy
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
+	BPL	LAB_DO_SNER		; branch if not string. Syntax error.
+	;JSR	LAB_18C6		; print string from Sutill/Sutilh
+	LDA Sutill
+	STA ZP_TMP2
+	LDA Sutilh
+	STA ZP_TMP3
+	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
+	JSR fs_open_write	; start writing to file
+	BCS LAB_FSER		; File system error
+	; save tokenised basic program from Smeml/h up to (not including) Svarl/h
+	; we can assume it starts on a page boundary+1 - ie Smeml=1 ($300 is always 0)
+	; last 3 bytes should always be 0
+	LDA #0 ;Smeml		; save start pointer - page aligned for ease
+	STA ZP_TMP0			; read pointer Lo
+	LDA Smemh
+	STA ZP_TMP1			; read pointer Hi
+save_check_last_page:
+	CMP Svarh			; if ReadPtrHi=EndPtrHi the remaining is < 256 bytes in total 
+	BEQ save_lastpage	; save the remaining bytes
+	BCS LAB_DO_OMER		; if End > Start, something is wrong
+	LDY #0				; else save page by page
+save_pageloop:
+	LDA (ZP_TMP0),Y
+	JSR fs_put_byte
+	INY
+	BNE save_pageloop
+	INC ZP_TMP1			; next page
+	LDA ZP_TMP1
+	JMP save_check_last_page
+save_lastpage:
+	LDY #0
+save_lp_loop:
+	LDA (ZP_TMP0),Y
+	JSR fs_put_byte
+	INY
+	CMP Svarh
+	BNE save_lp_loop
+	; Program saved, now close file
+	JSR fs_close
+	ply
+	plx
+	pla
+	RTS
+
+LAB_FSER
+	LDX	#$24			; error code $24 ("Filesystem" error)
+	JMP	LAB_XERR		; do error #X, then warm start
+
+LAB_DO_SNER
+	JMP LAB_SNER
+LAB_DO_OMER
+	JMP LAB_OMER
+
+; perform SDLOAD <filename>
+LAB_SDLOAD
+	pha
+	phx
+	phy
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
+	BPL	LAB_DO_SNER		; Syntax error if not string
+	;JSR	LAB_18C6		; print string from Sutill/Sutilh
+	LDA Sutill
+	STA ZP_TMP2
+	LDA Sutilh
+	STA ZP_TMP3
+	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
+	JSR fs_open_read
+	BCS LAB_FSER		; File system error
+	JSR	LAB_1463		; do "NEW" and "CLEAR"
+	LDA #0 ;Smeml		; save start pointer - page aligned (that is how it was saved)
+	STA ZP_TMP0			; write pointer Lo
+	LDA Smemh
+	STA ZP_TMP1			; write pointer Hi
+load_loop:
+	JSR fs_get_next_byte	; byte in A, C=1 on EOF
+	BCS load_eof
+	STA (ZP_TMP0)		;
+	INC ZP_TMP0
+	BNE load_loop
+	INC ZP_TMP1
+	JMP load_loop
+load_eof:
+	ply
+	plx
+	pla
+	RTS
+
+
+; perform SDDEL <filename>
+LAB_SDDEL
+	pha
+	phx
+	phy
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
+	BPL	LAB_DO_SNER		; Syntax error if not string
+	;JSR	LAB_18C6		; print string from Sutill/Sutilh
+	JSR fs_delete
+	BCS LAB_FSER		; File system error
+	ply
+	plx
+	pla
+	RTS
+
+; perform SDDIR
+LAB_SDDIR
+	pha
+	phx
+	phy
+	JSR fs_dir_root_start		; Start at root
+dir_show_entry
+	CLC							; Only looking for valid files
+	JSR fs_dir_find_entry		; Find a valid entry
+	BCS dir_done				; If C then no more entries so done
+	JSR sdfs_set_dir_ptr		; load addr of fh_dir into X(lo)A(hi)
+	STX Sutill					; store them in string pointer so we can print
+	STA Sutilh
+	JSR	LAB_18C6				; print string (file name)
+	LDA #' '					; print spaces
+dir_pad
+	JSR V_OUTP
+	INY							; pad to 13 chars
+	CPY #13
+	BNE dir_pad
+	JSR sdfs_set_dir_filesize_ptr	; put filesize into X/A
+	JSR LAB_295E				; print number in X/A
+	JSR LAB_CRLF
+	BRA dir_show_entry			; Find another entry
+dir_done
+	CLC
+	ply
+	plx
+	pla
+	RTS
+.else
+LAB_SDSAVE
+	;ld16 R0,MSG_SDSV
+	;jsr acia_puts
+	RTS
+LAB_SDLOAD
+	;ld16 R0,MSG_SDLD
+	;jsr acia_puts
+	RTS
+LAB_SDDIR
+	;ld16 R0,MSG_SDDR
+	;jsr acia_puts
+	RTS
+LAB_SDDEL
+	;ld16 R0,MSG_SDDL
+	;jsr acia_puts
+	RTS
+.endif
+;-----------------------------------------------------------------
+
 ; system dependant i/o vectors
 ; these are in RAM and are set by the monitor at start-up
 
@@ -7889,7 +8157,7 @@ LAB_MSZM
 
 LAB_SMSG
 	.byte	" Bytes free",$0D,$0A,$0A
-	.byte	"Enhanced BASIC 2.22",$0A,$00
+	.byte	"Enhanced BASIC 2.22",$0D,$0A,$0A,$00
 
 ; numeric constants and series
 
@@ -8050,6 +8318,8 @@ LAB_CTBL
 	.word	LAB_BITSET-1	; BITSET		new command
 	.word	LAB_BITCLR-1	; BITCLR		new command
 	.word	LAB_IRQ-1		; IRQ			new command
+	.word	LAB_NMI-1		; NMI			new command
+	.word	LAB_MON-1		; MON			monitor
 	.word	LAB_MODE-1		; MODE			VDP command
 	.word	LAB_CLS-1		; CLS			VDP command
 	.word	LAB_TEXTCOL-1	; TEXTCOL		VDP command
@@ -8057,7 +8327,14 @@ LAB_CTBL
 	.word	LAB_SDSAVE-1	; SDSAVE		SD command
 	.word	LAB_SDDEL-1		; SDDEL		SD command
 	.word	LAB_SDDIR-1		; SDDIR		SD command
-	.word	LAB_NMI-1		; NMI			new command
+	.word	LAB_SPR_COLOUR-1		; SPR_COLOUR		VDP command
+	.word	LAB_SPR_EARLY_OFF-1		; SPR_EARLY_OFF		VDP command
+	.word	LAB_SPR_EARLY_ON-1		; SPR_EARLY_ON		VDP command
+	.word	LAB_SPR_ENABLE-1		; SPR_ENABLE		VDP command
+	.word	LAB_SPR_LOADP-1			; SPR_LOADP			VDP command
+	.word	LAB_SPR_PATTERN-1		; SPR_PATTERN		VDP command
+	.word	LAB_SPR_POS-1			; SPR_POS			VDP command
+	.word	LAB_SPR_SET_TYPE-1		; SPR_SET_TYPE		VDP command
 
 ; function pre process routine table
 
@@ -8388,6 +8665,8 @@ LBB_MIN
 	.byte	"IN(",TK_MIN	; MIN(
 LBB_MODE
 	.byte   "ODE",TK_MODE   ; MODE
+LBB_MON
+	.byte	"ON",TK_MON		; MON
 	.byte	$00
 TAB_ASCN
 LBB_NEW
@@ -8462,6 +8741,22 @@ LBB_SIN
 	.byte	"IN(",TK_SIN	; SIN(
 LBB_SPC
 	.byte	"PC(",TK_SPC	; SPC(
+LBB_SPR_COLOUR
+	.byte	"PR_COLOUR",TK_SPR_COLOUR	; SPR_COLOUR
+LBB_SPR_EARLY_OFF
+	.byte	"PR_EARLY_OFF",TK_SPR_EARLY_OFF	; SPR_EARLY_OFF
+LBB_SPR_EARLY_ON
+	.byte	"PR_EARLY_ON",TK_SPR_EARLY_ON	; SPR_EARLY_ON
+LBB_SPR_ENABLE
+	.byte	"PR_ENABLE",TK_SPR_ENABLE	; SPR_ENABLE
+LBB_SPR_LOADP
+	.byte	"PR_LOADP",TK_SPR_LOADP	; SPR_LOADP
+LBB_SPR_PATTERN
+	.byte	"PR_PATTERN",TK_SPR_PATTERN	; SPR_PATTERN
+LBB_SPR_POS
+	.byte	"PR_POS",TK_SPR_POS	; SPR_POS
+LBB_SPR_SET_TYPE
+	.byte	"PR_SET_TYPE",TK_SPR_SET_TYPE	; SPR_SET_TYPE
 LBB_SQR
 	.byte	"QR(",TK_SQR	; SQR(
 LBB_STEP
@@ -8605,6 +8900,10 @@ LAB_KEYT
 	.word	LBB_BITCLR		; BITCLR
 	.byte	3,'I'
 	.word	LBB_IRQ			; IRQ
+	.byte	3,'N'
+	.word	LBB_NMI			; NMI
+	.byte	3,'M'
+	.word	LBB_MON			; MON
 	.byte	4,'M'
 	.word	LBB_MODE		; VDP MODE
 	.byte	3,'C'
@@ -8619,8 +8918,22 @@ LAB_KEYT
 	.word	LBB_SDDEL		; SD SDDEL
 	.byte	5,'S'
 	.word	LBB_SDDIR		; SD SDDIR
-	.byte	3,'N'
-	.word	LBB_NMI			; NMI
+	.byte	10,'S'
+	.word	LBB_SPR_COLOUR	; SPR_COLOUR
+	.byte	13,'S'
+	.word	LBB_SPR_EARLY_OFF	; SPR_EARLY_OFF
+	.byte	12,'S'
+	.word	LBB_SPR_EARLY_ON	; SPR_EARLY_ON
+	.byte	10,'S'
+	.word	LBB_SPR_ENABLE		; SPR_ENABLE
+	.byte	9,'S'
+	.word	LBB_SPR_LOADP		; SPR_LOADP
+	.byte	11,'S'
+	.word	LBB_SPR_PATTERN		; SPR_PATTERN
+	.byte	7,'S'
+	.word	LBB_SPR_POS			; SPR_POS
+	.byte	12,'S'
+	.word	LBB_SPR_SET_TYPE	; SPR_SET_TYPE
 
 ; secondary commands (can't start a statement)
 
@@ -8770,6 +9083,7 @@ LAB_BAER
 	.word	ERR_CN		;$1E continue error
 	.word	ERR_UF		;$20 undefined function
 	.word ERR_LD		;$22 LOOP without DO
+	.word   ERR_FS      ;$24 Filesystem
 
 ; I may implement these two errors to force definition of variables and
 ; dimensioning of arrays before use.
@@ -8798,6 +9112,7 @@ ERR_ST	.byte	"String too complex",$00
 ERR_CN	.byte	"Can't continue",$00
 ERR_UF	.byte	"Undefined function",$00
 ERR_LD	.byte	"LOOP without DO",$00
+ERR_FS  .byte   "Filesystem",$00
 
 ;ERR_UV	.byte	"Undefined variable",$00
 
@@ -8808,10 +9123,23 @@ ERR_LD	.byte	"LOOP without DO",$00
 LAB_BMSG	.byte	$0D,$0A,"Break",$00
 LAB_EMSG	.byte	" Error",$00
 LAB_LMSG	.byte	" in line ",$00
-LAB_RMSG	.byte	$0D,$0A,"Ready",$0D,$0A,$00
-LAB_PROMPT  .byte	"> ",$00
+;LAB_RMSG	.byte	$0D,$0A,"Ready",$0D,$0A,$00
+LAB_RMSG	.byte	"Ready",$0D,$0A,$00
+LAB_PROMPT  .byte	">",$00
 
 LAB_IMSG	.byte	" Extra ignored",$0D,$0A,$00
 LAB_REDO	.byte	" Redo from start",$0D,$0A,$00
+
+;MSG_SDLD	.byte "SD Load",$0D,$0A,$00
+;MSG_SDSV	.byte "SD Save",$0D,$0A,$00
+;MSG_SDDR	.byte "SD Dir",$0D,$0A,$00
+;MSG_SDDL	.byte "SD Delete",$0D,$0A,$00
+;MSG_SPAT	.byte "SPR_PATTERN",$0D,$0A,$00
+;MSG_SENA	.byte "SPR_ENABLE",$0D,$0A,$00
+;MSG_SPOS	.byte "SPR_POS",$0D,$0A,$00
+;MSG_SLDP	.byte "SPR_LOADP",$0D,$0A,$00
+;MSG_SCOL	.byte "SPR_COL",$0D,$0A,$00
+;MSG_SEON	.byte "SPR_EARLY_ON",$0D,$0A,$00
+;MSG_SEOF	.byte "SPR_EARLY_OFF",$0D,$0A,$00
 
 AA_end_basic

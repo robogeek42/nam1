@@ -1,3 +1,4 @@
+.import init_sdcard
 ;.import sd_sendcmd16
 .import sd_sendcmd17
 .import sd_sendcmd24

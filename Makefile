@@ -16,8 +16,12 @@ else
 	LIBS = 
 endif
 
+ifdef SDIO
+	DEFINES = -D SDIO=$(SDIO)
+endif
+
 %.o: %.s65 basic.asm
-	ca65 --feature labels_without_colons -o $@ -l $(@:.o=.lst) $<
+	ca65 --feature labels_without_colons -o $@ -l $(@:.o=.lst) $(DEFINES) $<
 
 all: firmware
 

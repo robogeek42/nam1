@@ -54,16 +54,18 @@ SPR_PATTERN <S>, <P>
 SPR_POS <S>, <X>, <Y>
 	Set sprite S position to X,Y
 
-SPR_EARLY <S>
-	Set Early CLock bit for Sprite S  -(move position 32 pix to left)
+SPR_EARLY_ON <S>
+	Set Early CLock bit for Sprite S  (move position 32 pix to left)
+SPR_EARLY_OFF <S>
+	Unset Early CLock bit for Sprite S  (restore correct position for sprite)
 
 SPR_COLOUR <S>, <C>
 	Set colour of sprite S to C 
 	C range 0-15
 
-SPR_LOADP <P>
+SPR_LOADP <ADDR>,<P>
 	Load either 8 (Type=0,2) or 32 (Type=1,3) bytes into sprite
-	pattern table position P from current DATA pointer
+	pattern table position P from address ADDR
 
 Image Load commands
 -------------------

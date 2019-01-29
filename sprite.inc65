@@ -1,2 +1,12 @@
+.import spr_set_small
+.import spr_set_large
+.import spr_set_mag_on
+.import spr_set_mag_off
 .import vdp_init_sprites
+.import vdp_enable_sprites
+.import vdp_set_sprite_pos
+.import vdp_set_sprite_col
+.import vdp_set_sprite_early
+.import vdp_set_sprite_pattern
+.import vdp_load_sprite_data_from_mem
 

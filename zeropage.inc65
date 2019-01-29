@@ -28,7 +28,7 @@ ZP_VDP_YPOS = $3f
 ; Sprite movement
 ZP_SPR_NUM = $40
 
-; ZP_TMP2/3 currently only used by VDP blit
+; ZP_TMP2/3 currently only used by VDP blit, and SD save routine
 ZP_TMP2    = $42
 ZP_TMP3    = $43
 

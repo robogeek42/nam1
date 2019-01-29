@@ -25,6 +25,7 @@
 .include "acia.inc65"
 .include "macros.inc65"
 
+.export init_sdcard
 ;.export sd_sendcmd16
 .export sd_sendcmd17
 .export sd_sendcmd24
@@ -312,10 +313,14 @@ sd_resptimeout
 ;****************************************
 sd_busy
 	pha
+        ld16 R0,sd_msg_waitbusy
+	JSR acia_puts
 sd_isbusy
 	jsr sd_getbyte
 	cmp #$ff						; Keep reading MISO until FF
 	bne sd_isbusy
+        ld16 R0,sd_msg_ready
+	JSR acia_puts
 	pla
 	rts
 
@@ -463,6 +468,9 @@ sd_sendcmd17
 	phx
 	pha								; A is the page to write to
 	
+	ld16 R0,sd_msg_startcmd
+	JSR acia_puts
+
 	jsr sd_startcmd
 
 	; Convert sector address to byte address
@@ -521,6 +529,9 @@ sd_cmd17addr
 sd_getrespR17
 	pha
 	phy
+
+        ld16 R0,sd_msg_getresp
+	JSR acia_puts
 
 	sta ZP_TMP1						; Page to read in to
 	stz ZP_TMP0						; Always a page boundary
@@ -638,6 +649,14 @@ sd_waitforwritecomplete
 	
 sd_msg_initialising
 	.byte "Initialising SD Card", $0D,$0A,$00
+sd_msg_startcmd
+        .byte "Start cmd",$0D,$0A,$00
+sd_msg_getresp
+        .byte "Get resp",$0D,$0A,$00
+sd_msg_waitbusy
+        .byte "Wait busy ... ",$00
+sd_msg_ready
+        .byte "ready",$0D,$0A,$00
 
 sd_cmd55
 	.byte ($40+55), $00, $00, $00, $00, $95
