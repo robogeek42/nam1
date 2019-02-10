@@ -49,10 +49,12 @@
 
 ; Load zero page register reg/reg+1 with the 16-bit value, destroys A
 .macro ld16 reg, value
+  pha
   lda #<(value)
   sta reg
   lda #>(value)
   sta reg + 1
+  pla
 .endmacro
 
 

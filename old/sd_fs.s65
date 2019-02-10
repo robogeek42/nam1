@@ -91,7 +91,10 @@ _sdfs_fname_case
 
 sdfs_set_dir_ptr:
 	LDX #<fh_dir
+    STX R0+1
 	LDA #>fh_dir
+    STA R0
+    JSR acia_puts
 	RTS
 sdfs_set_dir_filesize_ptr:
 	LDX fh_dir+FileHandle::FH_Size			; Low byte of size

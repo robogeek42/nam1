@@ -7867,11 +7867,11 @@ LAB_SPR_LOADP
 	;ld16 R0,MSG_SLDP
 	;jsr acia_puts
 	JSR	LAB_GADB	; get two intergers (1st can be 16bit) 2nd is 8bit
-	STX ZP_TMP0		; Store pattern number
+	STX ZP_TMP2		; Store pattern number
 	LDA Itempl
-	STA ZP_TMP1
+	STA ZP_TMP0
 	LDA Itemph
-	STA ZP_TMP2
+	STA ZP_TMP1
 	JSR vdp_load_sprite_data_from_mem
 	RTS
 ; Set sprite position SPR_POS <S>, <X>, <Y>
@@ -7882,18 +7882,24 @@ LAB_SPR_POS
 	JSR	LAB_EVNM		; evaluate expression and check is numeric,
 						; else do type mismatch
 	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA	Itempl			; Get value (S)
+	STA ZP_TMP0			; Store S
 ; scan for "," and get byte, else do Syntax error then warm start
 	JSR	LAB_1C01		; scan for "," , else do syntax error then warm start
-	LDA	Itempl		; save temporary integer low byte
-	STA ZP_TMP1
 	JSR	LAB_EVNM		; evaluate expression and check is numeric,
 						; else do type mismatch
 	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA	Itempl			; Get value (X)
+	STA ZP_TMP1			; Store X
+; scan for "," and get byte, else do Syntax error then warm start
 	JSR	LAB_1C01		; scan for "," , else do syntax error then warm start
-	LDA	Itempl		; save temporary integer low byte
-	STA ZP_TMP0
-	JSR	LAB_GTBY		; get byte parameter
-	STX ZP_TMP2
+	JSR	LAB_EVNM		; evaluate expression and check is numeric,
+						; else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA	Itempl			; Get value (X)
+	STA ZP_TMP2			; Store X
+	;ld16 R0,MSG_SPOS
+	;jsr acia_puts
 	JSR vdp_set_sprite_pos
 	RTS
 
@@ -9136,7 +9142,7 @@ LAB_REDO	.byte	" Redo from start",$0D,$0A,$00
 ;MSG_SDDL	.byte "SD Delete",$0D,$0A,$00
 ;MSG_SPAT	.byte "SPR_PATTERN",$0D,$0A,$00
 ;MSG_SENA	.byte "SPR_ENABLE",$0D,$0A,$00
-;MSG_SPOS	.byte "SPR_POS",$0D,$0A,$00
+MSG_SPOS	.byte "SPR_POS",$0D,$0A,$00
 ;MSG_SLDP	.byte "SPR_LOADP",$0D,$0A,$00
 ;MSG_SCOL	.byte "SPR_COL",$0D,$0A,$00
 ;MSG_SEON	.byte "SPR_EARLY_ON",$0D,$0A,$00

@@ -24,6 +24,7 @@
 .include "io.inc65"
 .include "acia.inc65"
 .include "macros.inc65"
+.include "string.inc65"
 
 .export init_sdcard
 ;.export sd_sendcmd16
@@ -36,7 +37,9 @@
 .segment "SDBUF"
 sd_buf:
 	.res 512,0
-
+.bss
+charbuffer:
+    .res 8,0    ; 8 bytes for just a 2char hex and 0
 ; ROM code
 .code
 
@@ -44,6 +47,8 @@ sd_buf:
 ;* long_delay
 ;* Long delay (X decremented every 0.125ms)
 ;* Input : X = number of 0.125ms ticks to wait (max wait approx 0.32s)
+;*       : (assif: my homebrew runs at 1MHz, Dolo's at 2.68MHz
+;*                 so this majes the X dec ~ 0.335ms
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
@@ -73,7 +78,7 @@ long_delay_1
 
 ;****************************************
 ;* init_sdcard
-;* Initialise SD card interface after CIA2!
+;* Initialise SD card interface after VIA2!
 ;* Input : None
 ;* Output : None
 ;* Regs affected : None
@@ -81,6 +86,9 @@ long_delay_1
 init_sdcard
 	ld16 R0,sd_msg_initialising
 	JSR acia_puts
+init_retry
+    LDA #'.'
+    JSR acia_putc
 
 	lda #SD_CS						; Unselect device
 	tsb SD_REG
@@ -88,7 +96,7 @@ init_sdcard
 	trb SD_REG
 	lda #SD_MOSI					; DI/MOSI high
 	tsb SD_REG
-	ldx #8							; 8*0.125ms = 1ms
+	ldx #3							; 3*0.335ms = 1ms
 	jsr long_delay
 
 	ldx #8							; 10 bytes of $ff
@@ -100,24 +108,42 @@ init_sd_pulse
 	lda #SD_CS						; Unselect device
 	tsb SD_REG
 
+; Send command 0 (GO_IDLE_STATE. Read response, bit 0 set = Idle)
+; R1 Response
+; 	b7 b6 b5 b4 b3 b2 b1 b0
+; 	0  |  |  |  |   | |  \ Idle
+; 	   |  |  |  |   |  \ Erase reset
+; 	   |  |  |  |   \ Illegal command
+; 	   |  |  |  \ Command CRC Error
+; 	   |  |  \ Erase sequence error
+; 	   |  \ Address error
+; 	    \ Parameter error
 init_cmd0
-	jsr sd_sendcmd0
+	jsr sd_sendcmd0					; GO_IDLE_STATE
 	cmp #$ff						; $ff is not a valid response
 	bne init_acmd41
-	bra init_sdcard
-	
+    bra init_retry
+
+; Send command 41 APP_SEND_OP_COND (Initiate initialisation process)
+; needs CMD55 first as this is an APP command
+; expect R1=0 (not idle)
 init_acmd41
+    LDA #'+'
+    JSR acia_putc
 
 	jsr sd_sendcmd55
-
 	jsr sd_sendcmd41
 	
 	cmp #0							; Was R1 = 0
 	bne init_acmd41					; Retry if not
 	
+; Now can send command16 SET_BLOCKLEN
 init_cmd16
 	jsr sd_sendcmd16
-	
+
+    ld16 R0,sd_msg_initdone
+	JSR acia_puts
+
 	rts
 
 ;****************************************
@@ -313,13 +339,15 @@ sd_resptimeout
 ;****************************************
 sd_busy
 	pha
-        ld16 R0,sd_msg_waitbusy
+
+    ld16 R0,sd_msg_waitbusy
 	JSR acia_puts
+
 sd_isbusy
 	jsr sd_getbyte
 	cmp #$ff						; Keep reading MISO until FF
 	bne sd_isbusy
-        ld16 R0,sd_msg_ready
+    ld16 R0,sd_msg_ready
 	JSR acia_puts
 	pla
 	rts
@@ -510,6 +538,9 @@ sd_cmd17addr
 	pla								; Get the A param
 	jsr sd_getrespR17				; Get the response
 
+            ld16 R0,sd_msg_backinsend17
+            JSR acia_puts
+
 	jsr sd_busy						; Wait for card to be ready
 	
 	jsr sd_endcmd
@@ -530,8 +561,8 @@ sd_getrespR17
 	pha
 	phy
 
-        ld16 R0,sd_msg_getresp
-	JSR acia_puts
+;    ld16 R0,sd_msg_getresp17
+;	JSR acia_puts
 
 	sta ZP_TMP1						; Page to read in to
 	stz ZP_TMP0						; Always a page boundary
@@ -539,11 +570,33 @@ sd_getrespR17token
 	jsr sd_getbyte					; Get a byte
 	cmp #$fe						; Is it the token?
 	bne sd_getrespR17token			; No
-	
+
+;            ld16 R0,charbuffer
+
 	ldy #0							; read 1st 256 bytes
 sd_getrespR17block1
 	jsr sd_getbyte					; get a byte
 	sta (ZP_TMP0),y					; Save the byte
+
+;            PHA
+;            TYA
+;            AND #$0F
+;            BNE @over1
+;            JSR acia_put_newline
+;            TYA
+;            JSR fmt_hex_string
+;            JSR acia_puts
+;            LDA #':'
+;            JSR acia_putc
+;            LDA #' '
+;            JSR acia_putc
+;   @over1:
+;            PLA
+;            JSR fmt_hex_string
+;            JSR acia_puts
+;            LDA #' '
+;            JSR acia_putc
+
 	iny								; Keep going
 	bne sd_getrespR17block1			; Until all bytes read
 
@@ -551,15 +604,53 @@ sd_getrespR17block1
 sd_getrespR17block2
 	jsr sd_getbyte					; get a byet
 	sta (ZP_TMP0),y					; Save the byte
+
+;            PHA
+;            TYA
+;            AND #$0F
+;            BNE @over2
+;            JSR acia_put_newline
+;            TYA
+;            JSR fmt_hex_string
+;            JSR acia_puts
+;            LDA #':'
+;            JSR acia_putc
+;            LDA #' '
+;            JSR acia_putc
+;   @over2:
+;            PLA
+;            JSR fmt_hex_string
+;            JSR acia_puts
+;            LDA #' '
+;            JSR acia_putc
+
 	iny								; Keep going
 	bne sd_getrespR17block2			; Until all bytes read
 
+;            ld16 R0,sd_msg_crc
+;            JSR acia_puts
+
 	jsr sd_getbyte					; CRC
+
+;            JSR fmt_hex_string
+;            ld16 R0,charbuffer
+;            JSR acia_puts
+;            LDA #' '
+;            JSR acia_putc
+
 	jsr sd_getbyte					; CRC
 	
+;            JSR fmt_hex_string
+;            JSR acia_puts
+;            LDA #' '
+;            JSR acia_putc
+;            JSR acia_put_newline
+
 	ply
 	pla
 
+;            ld16 R0,sd_msg_endresp17
+;            JSR acia_puts
 	rts
 	
 
@@ -648,15 +739,25 @@ sd_waitforwritecomplete
 
 	
 sd_msg_initialising
-	.byte "Initialising SD Card", $0D,$0A,$00
+	.byte "Initialising SD Card ",$00
+sd_msg_initdone
+    .byte " done.", $0D,$0A,$00
 sd_msg_startcmd
         .byte "Start cmd",$0D,$0A,$00
 sd_msg_getresp
         .byte "Get resp",$0D,$0A,$00
+sd_msg_getresp17
+        .byte "Get resp17",$0D,$0A,$00
 sd_msg_waitbusy
         .byte "Wait busy ... ",$00
 sd_msg_ready
         .byte "ready",$0D,$0A,$00
+sd_msg_crc
+        .byte "crc",$0D,$0A,$00
+sd_msg_endresp17
+        .byte "EndResp17",$0D,$0A,$00
+sd_msg_backinsend17
+        .byte "back",$0D,$0A,$00
 
 sd_cmd55
 	.byte ($40+55), $00, $00, $00, $00, $95

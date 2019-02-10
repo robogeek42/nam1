@@ -11,8 +11,7 @@
 .include "video_common.inc65"
 .include "video_registers.inc65"
 .include "sprite.inc65"
-.include "sdcard.inc65"
-.include "sd_fs.inc65"
+.include "sd.inc65"
 ;.include "video_test.inc65"
 
 IRQ_vec	= VEC_SV+2		; IRQ code vector
@@ -174,6 +173,10 @@ cmd_memory: ; Check if only "m" or "m " was entered - address unchanged
                 ; read the address
                 ld16 R0, buffer + 2
                 jsr scan_hex16
+                LDA RES 
+                STA R1
+                LDA RES+1
+                STA R1+1
 print_address:  jsr print_memory16
                 RTS
 

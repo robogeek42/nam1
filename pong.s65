@@ -1,0 +1,94 @@
+; Pong 
+
+.setcpu "65C02"
+
+.include "macros.inc65"
+.include "zeropage.inc65"
+.include "acia.inc65"
+.include "io.inc65"
+.include "string.inc65"
+.include "video.inc65"
+.include "video_common.inc65"
+.include "video_registers.inc65"
+.include "sprite.inc65"
+
+.code
+
+; Setup sprites for ball and bats
+ball_sprite:
+	.byte $3C,$7E,$FF,$FF,$FF,$FF,$7E,$3C
+bat_left_sprite_top:
+	.byte $40,$E0,$E0,$E0,$E0,$E0,$E0,$E0
+bat_left_sprite_bot:
+	.byte $E0,$E0,$E0,$E0,$E0,$E0,$E0,$40
+bat_right_sprite_top:
+	,byte $02,$07,$07,$07,$07,$07,$07,$07
+bat_right_sprite_bot:
+	,byte $07,$07,$07,$07,$07,$07,$07,$02
+
+pong_init:
+; set mode
+		LDA #1					; Graphics I mode
+		JSR vdp_set_mode
+		LDA $F0					; white on black
+		JSR vdp_load_flat_colors
+
+; Init and Set sprite type (8x8 unmag)
+		JSR vdp_init_sprites
+		JSR spr_set_small
+		JSR spr_set_mag_off
+		LDA #5					; enable 5 sprites
+		STA ZP_TMP0
+		JSR vdp_enable_sprites
+
+; Load patterns
+		LDA #>ball_sprite
+		STA ZP_TMP0
+		LDA #<ball_sprite
+		STA ZP_TMP1
+		STZ ZP_TMP2				; load into P=0,1 ...
+@next_pattern:
+		STA ZP_TMP1
+		JSR vdp_load_sprite_data_from_mem
+		INC ZP_TMP2
+		LDA ZP_TMP2
+		CMP #5
+		BNE @next_sprite
+; set sprite pattern, position, colour and early bit
+		LDX #0
+		LDY ZP_VDP_SAB
+		LDA ZP_VDP_SAB+1
+		JSR vdp_set_addr_w
+		LDY #0
+		LDA #$0F				; Colour white
+@next_sprite:
+		STY VDP_WR_VRAM			; Pos X
+		STY VDP_WR_VRAM			; Pos Y
+		STX VDP_WR_VRAM			; Pattern
+		STA VDP_WR_VRAM			; Colour
+		INX
+		BNE @next_sprite
+; set character pattern $00 to be dots for central line
+dot_line_char:
+	.byte $00,$18,$18,$00,$00,$18,$18,$00
+		STZ TMP0
+		JSR vdp_setaddr_pattern_table_g1
+		LDA #>dot_line_char
+		STA ZP_TMP0
+		LDA #<dot_line_char
+		STA ZP_TMP1
+		LDY #8
+@load_char:
+		LDA (ZP_TMP0),Y
+		STA VDP_WR_VRAM
+		DEY
+		BNE @load_char
+		
+; Draw board & Score
+; Central dotted line
+		JSR vdp_setaddr_name_table
+
+; Game loop
+
+; If game has not started just move bats
+
