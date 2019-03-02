@@ -25,6 +25,7 @@
 .include "acia.inc65"
 .include "macros.inc65"
 .include "string.inc65"
+.include "print_util.inc65"
 
 .export init_sdcard
 ;.export sd_sendcmd16
@@ -48,6 +49,7 @@
 
 ;* The FileHandle stucture is key to
 ;* accessing the file system
+;* 40 bytes in total
 	.struct FileHandle
 		FH_Name .byte 13			; 8 name, 3 extension, 1 separator, 1 terminator
 		FH_Size .byte 4
@@ -63,15 +65,20 @@
 		FH_FileMode .byte 1
 	.endstruct
 
+SD_BUF = $7B
+
 .segment "SDBUF"
 sd_buf:
 	.res 512,0
+
 .bss
 charbuffer:
 ; File entry current dir entry
 fh_handle:	.tag FileHandle
 fh_dir:		.tag FileHandle
-        .res 8,0    ; 8 bytes for just a 2char hex and 0
+
+;filesize_32bit:
+;  .res 4,0    ; 4 bytes for a 32-bit number (file size)
 
 ; ROM code
 .code
@@ -529,8 +536,8 @@ sd_sendcmd17
 	phx
 	pha								; A is the page to write to
 	
-	ld16 R0,sd_msg_startcmd
-	JSR acia_puts
+	;ld16 R0,sd_msg_startcmd
+	;JSR acia_puts
 
 	jsr sd_startcmd
 
@@ -570,9 +577,6 @@ sd_cmd17addr
 
 	pla								; Get the A param
 	jsr sd_getrespR17				; Get the response
-
-            ld16 R0,sd_msg_backinsend17
-            JSR acia_puts
 
 	jsr sd_busy						; Wait for card to be ready
 	
@@ -679,6 +683,11 @@ sd_getrespR17block2
 ;            JSR acia_putc
 ;            JSR acia_put_newline
 
+; Debug print of 1st page of SD buffer
+;            LDA #SD_BUF
+;            STA ZP_TMP1
+;            STZ ZP_TMP0
+;            JSR print_memory256
 	ply
 	pla
 
@@ -791,15 +800,17 @@ _sdfs_fname_case
 	rts
 
 sdfs_set_dir_ptr:
-	LDX #<fh_dir
-    STX R0+1
-	LDA #>fh_dir
-    STA R0
-    JSR acia_puts
+    LDX #<fh_dir            ; low byte
+    ;STX R0+1
+    LDA #>fh_dir            ; hi byte
+    ;STA R0
+    ;JSR acia_puts
 	RTS
+
 sdfs_set_dir_filesize_ptr:
-	LDX fh_dir+FileHandle::FH_Size			; Low byte of size
-	LDA fh_dir+FileHandle::FH_Size+1		; High byte of size
+    ; put DIR offset by FH_Size into X(lo) A(hi)
+    LDX fh_dir+FileHandle::FH_Size      ; Lo byte
+    LDA fh_dir+FileHandle::FH_Size+1    ; Hi byte
 	RTS
 ;-----------------------------------------
 
@@ -820,7 +831,7 @@ init_fs_clr_sect
 	dex
 	bpl init_fs_clr_sect
 
-	lda #<(sd_buf)				; Read in to the buffer
+	lda #SD_BUF				; Read in to the buffer
 	jsr sd_sendcmd17			; Call read block
 
 	;Extract data from boot record
@@ -1043,11 +1054,11 @@ fs_dir_set_sd
 
 	; SD buffer is where blocks will be read to
 	stz sd_slo
-	lda #<(sd_buf)
+	lda #SD_BUF
 	sta sd_shi
 
 	; Load up first sector in to SD buf
-	lda #<(sd_buf)
+	lda #SD_BUF
 	jsr sd_sendcmd17
 
 	plx
@@ -1145,10 +1156,10 @@ fs_dir_inc_sect
 	
 	; Reset SD buffer  where blocks will be read to
 	stz sd_slo
-	lda #<(sd_buf)
+	lda #SD_BUF
 	sta sd_shi
 
-	lda #<(sd_buf)				; Goes in to sd_buf
+	lda #SD_BUF				; Goes in to sd_buf
 	jsr sd_sendcmd17			; Load it
 
 fs_dir_next_done
@@ -1174,8 +1185,8 @@ fs_dir_copy_entry
 	bcs fs_dir_empty_slot		; If an empty slot, then most info not relevant
 
 	;Normal processing of an entry loaded from the directory
-	ldx #FileHandle::FH_Name				; Point to where name will go
-	ldy #FAT_Name
+	ldx #FileHandle::FH_Name	; Point to where name will go (X=>0)
+    ldy #FAT_Name               ; offset into 32byte dir entry to find Name ($00)
 fs_dir_get_name_ch
 	lda (sd_slo),y				; Get name char
 	cmp #' '					; Don't copy space
@@ -1490,7 +1501,7 @@ fs_load_cpy_sect
 	sta sd_sect,x
 	dex
 	bpl fs_load_cpy_sect
-	lda #<(sd_buf)
+	lda #SD_BUF
 	jsr sd_sendcmd17
 
 	plx
@@ -1510,7 +1521,7 @@ fs_flush_cpy_sect
 	sta sd_sect,x
 	dex
 	bpl fs_flush_cpy_sect
-	lda #<(sd_buf)				; Sending data in sd_buf
+	lda #SD_BUF				; Sending data in sd_buf
 	jsr sd_sendcmd24
 	
 	plx

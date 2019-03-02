@@ -32,6 +32,7 @@
 .export vdp_set_addr_r
 .export vdp_setaddr_name_table
 .export vdp_setaddr_pattern_table
+.export vdp_setaddr_pattern_table_g1
 .export vdp_setaddr_pattern_table_g2
 .export vdp_setaddr_color_table_g1
 .export vdp_setaddr_color_table_g2

@@ -6,6 +6,7 @@
         .include "io.inc65"
 
         .export print_memory16
+        .export print_memory256
 
 .bss
                 BUFFER_LENGTH = 80
@@ -13,9 +14,12 @@ buffer:         .res BUFFER_LENGTH + 1, 0
 
 .code
 
+; Dump 16 bytes as hex and chars
+;   address is in RES,RES+1
+;   address to print is in R1,R1+1
 print_memory16:  
-                ; address is in RES,RES+1
-				; address to print is in R1,R1+1
+				pha
+				phy
                 ; First print 4 char address
                 ld16 R0, buffer
                 lda R1 + 1
@@ -76,5 +80,29 @@ next_byte:      lda (RES),y
                 lda RES + 1
                 adc #0
                 sta RES + 1
+				ply
+				pla
                 rts
 
+; dump a page. ZP_TMP0/1 has starting address
+print_memory256:
+				phaxy
+				LDX #16
+@pmloop:		LDA ZP_TMP0 
+				STA RES
+				STA R1
+				LDA ZP_TMP1
+				STA RES+1
+				STA R1+1
+				JSR print_memory16
+				CLC
+				LDA ZP_TMP0
+				ADC #16
+				STA ZP_TMP0
+				LDA ZP_TMP1
+				ADC #0
+				STA ZP_TMP1
+				DEX
+				BNE @pmloop
+				plaxy
+				RTS

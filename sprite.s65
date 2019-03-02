@@ -142,8 +142,10 @@ vdp_set_sprite_pos:
                 TAY
                 LDA ZP_VDP_SAB+1
                 JSR vdp_set_addr_w
+				NOP
 				LDA ZP_TMP2			; Y first
 				STA VDP_WR_VRAM
+				NOP
 				LDA ZP_TMP1			; then X
 				STA VDP_WR_VRAM
 				play
@@ -225,27 +227,23 @@ vdp_set_sprite_pattern:
 vdp_load_sprite_data_from_mem:
 				phay
 				LDY ZP_TMP2			;; use P as counter
+
 				LDA ZP_VDP_REGS+6   ;; Reg 6 has Pattern table addr
 				ASL					;; 2k boundaries (*0x800)
 				ASL					;; mult by 8 to give MSB
                 ASL
-				STA ZP_TMP3			;; patt table addr in ZP_TMP2/3
-				LDA #0				;;
-				STA ZP_TMP2			;;
-				CPY #0
-				BEQ vssp_setvram	;; if P=0 don't need to add to addr
-@vssp_loop1:	CLC					;; add 8 P times
-				LDA ZP_TMP2
-				ADC #8
-				STA ZP_TMP2
-				LDA ZP_TMP3
-				ADC #0
-				STA ZP_TMP3
+				STA TMP2+1			;; put patt table addr in TMP2/TMP2+1
+				STZ TMP2			;;
+
+				CPY #0				;; if P=0 don't need to add to addr
+				BEQ vssp_setvram
+
+@vssp_loop1:	add8To16 #8, TMP2	;; add 8 P times
 				DEY
 				BNE @vssp_loop1
 
-vssp_setvram:	LDY ZP_TMP2			;; set vram write address
-				LDA ZP_TMP3
+vssp_setvram:	LDY TMP2			;; set vram write address
+				LDA TMP2+1
                 JSR vdp_set_addr_w
 
 				LDY #0				;; copy data into vram

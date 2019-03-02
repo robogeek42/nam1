@@ -11,27 +11,55 @@
 .include "video_common.inc65"
 .include "video_registers.inc65"
 .include "sprite.inc65"
+.include "bcd.inc65"
+
+.export pong
+
+; pong vars in basic zeropage vars
+pp_ballx  = $EA
+pp_bally  = $EB
+pp_batly  = $EC
+pp_batry  = $ED
+pp_ballxv = $EE	; ball velocity in X
+pp_ballyv = $EF	; ball velocity in Y
+pp_scorel = $F0
+pp_scorer = $F1
+pp_game   = $F2 ; Game state. 0=not started, 1=playing, FF=quit
+
+BATSPEED  = 4
+
+.bss
+score_buffer:
+	.res 4,0
 
 .code
 
 ; Setup sprites for ball and bats
-ball_sprite:
-	.byte $3C,$7E,$FF,$FF,$FF,$FF,$7E,$3C
+pp_sprite_pattern_start:
 bat_left_sprite_top:
 	.byte $40,$E0,$E0,$E0,$E0,$E0,$E0,$E0
 bat_left_sprite_bot:
 	.byte $E0,$E0,$E0,$E0,$E0,$E0,$E0,$40
 bat_right_sprite_top:
-	,byte $02,$07,$07,$07,$07,$07,$07,$07
+	.byte $02,$07,$07,$07,$07,$07,$07,$07
 bat_right_sprite_bot:
-	,byte $07,$07,$07,$07,$07,$07,$07,$02
+	.byte $07,$07,$07,$07,$07,$07,$07,$02
+ball_sprite:
+	.byte $3C,$7E,$FF,$FF,$FF,$FF,$7E,$3C
+pp_char_pattern_start:
+dot_line_char:
+	.byte $00,$01,$01,$00,$00,$01,$01,$00
+	.byte $00,$80,$80,$00,$00,$80,$80,$00
 
-pong_init:
+pong:
 ; set mode
 		LDA #1					; Graphics I mode
 		JSR vdp_set_mode
-		LDA $F0					; white on black
+		LDA #$F4				; white on black
 		JSR vdp_load_flat_colors
+		LDA #$F2				; white on green (background)
+		LDY #$87
+		JSR vdp_regwrite
 
 ; Init and Set sprite type (8x8 unmag)
 		JSR vdp_init_sprites
@@ -42,53 +70,466 @@ pong_init:
 		JSR vdp_enable_sprites
 
 ; Load patterns
-		LDA #>ball_sprite
-		STA ZP_TMP0
-		LDA #<ball_sprite
-		STA ZP_TMP1
+		ld16 ZP_TMP0, pp_sprite_pattern_start
 		STZ ZP_TMP2				; load into P=0,1 ...
 @next_pattern:
-		STA ZP_TMP1
 		JSR vdp_load_sprite_data_from_mem
-		INC ZP_TMP2
+		CLC
+		add8To16 #8,ZP_TMP0		; move data ptr to next pattern
+		INC ZP_TMP2				; inrement pattern numner
 		LDA ZP_TMP2
 		CMP #5
-		BNE @next_sprite
+		BNE @next_pattern
+
 ; set sprite pattern, position, colour and early bit
-		LDX #0
-		LDY ZP_VDP_SAB
+		LDX #0					; X is sprite number (S)
+		LDY ZP_VDP_SAB			; set address of Sprite Attribute table
 		LDA ZP_VDP_SAB+1
 		JSR vdp_set_addr_w
-		LDY #0
-		LDA #$0F				; Colour white
+		LDY #0					; most fields are initially 0
+		LDA #$0F				; Colour white / no early bit set
 @next_sprite:
 		STY VDP_WR_VRAM			; Pos X
+        NOP
+        NOP
 		STY VDP_WR_VRAM			; Pos Y
+        NOP
+        NOP
 		STX VDP_WR_VRAM			; Pattern
+        NOP
+        NOP
 		STA VDP_WR_VRAM			; Colour
 		INX
+		CPX #5
 		BNE @next_sprite
-; set character pattern $00 to be dots for central line
-dot_line_char:
-	.byte $00,$18,$18,$00,$00,$18,$18,$00
-		STZ TMP0
-		JSR vdp_setaddr_pattern_table_g1
-		LDA #>dot_line_char
-		STA ZP_TMP0
-		LDA #<dot_line_char
-		STA ZP_TMP1
-		LDY #8
+
+; disable ball sprite for now
+		JSR disable_ball
+
+; set patterns 0&1 to be dots for central line
+		ld16 ZP_TMP0, dot_line_char
+		JSR vdp_setaddr_pattern_table
+		LDY #0
 @load_char:
 		LDA (ZP_TMP0),Y
 		STA VDP_WR_VRAM
-		DEY
+		INY
+		CPY #16
 		BNE @load_char
 		
 ; Draw board & Score
 ; Central dotted line
-		JSR vdp_setaddr_name_table
+		LDX #24				; height mode 1
+		LDA ZP_VDP_REGS+2
+		ASL
+		ASL
+		STA ZP_TMP1
+		LDA #$0F			; start at position 15
+		STA ZP_TMP0
+@loop1:
+		LDY ZP_TMP0			; set vram write addr
+		LDA ZP_TMP1
+		JSR vdp_set_addr_w
+		LDA #0				; write 2 chars to split centre
+		STA VDP_WR_VRAM
+		LDA #1
+        NOP
+		STA VDP_WR_VRAM
+		
+		add8To16 #$20, ZP_TMP0 ; add screen width
+		DEX
+		BNE @loop1
 
+;; initialise game variables
+		LDA #96-8
+		STA pp_batly
+		STA pp_batry
+		STZ pp_scorel
+		STZ pp_scorer
+		LDA #60-4
+		STA pp_bally
+		LDA #80-4
+		STA pp_ballx
+		LDA #1
+		STA pp_ballyv
+		STA pp_ballxv
+		STZ pp_game
+
+		JSR draw_score
+
+;=======================================
 ; Game loop
+game_loop:
 
-; If game has not started just move bats
+		JSR get_input
+		JSR draw_paddles
+		
+		LDA pp_game		; check game state:
+		CMP #$00		; 	game not started?
+		BEQ game_loop	; 		yes, keep just checking input and drawing paddles
+		CMP #$FF		; 	quit requested?
+		BNE gl_dogame	; 		no, then continue
+		JMP quit_game	; 		yes, quit
 
+gl_dogame:
+		JSR move_ball
+		JSR draw_ball
+		JSR check_game
+		JSR draw_score
+		JSR delay
+		JMP game_loop
+
+;---------------------------------------
+; Get input from ACIA
+get_input:
+		LDA ACIA_STATUS
+		AND #ACIA_STATUS_RX_FULL
+		BEQ gi_done
+		LDA ACIA_DATA
+		CMP #'a'
+		BEQ gi_movelup
+		CMP #'z'
+		BEQ gi_moveldown
+		CMP #';'
+		BEQ gi_moverup
+		CMP #'.'
+		BEQ gi_moverdown
+		CMP #'q'
+		BNE gi_check_s
+		LDA #$FF
+		STA pp_game
+gi_check_s:
+		CMP #'s'
+		BNE gi_done
+		LDA #$01
+		STA pp_game
+gi_done:
+		RTS
+gi_movelup:
+		LDA pp_batly
+		CMP #BATSPEED			; top=0+BATSPEED
+		BCC gi_done				; A < top
+		SEC
+		LDA pp_batly
+		SBC #BATSPEED
+		STA pp_batly
+		RTS
+gi_moveldown:
+		LDA pp_batly
+		CMP #193-16-BATSPEED	; bot=193-BATSIZE-BATSPEED
+		BCS gi_done				; A >= bot
+		CLC
+		LDA pp_batly
+		ADC #BATSPEED
+		STA pp_batly
+		RTS
+gi_moverup:
+		LDA pp_batry
+		CMP #BATSPEED			; top=0+BATSPEED
+		BCC gi_done				; A < top
+		SEC
+		LDA pp_batry
+		SBC #BATSPEED
+		STA pp_batry
+		RTS
+gi_moverdown:
+		LDA pp_batry
+		CMP #193-16-BATSPEED	; bot=193-BATSIZE-BATSPEED
+		BCS gi_done				; A >= bot
+		CLC
+		LDA pp_batry
+		ADC #BATSPEED
+		STA pp_batry
+		RTS
+
+;---------------------------------------
+; Draw paddles
+draw_paddles:
+		;; draw left paddle
+		LDA #0
+		STA ZP_TMP0		; S
+		LDA #16
+		STA ZP_TMP1		; X
+		LDA pp_batly
+		STA ZP_TMP2		; Y
+		JSR vdp_set_sprite_pos
+		LDA #1
+		STA ZP_TMP0		; S
+		LDA #16
+		STA ZP_TMP1		; X
+		LDA pp_batly
+		CLC
+		ADC #8
+		STA ZP_TMP2		; Y+8
+		JSR vdp_set_sprite_pos
+		;; draw right paddle
+		LDA #2
+		STA ZP_TMP0		; S
+		LDA #238
+		STA ZP_TMP1		; X
+		LDA pp_batry
+		STA ZP_TMP2		; Y
+		JSR vdp_set_sprite_pos
+		LDA #3
+		STA ZP_TMP0		; S
+		LDA #238
+		STA ZP_TMP1		; X
+		LDA pp_batry
+		CLC
+		ADC #8
+		STA ZP_TMP2		; Y+8
+		JSR vdp_set_sprite_pos
+		RTS
+
+;--------------------------------------------------
+; Check ball position and change speed as necessary
+; Move the ball according to current speed
+;
+move_ball:
+		; if y<top or y>bot then invert yspeed
+		LDA pp_bally
+		CMP #1
+		BCC mb_yspeed_pos	; A < 3
+		CMP #193-8-1
+		BCS	mb_yspeed_neg	; A >= 183
+		JMP mb_checkx
+mb_yspeed_pos:
+		LDA #1				; make Y-velocity positive
+		STA pp_ballyv
+		JMP mb_checkx
+mb_yspeed_neg:
+		LDA #$FF			; make Y-velocity negative
+		STA pp_ballyv		; invert Y-velocity
+		JMP mb_checkx
+
+; X direction
+;
+; Conditions for ball to hit bat - more oblique as they go down
+; BX == BLX+3 & BY+4 >= BLY & BY < BLY+13  (straight hit - invert X, same speed)
+;
+; BX == BLX+2 & BY+5 >= BLY 
+; BX == BLX+2 & BY   <  BLY+14  
+;
+; BX == BLX+1 & BY+6 >= BLY 
+; BX == BLX+1 & BY   <   BLY+15
+;
+; BX == BLX   & BY+7 >= BLY 
+; BX == BLX   & BY   <   BLY+16
+; 
+; Miss but ball moves up into bat or down into bat
+; Ball X speed +ve & BY+8==BLY     & BX<BLX & BX+8>BLX
+; Ball X speed -ve & BY  ==BLY+16  & BX<BLX & BX+8>BLX
+
+mb_checkx:
+		; find out if we need to check Left/Right or neither
+		LDA pp_ballx
+		CMP #20
+		BCC mb_check_batl		; Ballx < 18
+		CMP #234
+		BCS mb_check_batr		; Ballx >= 230
+		JMP mb_add_speed
+
+mb_check_batl:
+		; check ball is above bat top
+		LDA pp_bally
+		CLC
+		ADC #7
+		CMP pp_batly
+		BCC mb_add_speed	; BallY+7 < bat top
+		; check ball is below bat bottom
+		LDA pp_batly
+		CLC
+		ADC #15
+		CMP pp_bally
+		BCC mb_add_speed	; bat bot < ball top
+
+		; hit bat - make ball speed positive again
+mb_xspeed_pos:
+		LDA #1
+		STA pp_ballxv
+		JMP mb_add_speed
+
+mb_xspeed_neg:
+		LDA #$FF
+		STA pp_ballxv
+		JMP mb_add_speed
+
+mb_check_batr:
+		; check ball is above bat top
+		LDA pp_bally
+		CLC
+		ADC #7
+		CMP pp_batry
+		BCC mb_add_speed	; ball is above bat top
+		; check ball is below bat bottom
+		LDA pp_batry
+		CLC
+		ADC #15
+		CMP pp_bally
+		BCC mb_add_speed	; bat bot < ball top
+
+		; hit bat - make ball speed negative again
+		JMP mb_xspeed_neg
+
+mb_add_speed:
+		; add speed to x/y
+		CLC
+		LDA pp_ballx
+		ADC pp_ballxv
+		STA pp_ballx
+		CLC
+		LDA pp_bally
+		ADC pp_ballyv
+		STA pp_bally
+		RTS
+
+;---------------------------------------
+; Draw ball
+draw_ball:
+		;; draw ball
+		LDA #4			; S=4 ball sprite
+		STA ZP_TMP0
+		LDA pp_ballx
+		STA ZP_TMP1		; X 
+		LDA pp_bally
+		STA ZP_TMP2		; Y
+		JSR vdp_set_sprite_pos
+		RTS
+
+;---------------------------------------
+; Disable ball sprite
+disable_ball:
+		LDA ZP_VDP_SAB			; set address of Sprite Attribute table
+		CLC
+		ADC #16
+		TAY
+		LDA ZP_VDP_SAB+1
+		JSR vdp_set_addr_w
+		LDA #$D0
+		STA VDP_WR_VRAM
+		RTS
+
+;---------------------------------------
+; Draw score
+draw_score:
+		LDA #10
+		JSR ds_set_cursor_position
+		LDA pp_scorel
+		CMP #100				; check if triple digit
+		BCS ds_over				; X >= 100
+		INC ZP_VDP_CURS			; move right
+		CMP #10					; check if double digits
+		BCS ds_over				; X >= 10, X < 100
+		INC ZP_VDP_CURS			; move right
+ds_over:
+		LDA pp_scorel			; Left score
+		JSR ds_conv_decimal		; convert to decimal string in R0
+		JSR vdp_write_text		; write the string
+
+		LDA #19					; x position to put score
+		JSR ds_set_cursor_position
+		LDA pp_scorer
+		JSR ds_conv_decimal
+		JSR vdp_write_text		; write the string
+		RTS
+
+ds_conv_decimal:
+		; A has number, convert to bcd in RES, RES+1
+		JSR BINBCD8
+		; Convert BCD number in RES to string pointed to in R0
+		ld16 R0, score_buffer
+		JSR BCD2STR
+		RTS
+		
+ds_set_cursor_position:
+		; A has x position, y pos is 2
+		; Set cursor position in ZP_VDP_CURS
+		CLC
+		ADC #64					; set Y=2 on a graphics screen
+		STA ZP_VDP_CURS
+		STZ ZP_VDP_CURS+1
+		STA ZP_VDP_XPOS
+		LDA #2
+		STA ZP_VDP_YPOS
+		RTS
+		
+;---------------------------------------
+; Check game conditions
+; Check ball position - if going off left, inc R score
+check_game:
+
+	; Check if ball has gone off left
+		LDA pp_ballx
+		CMP #3
+		BCS cg_check_right		; still in play (X>0)
+
+		LDA pp_scorer
+		INC
+		STA pp_scorer
+
+		LDA #96					; reset ball position
+		STA pp_ballx
+		LDA #1
+		STA pp_ballxv		
+cg_check_right:
+	; Check if ball has gone off right
+		LDA pp_ballx
+		CMP #244
+		BCC cg_check_scores		; still in play (X<256)
+
+		LDA pp_scorel
+		INC
+		STA pp_scorel
+
+		LDA #96					; reset ball position
+		STA pp_ballx
+		LDA #$FF
+		STA pp_ballxv		
+cg_check_scores:
+		LDA pp_scorel
+		CMP #21
+		BCS cg_left_wins
+		LDA pp_scorer
+		CMP #21
+		BCS cg_right_wins
+cg_done:
+		RTS
+
+cg_left_wins:
+		ld16 R0, win_left_message
+		JMP cg_write_win_message
+cg_right_wins:
+		ld16 R0, win_right_message
+cg_write_win_message:
+		JSR acia_puts
+		JSR acia_put_newline
+		LDA #$FF
+		STA pp_game
+		RTS
+;---------------------------------------
+;
+quit_game:
+		ld16 R0,quit_message
+		JSR acia_puts
+		RTS
+
+;---------------------------------------
+; Delay
+delay:
+		LDX #6
+d_loop2:
+		LDY #0
+d_loop1:
+		NOP
+		DEY
+		BNE d_loop1
+		DEX
+		BNE d_loop2
+		RTS
+
+quit_message:
+	.byte "Goodbye!",$0d,$0a,$00
+win_left_message:
+	.byte "Player 1 Wins!",$0d,$0a,$00
+win_right_message:
+	.byte "Player 2 Wins!",$0d,$0a,$00

@@ -41,6 +41,7 @@ next_char:        iny
                   lda (R0),y
                   jsr acia_putc
                   bne next_char
+                  STY R1            ; number of chars printed
                   ;play
 				  ply
 				  pla

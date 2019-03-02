@@ -1,0 +1,76 @@
+BLX,BLY - top-left coords of Left Bat
+BX,BY   - top-left coords of ball
+Straight hit
+
+               ***.....
+               ***.....
+               ***.....
+               ***..ooo
+......ooo      ***.oooo
+.....oooo      ***ooooo
+...oooooo      .*.ooooo
+...oooooo      ...ooooo
+.*.oooooo      ...ooooo
+***oooooo      ....oooo
+***.ooooo      .....ooo
+***..oooo
+***......
+
+BX == BLX+3 & BY+4 >= BLY & BY <=  BLY+12
+
+Off hit - 1
+               ***.....
+               ***.....
+               ***.....
+               ***.....
+.....oooo      ***.oooo
+....ooooo      ***ooooo
+..ooooooo      .*oooooo
+..ooooooo      ..oooooo
+..ooooooo      ..oooooo
+.*ooooooo      ..oooooo
+***oooooo      ...ooooo
+***.ooooo      ....oooo
+***......
+
+BX == BLX+2 & BY+5 >= BLY & BY <=  BLY+13
+
+Off hit - 2
+               ***.....
+               ***.....
+               ***.....
+...oooo.       ***.....
+..oooooo.      ***.....
+.oooooooo      ***oooo.
+.oooooooo      .*oooooo
+.oooooooo      .ooooooo
+.oooooooo      .ooooooo
+.*oooooo.      .ooooooo
+***oooo..      .ooooooo
+***......      ..oooooo
+***......      ...oooo.
+
+BX == BLX+1 & BY+6 >= BLY & BY <=  BLY+14
+
+Off hit - 3
+
+BX == BLX & BY+7 >= BLY & BY <=  BLY+15
+
+Miss but behind and down/up
+
+ ball movin       ......***...
+  down            ......***...
+                  ......***...
+..oooooooo..      ......***...
+..oooooooo..      .......*....
+..oooooooo..      .......oooo.
+..oooooooo..      ......oooooo
+...oooooo...      .....ooooooo
+....oooo....      .....ooooooo
+....*.......      .....ooooooo
+...***......      .....ooooooo
+...***......      ......oooooo
+...***......      .......oooo.
+
+Ball X speed +ve & BY+8==BLY     & BX<BLX & BX+8>BLX
+Ball X speed -ve & BY  ==BLY+16  & BX<BLX & BX+8>BLX

@@ -17,6 +17,7 @@
         .export vdp_clear_screen
         .export vdp_load_chars
         .export vdp_load_g1_col
+		.export vdp_set_pos
 		.export vdp_write_char
         .export vdp_write_text
 		.export vdp_backspace
@@ -226,8 +227,8 @@ lgc2_loop:      STA VDP_WR_VRAM
 ; Set base colors (VDP reg 7) 
 vdp_set_base_colors:
 				STA TMP0
-				STX TMP1
-				STY TMP2
+                phx
+                phy
                 ; save color in ZP regs
                 STA ZP_VDP_REGS+7
                 ; set BG/FG Col
@@ -239,8 +240,8 @@ vdp_set_base_colors:
 				JSR vdp_load_flat_colors
 @done_set_base_cols: 
 				LDA TMP0
-				LDX TMP1
-				LDY TMP2
+                ply
+                plx
 				RTS
 ;----------------------------------------------------------------
 
@@ -339,10 +340,37 @@ vdp_start_str_w:
                 RTS
 
 ;------------------------------------------------
-; monitor only routine
+; Set screen position.
+; Start VDP write at given location and set cursor vars.
+; X - xpos, A - ypos, preserve Y
+vdp_set_pos:	phy
+				STX ZP_VDP_XPOS
+				STA ZP_VDP_YPOS
+				TAY
+				LDA #0
+				STA ZP_VDP_CURS
+				STA ZP_VDP_CURS+1
+				CPY #0
+				BEQ vsp_done
+vsp_loop:		CLC
+				LDA ZP_VDP_CURS
+				ADC ZP_VDP_CHAR_WIDTH
+				STA ZP_VDP_CURS
+				LDA ZP_VDP_CURS+1
+				ADC #0
+				STA ZP_VDP_CURS+1
+				DEY
+				BNE vsp_loop
+vsp_done:
+				JSR vdp_start_str_w
+				ply
+				RTS
+				 
+;------------------------------------------------
 ; Write the zero terminated string pointed to by R0 to screen
 ; to current cursor pos
 ; Screen pos will wrap lines, but not pages
+; The screen position is handled internall - not suitable for BASIC inteface
 vdp_write_text: 
                 JSR vdp_start_str_w
                 LDY #0              ;; max 255 chars, in case not zero term

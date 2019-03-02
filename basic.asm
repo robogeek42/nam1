@@ -282,11 +282,11 @@ IrqBase		= $DF		; IRQ handler enabled/setup/triggered flags
 ;			= $E7		; sd card
 ;			= $E8		; sd card
 ;			= $E9		; sd card
-NAM_TMP0	= $EA		; unused
-NAM_TMP1	= $EB		; unused
-NAM_TMP2	= $EC		; unused
-NAM_TMP3	= $ED		; unused
-;			= $EE		; unused
+;       	= $EA		; keyboard
+;       	= $EB		; keyboard
+;       	= $EC		; keyboard
+;       	= $ED		; keyboard
+;			= $EE		; keyboard
 
 Decss			= $EF		; number to decimal string start
 Decssp1		= Decss+1	; number to decimal string start
@@ -7896,8 +7896,8 @@ LAB_SPR_POS
 	JSR	LAB_EVNM		; evaluate expression and check is numeric,
 						; else do type mismatch
 	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
-	LDA	Itempl			; Get value (X)
-	STA ZP_TMP2			; Store X
+	LDA	Itempl			; Get value (Y)
+	STA ZP_TMP2			; Store Y
 	;ld16 R0,MSG_SPOS
 	;jsr acia_puts
 	JSR vdp_set_sprite_pos
@@ -7914,12 +7914,17 @@ LAB_SDSAVE
 	JSR	LAB_EVEX		; evaluate expression
 	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
 	BPL	LAB_DO_SNER		; branch if not string. Syntax error.
-	;JSR	LAB_18C6		; print string from Sutill/Sutilh
-	LDA Sutill
+
+	JSR	LAB_22B6		; pop string off descriptor stack, or from top of string
+				    	; space returns with A = length, X=$70=pointer low byte,
+				    	; Y=$71=pointer high byte
+                        ; Pointer is in ut1_pl/h
+    LDA ut1_pl
 	STA ZP_TMP2
-	LDA Sutilh
+    LDA ut1_ph
 	STA ZP_TMP3
 	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
+
 	JSR fs_open_write	; start writing to file
 	BCS LAB_FSER		; File system error
 	; save tokenised basic program from Smeml/h up to (not including) Svarl/h
@@ -7952,6 +7957,7 @@ save_lp_loop:
 	BNE save_lp_loop
 	; Program saved, now close file
 	JSR fs_close
+save_done:
 	ply
 	plx
 	pla
@@ -7974,11 +7980,14 @@ LAB_SDLOAD
 	JSR	LAB_EVEX		; evaluate expression
 	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
 	BPL	LAB_DO_SNER		; Syntax error if not string
-	;JSR	LAB_18C6		; print string from Sutill/Sutilh
-	LDA Sutill
+
+	JSR	LAB_22B6		; pop string off descriptor stack, or from top of string
+                        ; Pointer is in ut1_pl/h
+    LDA ut1_pl
 	STA ZP_TMP2
-	LDA Sutilh
+    LDA ut1_ph
 	STA ZP_TMP3
+
 	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
 	JSR fs_open_read
 	BCS LAB_FSER		; File system error
@@ -8018,6 +8027,63 @@ LAB_SDDEL
 	pla
 	RTS
 
+; Print string pointed to by X(lo)&A(Hi)
+; Y has number of chars printed
+AM_PRINTSTR:
+    STX TMP1
+    STA TMP1+1
+    LDY #0
+amps_loop:
+    LDA (TMP1),Y
+    BEQ amps_done        ; char 00 = stop
+	JSR LAB_PRNA
+	INY
+    BEQ amps_done        ; printed 256 chars - stop anyway
+    JMP amps_loop
+amps_done:    
+    RTS
+
+; Convert num <16 in A to a single hex char
+AM_GETHEXCHAR:
+    CMP #10
+    BCC amgh_less_than_10
+amgh_greater_than_10:
+    SEC
+    SBC #10
+    CLC
+    ADC #'A'
+    RTS
+amgh_less_than_10:
+    CLC
+    ADC #'0'
+    RTS
+
+; Print 4 digit hex number in X(l0)&A(hi)
+AM_PRINTHEX16:
+    phy
+    STX TMP1+1      ; store reversed
+    STA TMP1        ; we will print hi byte first
+    LDY #0
+amph_loop:
+    LDA TMP1,Y
+    AND #$F0        ; Mask top nibble
+    LSR
+    LSR
+    LSR
+    LSR                 ; put into lower nibble
+    JSR AM_GETHEXCHAR   ; and convert to a hex char
+    JSR LAB_PRNA        ; print
+    LDA TMP1,Y          
+    AND #$0F            ; now get lower nibble
+    JSR AM_GETHEXCHAR   ; convert
+    JSR LAB_PRNA        ; and print
+    INY                 ; get low byte
+    CPY #2              ; just printing two bytes
+    BNE amph_loop
+amph_done:
+    ply
+    RTS
+
 ; perform SDDIR
 LAB_SDDIR
 	pha
@@ -8029,17 +8095,16 @@ dir_show_entry
 	JSR fs_dir_find_entry		; Find a valid entry
 	BCS dir_done				; If C then no more entries so done
 	JSR sdfs_set_dir_ptr		; load addr of fh_dir into X(lo)A(hi)
-	STX Sutill					; store them in string pointer so we can print
-	STA Sutilh
-	JSR	LAB_18C6				; print string (file name)
+    JSR	AM_PRINTSTR				; print string (file name)
 	LDA #' '					; print spaces
 dir_pad
-	JSR V_OUTP
+	JSR LAB_PRNA
 	INY							; pad to 13 chars
-	CPY #13
+	CPY #14
 	BNE dir_pad
+
 	JSR sdfs_set_dir_filesize_ptr	; put filesize into X/A
-	JSR LAB_295E				; print number in X/A
+	JSR AM_PRINTHEX16				; print number in X/A
 	JSR LAB_CRLF
 	BRA dir_show_entry			; Find another entry
 dir_done

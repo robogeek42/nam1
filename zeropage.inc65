@@ -6,6 +6,7 @@ TMP0     = $26
 TMP1     = $28
 TMP2     = $2A
 MACROTMP = $2C
+BCD_IN   = $2C ; overloaded for BCD conv
 
 ZP_TMP0  = $2D
 ZP_TMP1  = $2E
@@ -36,17 +37,29 @@ ZP_TMP3    = $43
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver
 ; SD card driver parameters
-sd_slo		= $E0		; 1 Sector pointer low
-sd_shi		= $E1		; 1 Sector pointer high
-sd_sect		= $E2		; 4 SD Card sector address
-sd_addr		= $E6		; 4 SD Card byte address
-
 ; File system parameters
 fs_bootsect	= $44		; 4 Start of partition (usually 0x0000)
 fs_fatsect	= $48		; 4 Start of FAT tables
 fs_rootsect	= $4C		; 4 Start of Root Directory
 fs_datasect	= $50		; 4 Start of Data Area
 fs_dirsect	= $54		; 4 Current directory
+
+sd_slo		= $E0		; 1 Sector pointer low
+sd_shi		= $E1		; 1 Sector pointer high
+sd_sect		= $E2		; 4 SD Card sector address
+sd_addr		= $E6		; 4 SD Card byte address
 ;-----------------------------------------------------------
 
-
+;-----------------------------------------------------------
+; For keyboard scan routine
+; 8 bytes
+; ASCII char of character pressed
+KBD_CHAR       = $EA
+KBD_CHAR_LAST  = $ED
+; Flags of Shift/Ctrl etc. as a bit-mask
+KBD_FLAGS      = $EB
+; Other keys (Function, Return, Del, Cursor) as a bit-mask
+KBD_SPECIAL    = $EC
+; Debounce counter (2 bytes)
+;KBD_DBCOUNT    = $ED
+;-----------------------------------------------------------

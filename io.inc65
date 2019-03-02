@@ -1,3 +1,13 @@
+; Device map
+; $7F00 - $7F1F : ACIA
+; $7F20 - $7F3F : Sound
+; $7F40 - $7F5F : VIA1 (Keyboard)
+; $7F60 - $7F7F : VDP
+; $7F80 - $7F9F : VIA2 (Joy & SD card)
+; $7FA0 - $7FBF : DS Clock
+; $7FC0 - $7FDF : --
+; $7FE0 - $7FFF : --
+
 ; ACIA registers
 
 ACIA_BASE    = $7f00

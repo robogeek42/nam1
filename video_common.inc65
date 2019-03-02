@@ -4,6 +4,7 @@
 .import vdp_set_addr_r
 .import vdp_setaddr_name_table
 .import vdp_setaddr_pattern_table
+.import vdp_setaddr_pattern_table_g1
 .import vdp_setaddr_pattern_table_g2
 .import vdp_setaddr_color_table_g1
 .import vdp_setaddr_color_table_g2

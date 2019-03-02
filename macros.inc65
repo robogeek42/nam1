@@ -96,3 +96,15 @@ _mlbl_skip: dec reg
 	lda worda+1
 	sta wordb+1
 .endmacro
+
+; add a 8 bit value to a 16 bit word
+; destroys A
+.macro add8To16 val, word
+	clc
+	lda word
+	adc val
+	sta word
+	lda word+1
+	adc #0
+	sta word+1
+.endmacro
