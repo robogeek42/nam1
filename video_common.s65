@@ -40,6 +40,11 @@
 .export vdp_setaddr_sprite_pattern_table
 .export vdp_setaddr_pattern_table_offset
 
+.bss
+VDP_REGS:   .res  8,0
+
+.export VDP_REGS
+
 .code
 
 ;================================================================
@@ -75,7 +80,7 @@ vdp_set_addr_r: AND #$3F
 
 vdp_setaddr_name_table:
                 LDY #00             ;; Set VRAM address to name table (VDP_REG2 * 0x400)
-                LDA ZP_VDP_REGS+2
+                LDA VDP_REGS+2
                 ASL
                 ASL
                 JSR vdp_set_addr_w
@@ -90,7 +95,7 @@ vdp_setaddr_pattern_table_offset:   ;; add TMP0*256 to pattern table address
                 BEQ vdp_setaddr_pattern_table_g2
 vdp_setaddr_pattern_table_g1:
                 LDY #00             ;; Set VRAM address to VDP_REG4 * 0x800
-                LDA ZP_VDP_REGS+4
+                LDA VDP_REGS+4
                 ASL
                 ASL
                 ASL
@@ -99,7 +104,7 @@ vdp_setaddr_pattern_table_g1:
                 JSR vdp_set_addr_w
                 RTS
 vdp_setaddr_pattern_table_g2:
-                LDA ZP_VDP_REGS+4   ;; Pattern Table
+                LDA VDP_REGS+4   ;; Pattern Table
                 AND #$04            ;; just want upper bit (of the 3 that are used)
                 ASL
                 ASL
@@ -117,7 +122,7 @@ vdp_setaddr_sprite_attribute_table:
                 RTS
 vdp_setaddr_sprite_pattern_table:
                 LDY #0
-                LDA ZP_VDP_REGS+6   ;; 2k boundaries (*0x800)
+                LDA VDP_REGS+6   ;; 2k boundaries (*0x800)
                 ASL
                 ASL
                 ASL
@@ -125,7 +130,7 @@ vdp_setaddr_sprite_pattern_table:
                 RTS
 vdp_setaddr_color_table_g1:
 vdp_setaddr_color_table_g2:
-                LDA ZP_VDP_REGS+3   ;; Color table
+                LDA VDP_REGS+3   ;; Color table
                 AND #$80            ;; just want upper bit
                 CLC
                 ROR

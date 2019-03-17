@@ -320,8 +320,8 @@ TK_ON			= TK_STOP+1		; ON token
 TK_NULL		= TK_ON+1		; NULL token
 TK_INC		= TK_NULL+1		; INC token
 TK_WAIT		= TK_INC+1		; WAIT token
-TK_LOAD		= TK_WAIT+1		; LOAD token
-TK_SAVE		= TK_LOAD+1		; SAVE token
+TK_LOAD		= TK_WAIT+1		; LOAD token (SD Card)
+TK_SAVE		= TK_LOAD+1		; SAVE token (SD Card)
 TK_DEF		= TK_SAVE+1		; DEF token
 TK_POKE		= TK_DEF+1		; POKE token
 TK_DOKE		= TK_POKE+1		; DOKE token
@@ -343,12 +343,11 @@ TK_NMI		= TK_IRQ+1		; NMI token
 TK_MON		= TK_NMI+1		; MON token
 TK_MODE		= TK_MON+1		; VDP MODE token
 TK_CLS		= TK_MODE+1		; VDP CLS token
-TK_TEXTCOL		= TK_CLS+1		; VDP TEXTCOL token
-TK_SDLOAD	= TK_TEXTCOL+1		; SD SDLOAD
-TK_SDSAVE	= TK_SDLOAD+1		; SD SDSAVE
-TK_SDDEL	= TK_SDSAVE+1		; SD SDDEL
-TK_SDDIR	= TK_SDDEL+1		; SD SDDIR
-TK_SPR_COLOUR		= TK_SDDIR+1			; SPR_COLOUR
+TK_COL		= TK_CLS+1		; VDP COL token
+TK_DEL		= TK_COL+1		; SD DEL
+TK_DIR		= TK_DEL+1		; SD DIR
+TK_CAT		= TK_DIR+1		; SD CAT
+TK_SPR_COLOUR		= TK_CAT+1				; SPR_COLOUR
 TK_SPR_EARLY_OFF 	= TK_SPR_COLOUR+1		; SPR_EARLY_OFF
 TK_SPR_EARLY_ON		= TK_SPR_EARLY_OFF+1	; SPR_EARLY_ON
 TK_SPR_ENABLE 		= TK_SPR_EARLY_ON+1		; SPR_ENABLE 
@@ -356,10 +355,11 @@ TK_SPR_LOADP 		= TK_SPR_ENABLE+1		; SPR_LOADP
 TK_SPR_PATTERN 		= TK_SPR_LOADP+1		; SPR_PATTERN
 TK_SPR_POS 			= TK_SPR_PATTERN+1		; SPR_POS
 TK_SPR_SET_TYPE 	= TK_SPR_POS+1			; SPR_SET_TYPE
+TK_IMGLOAD 	= TK_SPR_SET_TYPE+1			; SPR_IMGLOAD
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB		= TK_SPR_SET_TYPE+1		; TAB token
+TK_TAB		= TK_IMGLOAD+1		; TAB token
 TK_ELSE		= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -1364,6 +1364,7 @@ LAB_14D4
 	STA	Itempl		; set temporary integer low byte
 	STA	Itemph		; set temporary integer high byte
 LAB_14E2
+	JSR sdout_on
 	LDY	#$01			; set index for line
 	STY	Oquote		; clear open quote flag
 	JSR	LAB_CRLF		; print CR/LF
@@ -1416,6 +1417,7 @@ LAB_1519
 	BNE	LAB_14E2		; go do next line if not [EOT]
 					; else ..
 LAB_152B
+	JSR sdout_off
 	JSR LAB_CRLF	;; extra CR/LF at end because Ready no longer does
 	RTS
 
@@ -7562,8 +7564,8 @@ LAB_CLS
 	JSR vdp_clear_screen
 	RTS
 
-; perform TEXTCOL <FGCol>,<BGCol>
-LAB_TEXTCOL
+; perform COL <FGCol>,<BGCol> (affects Text)
+LAB_COL
 	JSR LAB_GADB		; get 2 integers seperated by comma
 						; 1st integer (FGCol) in Itempl/h, 2nd in X
 	STX Itemph			; put X (BGCol) int hi byte of temp integer for now
@@ -7903,138 +7905,183 @@ LAB_SPR_POS
 	JSR vdp_set_sprite_pos
 	RTS
 
+
+.export SEND_CMD
+;----------------------------------------------------------
+; Send a command as though it was typed
+; R4 (word) contains address of 0 term string
+; R3,R3+1 are used
+
+send_cmd_list: .byte $0d,$0a,"LIST",$0d,$0a,$0d,$0a, $00
+
+SEND_CMD:
+    phx
+    phy
+    LDY R3				; saved index into string
+    LDA (R4),Y
+	STA R3+1			; Save char so we can set flags correctly later
+    BEQ sdcmd_end
+	INC R3				; inc index for next time
+	BEQ sdcmd_end		; max line length 256
+    ply
+    plx
+	LDA R3+1			; set flags correctly
+    SEC                 ; flag we have char
+    RTS
+sdcmd_end:
+    LDA #<CHARin
+    STA VEC_IN
+    LDA #>CHARin
+    STA VEC_IN+1
+	STZ ccflag			; reenable ctrl-c
+    ply
+    plx
+	LDA R3+1			; set flags correctly
+    CLC                 ; flag - no char
+    RTS
+
 ;-----------------------------------------------------------------
 ; SD card routines
+
+; Switch output to SD card (SDWRITE function) or back again 
+; Used by LIST command when resulted from a SAVE command 
+sdout_on:
+	LDA OUT_LIST_SD		; Was this called after a SAVE?
+	BEQ soo_done		; no, exit
+	LDA #1
+	STA ccflag			; disable Ctrl-C or it will eat our chars
+    LDA #<SDWRITE 		; Set output vector to SDWRITE
+    STA VEC_OUT
+    LDA #>SDWRITE
+    STA VEC_OUT+1
+soo_done:
+	RTS
+sdout_off:
+	LDA OUT_LIST_SD		; Was this called during a SAVE?
+	BEQ soo_done		; no, exit
+	STZ ccflag			; restore CTRL-C behaviour
+	LDA #<CHARout		; resttore normal output device
+    STA VEC_OUT
+    LDA #>CHARout
+    STA VEC_OUT+1
 .ifdef SDIO
-; perform SDSAVE <filename>
-LAB_SDSAVE
-	pha
-	phx
-	phy
-	JSR	LAB_EVEX		; evaluate expression
-	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
-	BPL	LAB_DO_SNER		; branch if not string. Syntax error.
-
-	JSR	LAB_22B6		; pop string off descriptor stack, or from top of string
-				    	; space returns with A = length, X=$70=pointer low byte,
-				    	; Y=$71=pointer high byte
-                        ; Pointer is in ut1_pl/h
-    LDA ut1_pl
-	STA ZP_TMP2
-    LDA ut1_ph
-	STA ZP_TMP3
-	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
-
-	JSR fs_open_write	; start writing to file
-	BCS LAB_FSER		; File system error
-	; save tokenised basic program from Smeml/h up to (not including) Svarl/h
-	; we can assume it starts on a page boundary+1 - ie Smeml=1 ($300 is always 0)
-	; last 3 bytes should always be 0
-	LDA #0 ;Smeml		; save start pointer - page aligned for ease
-	STA ZP_TMP0			; read pointer Lo
-	LDA Smemh
-	STA ZP_TMP1			; read pointer Hi
-save_check_last_page:
-	CMP Svarh			; if ReadPtrHi=EndPtrHi the remaining is < 256 bytes in total 
-	BEQ save_lastpage	; save the remaining bytes
-	BCS LAB_DO_OMER		; if End > Start, something is wrong
-	LDY #0				; else save page by page
-save_pageloop:
-	LDA (ZP_TMP0),Y
-	JSR fs_put_byte
-	INY
-	BNE save_pageloop
-	INC ZP_TMP1			; next page
-	LDA ZP_TMP1
-	JMP save_check_last_page
-save_lastpage:
-	LDY #0
-save_lp_loop:
-	LDA (ZP_TMP0),Y
-	JSR fs_put_byte
-	INY
-	CMP Svarh
-	BNE save_lp_loop
-	; Program saved, now close file
-	JSR fs_close
-save_done:
-	ply
-	plx
-	pla
+	JSR fs_close 		; Program saved, now close file
+.endif
+	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 	RTS
 
-LAB_FSER
-	LDX	#$24			; error code $24 ("Filesystem" error)
-	JMP	LAB_XERR		; do error #X, then warm start
+;msg_Restore: .byte "Restore",$0D,$0A,$00
 
+;------------------------------------------------------
+.ifdef SDIO	; REAL SD Card configured
+;------------------------------------------------------
+   
+;------------------------------------------------------
+; SAVE <filename>
+;	Save to SD file
+;
+SDWRITE:
+    JSR fs_put_byte
+    RTS
+
+LAB_SAVE
+	JSR SD_GETFILENAME	; Read filename parameter as file handle
+	JSR fs_open_write	; start writing to file
+	BCS LAB_FSER		; File system error
+
+	LDA #1
+	STA ccflag			; disable Ctrl-C or it will eat our chars
+	STA OUT_LIST_SD		; flag LIST to output to SD card
+
+	; Send a LIST command
+	STZ R3				; string index
+	ld16 R4, send_cmd_list
+    ; Set input vector to SEND_CMD
+    LDA #<SEND_CMD
+    STA VEC_IN
+    LDA #>SEND_CMD
+    STA VEC_IN+1
+
+	RTS
+
+; cant read these subs from the commands below, so turn short jumps into long jumps
 LAB_DO_SNER
 	JMP LAB_SNER
 LAB_DO_OMER
 	JMP LAB_OMER
+; return a Filesystem error and do warm start
+LAB_FSER
+	LDX	#$24			; error code $24 ("Filesystem" error)
+	JMP	LAB_XERR		; do error #X, then warm start
 
-; perform SDLOAD <filename>
-LAB_SDLOAD
-	pha
-	phx
-	phy
-	JSR	LAB_EVEX		; evaluate expression
-	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
-	BPL	LAB_DO_SNER		; Syntax error if not string
+;------------------------------------------------------
+; LOAD "filename"
+; 	Load from an SD file
+;
 
-	JSR	LAB_22B6		; pop string off descriptor stack, or from top of string
-                        ; Pointer is in ut1_pl/h
-    LDA ut1_pl
-	STA ZP_TMP2
-    LDA ut1_ph
-	STA ZP_TMP3
+; perform SD LOAD <filename>
+LAB_LOAD
+	JSR SD_GETFILENAME	; read filename param as a file handle
+	JSR fs_open_read	; open file
+	BCS LAB_FSER		; File system error if failed to open
 
-	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
-	JSR fs_open_read
-	BCS LAB_FSER		; File system error
-	JSR	LAB_1463		; do "NEW" and "CLEAR"
-	LDA #0 ;Smeml		; save start pointer - page aligned (that is how it was saved)
-	STA ZP_TMP0			; write pointer Lo
-	LDA Smemh
-	STA ZP_TMP1			; write pointer Hi
-load_loop:
-	JSR fs_get_next_byte	; byte in A, C=1 on EOF
-	BCS load_eof
-	STA (ZP_TMP0)		;
-	INC ZP_TMP0
-	BNE load_loop
-	INC ZP_TMP1
-	JMP load_loop
-load_eof:
-	ply
-	plx
-	pla
+	LDA #1
+	STA ccflag			; disable Ctrl-C or it will eat our chars
+	
+	; Set input vector to SDREAD and let it take over input
+    LDA #<SDREAD
+    STA VEC_IN
+    LDA #>SDREAD
+    STA VEC_IN+1
+
 	RTS
 
+SDREAD:
+    phx
+    phy
+	JSR fs_get_next_byte
+	STA R3+1			; save so we load with correct flags later
+    BCS load_eof		; C=1 means EOF reached
+    ply
+    plx
+	LDA R3+1			; set flags correctly
+    SEC                 ; flag we have char
+    RTS
 
-; perform SDDEL <filename>
-LAB_SDDEL
-	pha
-	phx
-	phy
-	JSR	LAB_EVEX		; evaluate expression
-	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
-	BPL	LAB_DO_SNER		; Syntax error if not string
-	;JSR	LAB_18C6		; print string from Sutill/Sutilh
+load_eof:
+    ; reset input vector
+    ld16 R0,msg_EOF
+    JSR acia_puts       ; debug
+
+	LDA #<CHARin		; restore normal input device
+    STA VEC_IN
+    LDA #>CHARin
+    STA VEC_IN+1
+	STZ ccflag			; reenable ctrl-c
+
+    ply
+    plx
+    LDA #$0D            ; Put CR in to exit BASIC input loop??
+    SEC                 ; flag we have char
+    RTS
+
+
+;------------------------------------------------------
+; perform DEL <filename>
+LAB_DEL
+    JSR SD_GETFILENAME
 	JSR fs_delete
 	BCS LAB_FSER		; File system error
-	ply
-	plx
-	pla
 	RTS
 
 ; Print string pointed to by X(lo)&A(Hi)
 ; Y has number of chars printed
 AM_PRINTSTR:
-    STX TMP1
-    STA TMP1+1
+    STX R2
+    STA R2+1
     LDY #0
 amps_loop:
-    LDA (TMP1),Y
+    LDA (R2),Y
     BEQ amps_done        ; char 00 = stop
 	JSR LAB_PRNA
 	INY
@@ -8061,11 +8108,11 @@ amgh_less_than_10:
 ; Print 4 digit hex number in X(l0)&A(hi)
 AM_PRINTHEX16:
     phy
-    STX TMP1+1      ; store reversed
-    STA TMP1        ; we will print hi byte first
+    STX R2+1      ; store reversed
+    STA R2        ; we will print hi byte first
     LDY #0
 amph_loop:
-    LDA TMP1,Y
+    LDA R2,Y
     AND #$F0        ; Mask top nibble
     LSR
     LSR
@@ -8073,7 +8120,7 @@ amph_loop:
     LSR                 ; put into lower nibble
     JSR AM_GETHEXCHAR   ; and convert to a hex char
     JSR LAB_PRNA        ; print
-    LDA TMP1,Y          
+    LDA R2,Y          
     AND #$0F            ; now get lower nibble
     JSR AM_GETHEXCHAR   ; convert
     JSR LAB_PRNA        ; and print
@@ -8084,11 +8131,55 @@ amph_done:
     ply
     RTS
 
-; perform SDDIR
-LAB_SDDIR
+; Convert filename parameter to a file handle
+SD_GETFILENAME:
+    phy
+	JSR	LAB_EVEX		; evaluate expression
+	BIT	Dtypef			; test data type flag, $FF=string, $00=numeric
+	BPL	LAB_DO_SNER2	; branch if not string. Syntax error.
+
+	JSR	LAB_22B6		; pop string off descriptor stack, or from top of string
+				    	; space returns with A = length, X=$70=pointer low byte,
+				    	; Y=$71=pointer high byte
+                        ; Pointer is in ut1_pl/h
+    ; copy zero terminated string into buffer
+    TAY                 ; Put size into Y
+    ld16 ZP_TMP2,buffer ; point ZP_TMP2/3 to buffer
+    LDA #0
+    STA (ZP_TMP2),Y     ; zero terminator
+    DEY
+@loop:
+    LDA (ut1_pl),Y      ; copy from utility string
+    STA (ZP_TMP2),Y     ; to buffer
+    DEY
+    BPL @loop           ; stop loop when it gets to $FF (assumes length was < 127)
+
+;    LDA ut1_pl
+;	STA ZP_TMP2
+;    LDA ut1_ph
+;	STA ZP_TMP3
+	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
+    ply
+    RTS
+
+LAB_DO_SNER2
+	JMP LAB_SNER
+LAB_DO_FSER
+	JMP LAB_FSER
+
+;------------------------------------------------------
+; perform SD DIR
+;
+msg_dir_header: .byte "Filename      Size",$0d,$0a,"------------------",$0d,$0a,$00
+LAB_DIR
 	pha
 	phx
 	phy
+
+    ld16 R0, msg_dir_header
+    JSR vdp_write_text
+    JSR acia_puts
+
 	JSR fs_dir_root_start		; Start at root
 dir_show_entry
 	CLC							; Only looking for valid files
@@ -8113,24 +8204,144 @@ dir_done
 	plx
 	pla
 	RTS
-.else
-LAB_SDSAVE
-	;ld16 R0,MSG_SDSV
-	;jsr acia_puts
+
+;------------------------------------------------------
+; SD CAT (cat a file directly from the SD card)
+; CAT "<filename>"
+LAB_CAT
+	pha
+	phx
+	phy
+
+    JSR SD_GETFILENAME
+
+	JSR fs_open_read
+	BCS LAB_DO_FSER		; File system error
+
+sdc_getkey_loop:
+	JSR fs_get_next_byte
+	BCS sdc_eof			; C=1 means EOF reached
+	JSR LAB_PRNA
+						; should check for a break key pressed
+	JSR	V_INPT			; scan input device
+	CMP #$03			; CTRL-C
+	BEQ sdc_break
+	JMP sdc_getkey_loop
+
+sdc_break:
+	LDA	#<LAB_BMSG		; point to "Break" low byte
+	LDY	#>LAB_BMSG		; point to "Break" high byte
+	JSR	LAB_18C3		; print null terminated string from memory
+	JSR LAB_CRLF
+
+sdc_eof:
+	JSR LAB_CRLF
+	ply
+	plx
+	pla
 	RTS
-LAB_SDLOAD
-	;ld16 R0,MSG_SDLD
-	;jsr acia_puts
+
+;------------------------------------------------------
+.else			; NO REAL SD Card device
+;------------------------------------------------------
+
+SDWRITE:				; DUMMY SD Write
+    JSR acia_putc
 	RTS
-LAB_SDDIR
+
+LAB_SAVE
+	ld16 R0,MSG_SDSV
+	jsr acia_puts
+
+	LDA #1
+	STA ccflag			; disable Ctrl-C or it will eat our chars
+
+	STA OUT_LIST_SD		; flag LIST to output to SD card
+
+	; Send a LIST command
+	STZ R3				; string index
+	ld16 R4, send_cmd_list
+    ; Set input vector to SEND_CMD
+    LDA #<SEND_CMD
+    STA VEC_IN
+    LDA #>SEND_CMD
+    STA VEC_IN+1
+
+	RTS
+
+load_cmd_example1: 
+	.byte $0d,$0a
+	.byte "10 FOR I=1 TO 10",$0d,$0a
+	.byte "20 PRINT ",'"',"COUNT ",'"',";I",$0d,$0a
+	.byte "30 NEXT I",$0d,$0a,$00
+
+LAB_LOAD
+	ld16 R0,MSG_SDLD
+	jsr acia_puts
+
+	STZ R3				; string index
+	LDA #1
+	STA ccflag			; disable Ctrl-C
+	;---- purely for debug pretend to LOAD from SD
+	ld16 R4, load_cmd_example1
+    ; Set input vector to SEND_CMD
+    LDA #<SEND_CMD
+    STA VEC_IN
+    LDA #>SEND_CMD
+    STA VEC_IN+1
+	;----
+	RTS
+
+LAB_DIR
 	;ld16 R0,MSG_SDDR
 	;jsr acia_puts
 	RTS
-LAB_SDDEL
+LAB_DEL
 	;ld16 R0,MSG_SDDL
 	;jsr acia_puts
 	RTS
+LAB_CAT
+    RTS
+
 .endif
+
+LAB_DO_FSER2
+	JMP LAB_FSER
+;----------------------------------------------------------------
+; Load Mode 2 image (compressed)
+LAB_IMGLOAD
+.ifdef SDIO
+	; get filename and open for SD version
+    JSR SD_GETFILENAME
+	JSR fs_open_read
+	BCS LAB_DO_FSER2		; File system error
+.else
+	; this version just loads example
+	; put address into TMP1
+	LDA #<image_smashmario_COMP
+	STA TMP1
+	LDA #>image_smashmario_COMP
+	STA TMP1+1
+.endif
+	
+	; switch to mode 2 (Screen2)
+	LDA #2
+	JSR vdp_set_mode
+	LDA #1				; set input from SD
+	STA OUT_LIST_SD
+	; load image
+	JSR decompRLE1_SC2
+	STZ OUT_LIST_SD
+
+@loop
+	; wait for key press
+	JSR V_INPT
+	BCC @loop
+	RTS
+
+	LDA #2
+	JSR vdp_set_mode
+	
 ;-----------------------------------------------------------------
 
 ; system dependant i/o vectors
@@ -8370,8 +8581,8 @@ LAB_CTBL
 	.word	LAB_NULL-1		; NULL		modified command
 	.word	LAB_INC-1		; INC			new command
 	.word	LAB_WAIT-1		; WAIT
-	.word	V_LOAD-1		; LOAD
-	.word	V_SAVE-1		; SAVE
+	.word	LAB_LOAD-1		; LOAD
+	.word	LAB_SAVE-1		; SAVE
 	.word	LAB_DEF-1		; DEF
 	.word	LAB_POKE-1		; POKE
 	.word	LAB_DOKE-1		; DOKE		new command
@@ -8393,11 +8604,12 @@ LAB_CTBL
 	.word	LAB_MON-1		; MON			monitor
 	.word	LAB_MODE-1		; MODE			VDP command
 	.word	LAB_CLS-1		; CLS			VDP command
-	.word	LAB_TEXTCOL-1	; TEXTCOL		VDP command
-	.word	LAB_SDLOAD-1	; SDLOAD		SD command
-	.word	LAB_SDSAVE-1	; SDSAVE		SD command
-	.word	LAB_SDDEL-1		; SDDEL		SD command
-	.word	LAB_SDDIR-1		; SDDIR		SD command
+	.word	LAB_COL-1		; COL			VDP command
+;	.word	LAB_LOAD-1		; LOAD			SD command
+;	.word	LAB_SAVE-1		; SAVE			SD command
+	.word	LAB_DEL-1		; DEL			SD command
+	.word	LAB_DIR-1		; DIR			SD command
+	.word	LAB_CAT-1		; CAT			SD command
 	.word	LAB_SPR_COLOUR-1		; SPR_COLOUR		VDP command
 	.word	LAB_SPR_EARLY_OFF-1		; SPR_EARLY_OFF		VDP command
 	.word	LAB_SPR_EARLY_ON-1		; SPR_EARLY_ON		VDP command
@@ -8406,6 +8618,7 @@ LAB_CTBL
 	.word	LAB_SPR_PATTERN-1		; SPR_PATTERN		VDP command
 	.word	LAB_SPR_POS-1			; SPR_POS			VDP command
 	.word	LAB_SPR_SET_TYPE-1		; SPR_SET_TYPE		VDP command
+	.word	LAB_IMGLOAD-1		; IMGLOAD		VDP command
 
 ; function pre process routine table
 
@@ -8641,6 +8854,8 @@ LBB_CLS
 	.byte	"LS",TK_CLS		; CLS (VDP)
 LBB_CALL
 	.byte	"ALL",TK_CALL	; CALL
+LBB_CAT
+	.byte	"AT",TK_CAT	; CAT (SD Card)
 LBB_CHRS
 	.byte	"HR$(",TK_CHRS	; CHR$(
 LBB_CLEAR
@@ -8659,8 +8874,12 @@ LBB_DEEK
 	.byte	"EEK(",TK_DEEK	; DEEK(
 LBB_DEF
 	.byte	"EF",TK_DEF		; DEF
+LBB_DEL
+	.byte	"EL",TK_DEL		; DEL (delte file) (SD Card)
 LBB_DIM
 	.byte	"IM",TK_DIM		; DIM
+LBB_DIR
+	.byte	"IR",TK_DIR		; DIR (SD Card)
 LBB_DOKE
 	.byte	"OKE",TK_DOKE	; DOKE note - "DOKE" must come before "DO"
 LBB_DO
@@ -8699,6 +8918,8 @@ LBB_HEXS
 TAB_ASCI
 LBB_IF
 	.byte	"F",TK_IF		; IF
+LBB_IMGLOAD
+	.byte	"MGLOAD",TK_IMGLOAD	; IMGLOAD
 LBB_INC
 	.byte	"NC",TK_INC		; INC
 LBB_INPUT
@@ -8721,7 +8942,7 @@ LBB_LET
 LBB_LIST
 	.byte	"IST",TK_LIST	; LIST
 LBB_LOAD
-	.byte	"OAD",TK_LOAD	; LOAD
+	.byte	"OAD",TK_LOAD	; LOAD (SD Card)
 LBB_LOG
 	.byte	"OG(",TK_LOG	; LOG(
 LBB_LOOP
@@ -8797,15 +9018,7 @@ TAB_ASCS
 LBB_SADD
 	.byte	"ADD(",TK_SADD	; SADD(
 LBB_SAVE
-	.byte	"AVE",TK_SAVE	; SAVE
-LBB_SDDEL
-	.byte	"DDEL",TK_SDDEL	; SDDEL
-LBB_SDDIR
-	.byte	"DDIR",TK_SDDIR	; SDDIR
-LBB_SDLOAD
-	.byte	"DLOAD",TK_SDLOAD	; SDLOAD
-LBB_SDSAVE
-	.byte	"DSAVE",TK_SDSAVE	; SDSAVE
+	.byte	"AVE",TK_SAVE	; SAVE (SD Card)
 LBB_SGN
 	.byte	"GN(",TK_SGN	; SGN(
 LBB_SIN
@@ -8844,8 +9057,8 @@ LBB_TAB
 	.byte	"AB(",TK_TAB	; TAB(
 LBB_TAN
 	.byte	"AN(",TK_TAN	; TAN(
-LBB_TEXTCOL
-	.byte	"EXTCOL",TK_TEXTCOL ; TEXTCOL
+LBB_COL
+	.byte	"OL",TK_COL 	; COL
 LBB_THEN
 	.byte	"HEN",TK_THEN	; THEN
 LBB_TO
@@ -8980,15 +9193,17 @@ LAB_KEYT
 	.byte	3,'C'
 	.word	LBB_CLS			; VDP CLS
 	.byte	7,'T'
-	.word	LBB_TEXTCOL		; VDP TEXTCOL
-	.byte	6,'S'
-	.word	LBB_SDLOAD		; SD SDLOAD
-	.byte	6,'S'
-	.word	LBB_SDSAVE		; SD SDSAVE
-	.byte	5,'S'
-	.word	LBB_SDDEL		; SD SDDEL
-	.byte	5,'S'
-	.word	LBB_SDDIR		; SD SDDIR
+	.word	LBB_COL			; VDP COL
+;	.byte	4,'L'
+;	.word	LBB_LOAD		; LOAD
+;	.byte	4,'S'
+;	.word	LBB_SAVE		; SAVE
+	.byte	3,'S'
+	.word	LBB_DEL			; SD DEL
+	.byte	3,'S'
+	.word	LBB_DIR			; SD DIR
+	.byte	3,'S'
+	.word	LBB_CAT			; SD CAT
 	.byte	10,'S'
 	.word	LBB_SPR_COLOUR	; SPR_COLOUR
 	.byte	13,'S'
@@ -9005,6 +9220,8 @@ LAB_KEYT
 	.word	LBB_SPR_POS			; SPR_POS
 	.byte	12,'S'
 	.word	LBB_SPR_SET_TYPE	; SPR_SET_TYPE
+	.byte	7,'I'
+	.word	LBB_IMGLOAD	; IMGLOAD
 
 ; secondary commands (can't start a statement)
 
@@ -9201,8 +9418,8 @@ LAB_PROMPT  .byte	">",$00
 LAB_IMSG	.byte	" Extra ignored",$0D,$0A,$00
 LAB_REDO	.byte	" Redo from start",$0D,$0A,$00
 
-;MSG_SDLD	.byte "SD Load",$0D,$0A,$00
-;MSG_SDSV	.byte "SD Save",$0D,$0A,$00
+MSG_SDLD	.byte "SD Load",$0D,$0A,$00
+MSG_SDSV	.byte "SD Save",$0D,$0A,$00
 ;MSG_SDDR	.byte "SD Dir",$0D,$0A,$00
 ;MSG_SDDL	.byte "SD Delete",$0D,$0A,$00
 ;MSG_SPAT	.byte "SPR_PATTERN",$0D,$0A,$00

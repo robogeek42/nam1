@@ -11,4 +11,5 @@
 .import fs_open_read
 .import fs_open_write
 .import fs_close
-
+.import msg_EOF
+.import str_buf

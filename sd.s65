@@ -46,6 +46,7 @@
 .export fs_open_read
 .export fs_open_write
 .export fs_close
+.export msg_EOF
 
 ;* The FileHandle stucture is key to
 ;* accessing the file system
@@ -71,17 +72,32 @@ SD_BUF = $7B
 sd_buf:
 	.res 512,0
 
+;.segment "INBUF"
+;in_buf:
+;    .res 256,0
+;
+;buf_lo = <in_buf
+;buf_hi = >in_buf
+;buf_sz = $FF
+;buf_ef = $0D
+
 .bss
 charbuffer:
 ; File entry current dir entry
 fh_handle:	.tag FileHandle
 fh_dir:		.tag FileHandle
 
+.export fh_handle
+.export fh_dir
+.export str_buf
+
 ;filesize_32bit:
 ;  .res 4,0    ; 4 bytes for a 32-bit number (file size)
+str_buf:    .res 8,0
 
 ; ROM code
 .code
+msg_EOF: .byte "EOF",$0D,$0A,$00
 
 ;****************************************
 ;* long_delay
@@ -380,15 +396,15 @@ sd_resptimeout
 sd_busy
 	pha
 
-    ld16 R0,sd_msg_waitbusy
-	JSR acia_puts
+;    ld16 R0,sd_msg_waitbusy
+;	JSR acia_puts
 
 sd_isbusy
 	jsr sd_getbyte
 	cmp #$ff						; Keep reading MISO until FF
 	bne sd_isbusy
-    ld16 R0,sd_msg_ready
-	JSR acia_puts
+;    ld16 R0,sd_msg_ready
+;	JSR acia_puts
 	pla
 	rts
 
@@ -536,8 +552,17 @@ sd_sendcmd17
 	phx
 	pha								; A is the page to write to
 	
-	;ld16 R0,sd_msg_startcmd
-	;JSR acia_puts
+;    ld16 R0,sd_msg_readsector
+;	JSR acia_puts
+;    ld16 R0,str_buf
+;    LDX #3
+;@loop:
+;    LDA sd_sect,X
+;    JSR fmt_hex_string
+;    JSR acia_puts
+;    DEX
+;    BNE @loop
+;    JSR acia_put_newline
 
 	jsr sd_startcmd
 
@@ -784,19 +809,31 @@ sd_waitforwritecomplete
 ;======================================================================
 ;-----------------------------------------
 ; BASIC linkage - Assif
-; copy filename string to filehandle
+; copy filename string to filehandle - convert to upper case
 sdfs_file_to_fh:
 	ldy #0
-_sdfs_copy_fn
+_sdfs_copy_fn:
 	lda (ZP_TMP2),y
+    bmi _sdfs_terminate     ; if >127 then it is not a char - terminate
+    beq _sdfs_terminate     ; if ==0 then it is not a char - terminate
+    CMP #'"'
+    beq _sdfs_terminate
+    CMP #$21                ; space+1
+    bcc _sdfs_terminate     ; non-printable - this is a filename
+
 	bit #$40				; If 0x40 bit not set
 	beq _sdfs_fname_case	; then not an alpha char
 	and #$df				; Else mask out 0x20 bit to make upper case
-_sdfs_fname_case	
+
+_sdfs_fname_case:
 	sta fh_handle,y
 	iny
 	cmp #0
 	bne _sdfs_copy_fn
+    
+_sdfs_terminate:
+    lda #0
+    sta fh_handle,y         ; terminate with a zero
 	rts
 
 sdfs_set_dir_ptr:
@@ -1139,16 +1176,16 @@ fs_dir_next_entry
 	lda sd_shi
 	adc #0
 	sta sd_shi
-	cmp #5						; If not at end of sector (page 5)
+    cmp #SD_BUF+2				; If not at end of sector (page 5) Assif: change to SDBUF+2 (512byte blocks)
 	bne fs_dir_next_done		; then don't load next sector
 
 	; Advance the sector
 	ldx #$00
-	ldy #$04
-	sec
+    ldy #$04                    ; Assif 4 byte word LSB first
+    sec                         ; will increment first byte
 fs_dir_inc_sect
 	lda sd_sect,x
-	adc #0
+    adc #0                      ; any carries will ripple
 	sta sd_sect,x
 	inx
 	dey
@@ -1927,14 +1964,40 @@ fs_open_read
 	phx
 	phy
 
+            ; debug - print name from filehandle
+            ld16 R0,sd_msg_find_file
+            JSR acia_puts
+            LDA #<fh_handle
+            STA R0
+            LDA #>fh_handle
+            STA R0+1
+            JSR acia_puts
+            JSR acia_put_newline
+
 	jsr fs_dir_root_start		; Start at root
 fs_open_find
 	clc							; Only look for active files
 	jsr fs_dir_find_entry		; Find a valid entry
 	bcs	fs_open_not_found		; If C then no more entries
+
+            ; Debug - print dir entry name
+            LDA #<fh_dir
+            STA R0
+            LDA #>fh_dir
+            STA R0+1
+            JSR acia_puts
+            JSR acia_put_newline
+            
 	ldx #0						; Check name matches
 fs_open_check_name
 	lda fh_handle,x
+    
+    ; fh_handle is in upper case - convert the directory entry too
+	bit #$40				; If 0x40 bit not set
+    beq @notalpha       	; then not an alpha char
+	and #$df				; Else mask out 0x20 bit to make upper case
+@notalpha:
+
 	cmp fh_dir,x
 	bne fs_open_find
 	cmp #0						; If no more bytes in name to check
@@ -1943,6 +2006,11 @@ fs_open_check_name
 	bra fs_open_check_name
 fs_open_found
 	jsr fs_copy_dir_to_fh		; Put entry in to fh_handle
+
+            ; Debug
+            ld16 R0, sd_msg_found_entry
+            JSR acia_puts
+            JSR acia_put_newline
 
 	lda #$20					; 32 sector per cluster countdown			
 	sta fh_handle+FileHandle::FH_SectCounter
@@ -1970,6 +2038,22 @@ fs_open_not_found
 	plx
 	pla
 	rts
+
+; Print string pointed to by X(lo)&A(Hi)
+; Y has number of chars printed
+sdfs_printstr:
+    STX TMP1
+    STA TMP1+1
+    LDY #0
+fps_loop:
+    LDA (TMP1),Y
+    BEQ fps_done        ; char 00 = stop
+    JSR acia_putc
+	INY
+    BEQ fps_done        ; printed 256 chars - stop anyway
+    JMP fps_loop
+fps_done:    
+    RTS
 
 
 ;****************************************
@@ -2130,27 +2214,111 @@ fs_delete_fin
 	pla
 	rts
 
+;======================================================================
+; I/O Routines (read/write line)
+;======================================================================
+
+
+
+;****************************************
+;* Get a line of input
+;* Output: C=0 means io_buf is valid
+;****************************************
+;sdfs_inputline:
+;	; C is set on input for echo or not
+;	; Read a line of input
+;	jsr io_read_line
+;	; If nothing entered then sec
+;	cpy #0
+;    bne sdfs_inputline_ok
+;	sec
+;	rts
+;sdfs_inputline_ok:
+;	clc
+;	rts
+
+;****************************************
+;* io_read_line
+;* Read a line, terminated by terminating char or max buffer length
+;* Input : buf_(lo/hi/sz/ef) : Address, Max size, end marker, C = 1 means echo
+;* Output : Y = Line length C = Buffer limit reached
+;* Regs affected : None
+;****************************************
+;io_read_line:
+;	pha
+;
+;	ldy #0x00			; Starting at first byte
+;io_get_line_byte:
+;    jsr fs_get_next_byte		; Get a byte
+;	sta (buf_lo),y		; Save it
+;	iny					; Increase length
+;io_skip_special:
+;	cmp buf_ef			; Is it the terminating char?
+;	beq io_get_line_done	; If yes then done
+;	cpy buf_sz			; Reached the buffer max size?
+;	bne io_get_line_byte	; No, get another byte
+;	sec					; Yes, set carry flag
+;	pla
+;	rts					; And done
+;io_get_line_done:
+;	lda #0
+;	sta (buf_lo),y		; Terminate with 0
+;	clc					; Clear carry flag
+;	pla
+;	rts					; Fin
+
+;****************************************
+;* io_write_line
+;* Put a line of bytes out of a certain length
+;* Input : buf_(lo/hi/sz/ef) : Address, Y=Max size
+;* Output : None
+;* Regs affected : All
+;****************************************
+;io_write_line
+;	phy
+;	pha
+;	
+;	ldy #0				; Start at first byte
+;write_line_byte
+;	cpy buf_sz			; Check first if buffer sized reached
+;	beq write_line_done	; to catch zero length outputs
+;	lda (buf_lo),y		; Read the byte
+;	jsr io_put_ch		; Transmit
+;	iny					; Ready for next byte
+;	bne write_line_byte	; Forced branch as Y will only be 0 on wrap
+;write_line_done
+;
+;	pla
+;	ply
+;	rts	
+
 
 sd_msg_initialising
 	.byte "Initialising SD Card ",$00
 sd_msg_initdone
     .byte " done.", $0D,$0A,$00
-sd_msg_startcmd
-        .byte "Start cmd",$0D,$0A,$00
-sd_msg_getresp
-        .byte "Get resp",$0D,$0A,$00
-sd_msg_getresp17
-        .byte "Get resp17",$0D,$0A,$00
-sd_msg_waitbusy
-        .byte "Wait busy ... ",$00
-sd_msg_ready
-        .byte "ready",$0D,$0A,$00
-sd_msg_crc
-        .byte "crc",$0D,$0A,$00
-sd_msg_endresp17
-        .byte "EndResp17",$0D,$0A,$00
-sd_msg_backinsend17
-        .byte "back",$0D,$0A,$00
+;sd_msg_startcmd
+;        .byte "Start cmd",$0D,$0A,$00
+;sd_msg_getresp
+;        .byte "Get resp",$0D,$0A,$00
+;sd_msg_getresp17
+;        .byte "Get resp17",$0D,$0A,$00
+;sd_msg_waitbusy
+;        .byte "Wait busy ... ",$00
+;sd_msg_ready
+;        .byte "ready",$0D,$0A,$00
+;sd_msg_crc
+;        .byte "crc",$0D,$0A,$00
+;sd_msg_endresp17
+;        .byte "EndResp17",$0D,$0A,$00
+;sd_msg_backinsend17
+;        .byte "back",$0D,$0A,$00
+sd_msg_find_file
+        .byte "Find file ",$00
+sd_msg_found_entry
+        .byte "found file",$0D,$0A,$00
+sd_msg_readsector
+    .byte "Sector:",$00
 
 sd_cmd55
 	.byte ($40+55), $00, $00, $00, $00, $95

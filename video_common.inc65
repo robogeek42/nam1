@@ -12,3 +12,4 @@
 .import vdp_setaddr_sprite_pattern_table
 .import vdp_setaddr_pattern_table_offset
 
+.import VDP_REGS

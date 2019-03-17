@@ -34,9 +34,9 @@
 
 spr_set_small: ;; set small sprites in registers
 				phay
-                LDA ZP_VDP_REGS+1
+                LDA VDP_REGS+1
                 AND #$FD
-                STA ZP_VDP_REGS+1
+                STA VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
 				play
@@ -44,9 +44,9 @@ spr_set_small: ;; set small sprites in registers
                 
 spr_set_large: ;; set large sprites in registers
 				phay
-                LDA ZP_VDP_REGS+1
+                LDA VDP_REGS+1
                 ORA #$02
-                STA ZP_VDP_REGS+1
+                STA VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
 				play
@@ -54,9 +54,9 @@ spr_set_large: ;; set large sprites in registers
 
 spr_set_mag_on: 
 				phay
-                LDA ZP_VDP_REGS+1
+                LDA VDP_REGS+1
                 ORA #$01
-                STA ZP_VDP_REGS+1
+                STA VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
 				play
@@ -64,9 +64,9 @@ spr_set_mag_on:
 
 spr_set_mag_off:
 				phay
-                LDA ZP_VDP_REGS+1
+                LDA VDP_REGS+1
                 AND #$FE
-                STA ZP_VDP_REGS+1
+                STA VDP_REGS+1
                 LDY #$81            ;; register 1
                 JSR vdp_regwrite
 				play
@@ -228,7 +228,7 @@ vdp_load_sprite_data_from_mem:
 				phay
 				LDY ZP_TMP2			;; use P as counter
 
-				LDA ZP_VDP_REGS+6   ;; Reg 6 has Pattern table addr
+				LDA VDP_REGS+6   ;; Reg 6 has Pattern table addr
 				ASL					;; 2k boundaries (*0x800)
 				ASL					;; mult by 8 to give MSB
                 ASL

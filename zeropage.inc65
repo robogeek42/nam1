@@ -13,9 +13,16 @@ ZP_TMP1  = $2E
 
 ZP_CURSOR  = $2F	; Cursor char to print 0=cursor off
 
+R2      = $30
+R3      = $32
+R4      = $34
+
+;-----------------------------------------------------------
+; Output LIST to SD card if !=0
+OUT_LIST_SD = $36
+
 ;-----------------------------------------------------------
 ; VDP - 16 bytes
-ZP_VDP_REGS = $30 ;; 8 registers
 ZP_VDP_MODE = $38
 ZP_VDP_CHAR_WIDTH = $39
 ZP_VDP_SAB  = $3a ;; Sprite Attribute table Base addr (2 bytes)

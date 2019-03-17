@@ -54,7 +54,7 @@ vdp_set_mode:   STA ZP_VDP_MODE
                 LDX #$80
                 LDY #0
 vdp_sm_loop:    LDA (ZP_TMP0), Y        ; Load register value from mode tab
-                STA ZP_VDP_REGS,Y       ; Save it in zero page
+                STA VDP_REGS,Y       ; Save it in zero page
                 STA VDP_WR_REG          ; set registers directly as subroutine uses Y for reg num
                 STX VDP_WR_REG
                 INY
@@ -74,14 +74,14 @@ vdp_sm_loop:    LDA (ZP_TMP0), Y        ; Load register value from mode tab
 
                 ;; Load char-set, colours and clear screen
                 JSR vdp_load_chars  
-                LDA ZP_VDP_REGS+7
+                LDA VDP_REGS+7
                 JSR vdp_load_flat_colors
                 JSR vdp_clear_screen
 
                 ;; store the sprite table address
                 ;; it will be frequently used and is slow to derive
                 ;; SAB = REG5 * 0x80 (makes upper 7 bits of 14 bit address)
-                LDA ZP_VDP_REGS+5   
+                LDA VDP_REGS+5   
                 CLC                 
                 ROR A               
                 STA ZP_VDP_SAB+1    ;; put shifted right bits into hi word
@@ -175,7 +175,7 @@ vdp_load_flat_colors:
 ;
 vdp_load_g1_col: 
                 PHA                 ;; color in Acc
-                LDA ZP_VDP_REGS+3   ;; Set VRAM address to VDP_REG3 * 0x40
+                LDA VDP_REGS+3   ;; Set VRAM address to VDP_REG3 * 0x40
                 STA ZP_TMP0
                 LDX #0
                 STX ZP_TMP1
@@ -203,7 +203,7 @@ lgc_loop:       STA VDP_WR_VRAM
 ;
 vdp_load_g2_col:
                 PHA                 ;; color in Acc
-                LDA ZP_VDP_REGS+3   ;; Color table
+                LDA VDP_REGS+3   ;; Color table
                 AND #$80            ;; just want upper bit
                 CLC
                 ROR
@@ -230,7 +230,7 @@ vdp_set_base_colors:
                 phx
                 phy
                 ; save color in ZP regs
-                STA ZP_VDP_REGS+7
+                STA VDP_REGS+7
                 ; set BG/FG Col
                 LDY #$87
                 JSR vdp_regwrite    ;; write value of Acc to Reg 7 (Col)
@@ -254,7 +254,7 @@ vdp_clear_screen:
                 BEQ cs_clear_multicolor
 
                 LDY #00             ;; Set VRAM address to VDP_REG2 * 0x400
-                LDA ZP_VDP_REGS+2
+                LDA VDP_REGS+2
                 ASL
                 ASL
                 JSR vdp_set_addr_w
@@ -329,7 +329,7 @@ vt1_loop2:      JSR print_memory16  ;; print 16 bytes from (RES) and inc RES by 
 ; Setup a VDP write to ZP_VDP_CURS (2byte) position
 vdp_start_str_w:
 				phay
-                LDA ZP_VDP_REGS+2   ;; Load Name tab from Reg2
+                LDA VDP_REGS+2   ;; Load Name tab from Reg2
                 ASL                 ;; NameTab Addr = reg2 * 0x400
                 ASL
                 CLC
@@ -568,7 +568,7 @@ vdp_cursor_off:
 ;  		256+256+256+192-40
 vdp_scroll_up_line:
 				phay
-                LDA ZP_VDP_REGS+2   ;; hi address of name table (VDP_REG2 * 0x400)
+                LDA VDP_REGS+2   ;; hi address of name table (VDP_REG2 * 0x400)
                 ASL
                 ASL
 				STA ZP_TMP3			;; store in DestAddr (hi)
@@ -690,7 +690,7 @@ gt1_done:       RTS
 vdp_load_mc_standard_name_table:
                 ; get name table
                 LDY #00             ;; Set VRAM address to name table (VDP_REG2 * 0x400)
-                LDA ZP_VDP_REGS+2
+                LDA VDP_REGS+2
                 ASL
                 ASL
                 JSR vdp_set_addr_w

@@ -120,7 +120,7 @@ pong:
 ; Draw board & Score
 ; Central dotted line
 		LDX #24				; height mode 1
-		LDA ZP_VDP_REGS+2
+		LDA VDP_REGS+2
 		ASL
 		ASL
 		STA ZP_TMP1

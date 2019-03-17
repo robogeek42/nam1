@@ -11,7 +11,7 @@ MODE <mode>
 		2 = Graphics Mode II with 32x24 text
 		3 = Multicolor graphics mode
 
-TEXTCOL <FG>,<BG>
+COL <FG>,<BG>
 	Change foreground and background colours of a text
 	based screen (modes 0,1,2)
 	FG and BG are integers 0-15
@@ -20,18 +20,22 @@ SD card FAT16 access
 --------------------
 The FAT16 file structure is flat and does not have subdirectories
 
-SDDIR
+DIR
 	Get directory listing from SD card
 
-SDLOAD <"filename">
+LOAD <"filename">
 	Load basic program from file "filename" 
+	(From a text listing)
 
-SDSAVE <"filename">
+SAVE <"filename">
 	Save current basic program to file "filename" 
+	(Saved as a text listing)
 
-SDDEL <"filename">
+DEL <"filename">
 	Delete file "filename"
 
+CAT <"filename">
+	Cat (type out) file "filename"
 
 Sprite commands
 ---------------
@@ -69,13 +73,9 @@ SPR_LOADP <ADDR>,<P>
 
 Image Load commands
 -------------------
-IMG_LOAD
-	Load data from current DATA pointer to Pattern Table assuming standard Name Table layout
-	Amount of data loaded is dependent on graphics MODE
-	Valid for modes 2 (Graphics II) and 3 (Multicolor) only
-
-IMG_SDLOAD <filename>
-	Load data from file <filename> to Pattern Table assuming standard Name Table layout
+IMGLOAD
+	Load compressed data from file <filename> to Pattern Table assuming standard Name Table layout
+	Compressed using my RLE1 algorithm.  Use sc2_conv/convcomp to compress from an SC2 file (see http://msx.jannone.org/conv/) 
 	Amount of data loaded is dependent on graphics MODE
 	Valid for modes 2 (Graphics II) and 3 (Multicolor) only
 

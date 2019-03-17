@@ -13,7 +13,7 @@
 .include "sprite.inc65"
 .include "sd.inc65"
 .include "kbdvia.inc65"
-.include "bcd.inc65"
+.include "decomp.inc65"
 
 .import pong
 
@@ -48,6 +48,8 @@ LAB_stlp:
 				DEY					; decrement index/count
 				BNE	LAB_stlp		; loop if more to do
 
+				STZ OUT_LIST_SD
+
                 ; initialise ACIA serial comms
                 JSR acia_init
 
@@ -56,6 +58,12 @@ LAB_stlp:
                 JSR acia_puts
                 JSR kbd_init
 .endif
+                ;ld16 R0,buffer
+                ;JSR acia_put_newline
+                ;LDX #<VDP_REGS
+                ;LDA #>VDP_REGS
+				;JSR print_16bit_hex_string      ; print it
+                ;JSR acia_put_newline
 
 .ifdef SDIO
 				; SD Card and filesystem
@@ -157,11 +165,11 @@ loop:           ld16 R0, prompt
 				jmp loop
 				@cmd_sd_end:
 
-@cmd_t:         cmp #'t'
-				bne @cmd_t_end
-				jsr cmd_test_bcd
+@cmd_l:         cmp #'l'
+				bne @cmd_l_end
+				jsr cmd_loadimage
                 jmp loop
-				@cmd_t_end:
+				@cmd_l_end:
 
                 ; h = print help
 @cmd_h:         cmp #'h'
@@ -360,13 +368,28 @@ print_16bit_hex_string:
 ;-----------------------------------------------------
 ; test bcd printing
 cmd_test_bcd:
-				ld16 R0, buffer + 2
-				JSR scan_hex			; scan 2 byte hex value into Acc
-				JSR BINBCD8				; convert to BCD and write in RES,RES+1
-				ld16 R0, buffer			; output buffer
-				JSR BCD2STR				; convert BCD to string
-				JSR acia_puts			; print it
-				JSR acia_put_newline
+;				ld16 R0, buffer + 2
+;				JSR scan_hex			; scan 2 byte hex value into Acc
+;				JSR BINBCD8				; convert to BCD and write in RES,RES+1
+;				ld16 R0, buffer			; output buffer
+;				JSR BCD2STR				; convert BCD to string
+;				JSR acia_puts			; print it
+;				JSR acia_put_newline
+;				RTS
+
+;-----------------------------------------------------
+; Load a compressed image (test)
+cmd_loadimage:
+				; switch to mode 2 (Screen2)
+                LDA #2
+                JSR vdp_set_mode
+				; put address into TMP1
+				LDA #<image_smashmario_COMP
+				STA TMP1
+				LDA #>image_smashmario_COMP
+				STA TMP1+1
+				; load image
+				JSR decompRLE1_SC2
 				RTS
 
 ;-----------------------------------------------------
@@ -388,6 +411,9 @@ cmd_basic:
 				STA TMP0+1
 @boot_basic:	JMP (TMP0)
 
+image_smashmario_COMP:
+	.include "smashmario_COMP.inc65"
+
 ;-----------------------------------------------------
 ; BASIC linkage
 ;  - ROM code from LAB_vec to END_CODE will be copied to RAM $0300
@@ -397,7 +423,7 @@ cmd_basic:
 ; vector tables
 
 LAB_vec:
-	.word	ACIAin		; byte in from ACIA
+    .word	CHARin		; byte in from ACIA or Keyboard
 	.word	CHARout		; byte out to ACIA and video
 	.word	LOAD		; load vector for EhBASIC
 	.word	SAVE		; save vector for EhBASIC
@@ -426,11 +452,13 @@ NMI_CODE
 
 END_CODE
 
+; Output to serial & video
 CHARout:
 	JSR ACIAout
 	JSR vdp_write_char
 	RTS
 
+; Output only to serial port
 ACIAout:
 	PHA				; A contains char to print
 @wait_txd_empty:
@@ -441,7 +469,8 @@ ACIAout:
 	STA ACIA_DATA	; and output
     RTS
 
-ACIAin:
+; Input from ACIA and KBD if configured
+CHARin:
 	LDA	ACIA_STATUS
 	AND #ACIA_STATUS_RX_FULL
 	BEQ	@nobyw		; branch if no byte waiting
