@@ -380,16 +380,16 @@ cmd_test_bcd:
 ;-----------------------------------------------------
 ; Load a compressed image (test)
 cmd_loadimage:
-				; switch to mode 2 (Screen2)
-                LDA #2
-                JSR vdp_set_mode
-				; put address into TMP1
-				LDA #<image_smashmario_COMP
-				STA TMP1
-				LDA #>image_smashmario_COMP
-				STA TMP1+1
-				; load image
-				JSR decompRLE1_SC2
+;				; switch to mode 2 (Screen2)
+;                LDA #2
+;                JSR vdp_set_mode
+;				; put address into TMP1
+;				LDA #<image_smashmario_COMP
+;				STA TMP1
+;				LDA #>image_smashmario_COMP
+;				STA TMP1+1
+;				; load image
+;				JSR decompRLE1_SC2
 				RTS
 
 ;-----------------------------------------------------
@@ -411,8 +411,8 @@ cmd_basic:
 				STA TMP0+1
 @boot_basic:	JMP (TMP0)
 
-image_smashmario_COMP:
-	.include "smashmario_COMP.inc65"
+;image_smashmario_COMP:
+;	.include "smashmario_COMP.inc65"
 
 ;-----------------------------------------------------
 ; BASIC linkage

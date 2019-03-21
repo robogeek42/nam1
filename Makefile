@@ -18,11 +18,16 @@ else
 	LIBS = 
 endif
 
+# Compile with physical keyboard by default as the SIM now supports it
+KEYB ?= 1
+
 DEFINES = $(SDIO_DEF) $(KEYB_DEF)
 ifdef SDIO
+$(info ** Compile with SD card support **)
 	SDIO_DEF = -D SDIO=$(SDIO)
 endif
 ifdef KEYB
+$(info ** Compile with VIA Keyboard support **)
 	KEYB_DEF = -D KEYB=$(KEYB)
 endif
 
@@ -38,7 +43,7 @@ firmware: main.o $(SOURCES:.s65=.o)
 	cl65 -vm -g -T -C firmware.cfg $(LIBS) -t none -o $@ -m firmware.map -l firmware.lst -Ln firmware.vice $^
 
 clean:
-	 rm -f firmware *.o *.lst
+	 rm -f firmware *.o *.lst *map *vice
 
 install: firmware
 	cp firmware $(SYMON_ROOT)/homebrew.bin

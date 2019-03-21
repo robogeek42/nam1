@@ -8305,6 +8305,11 @@ LAB_CAT
 
 .endif
 
+; return a Filesystem error and do warm start
+LAB_FSER
+	LDX	#$24			; error code $24 ("Filesystem" error)
+	JMP	LAB_XERR		; do error #X, then warm start
+
 LAB_DO_FSER2
 	JMP LAB_FSER
 ;----------------------------------------------------------------
@@ -8315,14 +8320,6 @@ LAB_IMGLOAD
     JSR SD_GETFILENAME
 	JSR fs_open_read
 	BCS LAB_DO_FSER2		; File system error
-.else
-	; this version just loads example
-	; put address into TMP1
-	LDA #<image_smashmario_COMP
-	STA TMP1
-	LDA #>image_smashmario_COMP
-	STA TMP1+1
-.endif
 	
 	; switch to mode 2 (Screen2)
 	LDA #2
@@ -8337,11 +8334,10 @@ LAB_IMGLOAD
 	; wait for key press
 	JSR V_INPT
 	BCC @loop
+
+.endif
 	RTS
 
-	LDA #2
-	JSR vdp_set_mode
-	
 ;-----------------------------------------------------------------
 
 ; system dependant i/o vectors
