@@ -68,7 +68,7 @@
 scan_buffer:     .res 13,0
 ;dbg_buffer:     .res 10,0
 KBD_TMP = scan_buffer+8
-KBD_RPT_CNT = scan_buffer+9
+KBD_RPT_CNT = scan_buffer+9		; 2 bytes
 
 .code
 
@@ -116,6 +116,7 @@ kbd_init:       LDA #$FF
 				STA KBD_CHAR			; Output
                 STA KBD_CHAR_LAST		; to stop repeat
                 STA KBD_RPT_CNT         ; repeat delay counter
+                ;STA KBD_RPT_CNT+1
                 RTS
 
 ;---------------------------------------------------------------
@@ -291,16 +292,16 @@ check_repeat:
 ;---------------------------------------------------------------
 ;  Return A=char C=1 X,Y preserved
 all_keys_found: 
-                LDA #$7F
+                LDA #$FF
                 STA KBD_RPT_CNT
                 plxy
                 LDA KBD_CHAR
                 STA KBD_CHAR_LAST       ; and record as last
                 BPL found_real_key      ; $FF and $EE are flags/special, all real keys have bit7=0
+                STZ KBD_RPT_CNT
                 CLC
                 RTS
 found_real_key:
-                STZ KBD_RPT_CNT
                 SEC
                 RTS
 
