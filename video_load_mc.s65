@@ -17,7 +17,7 @@ vdp_load_mc_pic:
                 LDX #8
                 LDY #0
 @loop:          LDA (R0),Y
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 INY
                 BNE @loop
                 INC R0+1

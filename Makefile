@@ -21,7 +21,8 @@ endif
 # Compile with physical keyboard by default as the SIM now supports it
 KEYB ?= 1
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF)
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF)
+
 ifdef SDIO
 $(info ** Compile with SD card support **)
 	SDIO_DEF = -D SDIO=$(SDIO)
@@ -30,6 +31,11 @@ ifdef KEYB
 $(info ** Compile with VIA Keyboard support **)
 	KEYB_DEF = -D KEYB=$(KEYB)
 endif
+ifdef FASTCPU
+$(info ** Compile with FAST CPU support **)
+	FASTCPU_DEF = -D FASTCPU=$(FASTCPU)
+endif
+
 
 all: firmware
 

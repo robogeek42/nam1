@@ -60,6 +60,8 @@
 
 .export kbd_init
 .export kbd_scan
+.export kbd_iskey
+.export kbd_getkey
 
 ; Allocate KBD Buffer in RAM (.bss)
 .bss
@@ -69,6 +71,7 @@ scan_buffer:     .res 13,0
 ;dbg_buffer:     .res 10,0
 KBD_TMP = scan_buffer+8
 KBD_RPT_CNT = scan_buffer+9		; 2 bytes
+KBD_DB_CNT = scan_buffer+11		; 2 bytes
 
 .code
 
@@ -113,10 +116,10 @@ kbd_init:       LDA #$FF
                 LDA #$00
 				STA VIA1+VIA_DDRB		; Port B all lines input
 				STA VIA1+VIA_PCR		; Peripheral Control Reg (interrupts & handshaking)
-				STA KBD_CHAR			; Output
-                STA KBD_CHAR_LAST		; to stop repeat
-                STA KBD_RPT_CNT         ; repeat delay counter
-                ;STA KBD_RPT_CNT+1
+				STA KBD_CHAR			; Key detected
+				STA KBD_CHAR_LAST		; Last key detected
+				STA KBD_RPT_CNT
+				STA KBD_RPT_CNT+1
                 RTS
 
 ;---------------------------------------------------------------
@@ -132,9 +135,8 @@ kbd_scan:       phxy
 ; No key pressed, return C=0, KBD_CHAR=0
 no_key:         LDA #0
                 STA KBD_CHAR
-                STA KBD_CHAR_LAST
-                STZ KBD_RPT_CNT
-                ;STZ KBD_RPT_CNT+1
+				STA KBD_RPT_CNT
+				STA KBD_RPT_CNT+1
                 plxy                       ; restore x&y 
                 CLC                        ; C=0 means no key
                 RTS
@@ -151,7 +153,7 @@ kbd_save_cols:  LDX #0
 				LDA VIA1+VIA_IRB       ; read column
                 STA scan_buffer,X ; and store for later interpretation
                 SEC               ; move on
-                ROL KBD_CHAR      ; to next column
+				ROL KBD_CHAR      ; to next row
                 LDA KBD_CHAR
                 INX
                 CPX #8
@@ -241,8 +243,10 @@ get_anoth_key:  DEY
                 BNE next_scan_byte
 
 ; Gone through all keys
-                ;JMP all_keys_found
-                JMP check_repeat
+				LDA KBD_CHAR
+				CMP #0
+				BNE all_keys_found
+				JMP no_key
 
 ;---------------------------------------------------------------
 ; Found some key pressed.
@@ -280,38 +284,170 @@ fk_over:        ply            ; restore X and Y so jumping back into loop works
                 plx
 
                 CMP #$FF                ; if it is a non alpha modifier, go get another key
-                BNE check_repeat
+				BNE all_keys_found
                 LDA KBD_TMP
                 JMP get_anoth_key       ; jump back into the loop!
 
-check_repeat:
-                LDA KBD_CHAR
-                CMP KBD_CHAR_LAST
-                BEQ same_as_last
-                
+
 ;---------------------------------------------------------------
 ;  Return A=char C=1 X,Y preserved
 all_keys_found: 
-                LDA #$FF
-                STA KBD_RPT_CNT
-                plxy
                 LDA KBD_CHAR
-                STA KBD_CHAR_LAST       ; and record as last
-                BPL found_real_key      ; $FF and $EE are flags/special, all real keys have bit7=0
-                STZ KBD_RPT_CNT
+				CMP #$FF
+				BEQ found_modifier_key      
+				CMP #$FE
+				BEQ found_special_key      
+				BRA found_real_key
+
+found_modifier_key:
+				LDA #0
+				;STA KBD_RPT_CNT
+				;STA KBD_RPT_CNT+1
+found_special_key:
+				LDA #0
+                plxy
                 CLC
                 RTS
 found_real_key:
+				LDA KBD_CHAR
+				CMP KBD_CHAR_LAST
+				BEQ same_as_last
+				STA KBD_CHAR_LAST
+				JSR set_repeat_count_long
+                plxy
+				LDA KBD_CHAR
                 SEC
                 RTS
 
+;---------------------------------------------------------------
+; Same as last key pressed, return NO Key pressed, but dont
+; change LAST
 same_as_last:
-                DEC KBD_RPT_CNT
-                BNE no_repeat
-                LDA #0 
-                STA KBD_CHAR_LAST       ; clear last so next time we see same char, it will get printed
-no_repeat:                
-                plxy
-                CLC
-                RTS
+				LDA KBD_RPT_CNT
+				BEQ check_hi_is_zero
+				DEC KBD_RPT_CNT
+				BRA done_same_as_last
+check_hi_is_zero:
+				LDA KBD_RPT_CNT+1
+				BEQ countdown_done
+				DEC KBD_RPT_CNT+1
+				DEC KBD_RPT_CNT
+				BRA done_same_as_last
+countdown_done:
+				;STZ KBD_CHAR_LAST
+				JSR set_repeat_count_short
+				plxy
+				LDA KBD_CHAR
+				SEC
+				RTS
+
+done_same_as_last:
+				plxy
+				LDA #0
+				CLC
+				RTS
+
+set_repeat_count_short:
+				LDA #0
+				STA KBD_RPT_CNT+1
+				LDA #$FF
+				STA KBD_RPT_CNT
+				RTS
+
+set_repeat_count_long:
+				LDA #4
+				STA KBD_RPT_CNT+1
+				LDA #$1F
+				STA KBD_RPT_CNT
+				RTS
+
+;---------------------------------------------------------------
+; kbd_iskey - check if key given by keycode in X is pressed
+;
+; 			keycode: bits( SCrrrccc ) Shift, Ctrl, Row(3bits), Col(3bits)
+kbd_iskey:
+				STA TMP0				; has key-code
+; ignore shift/ctrl flags just check actual key press
+
+kik_decode_row:
+				STZ TMP1				; clear result row
+				LDA TMP0				; key-code
+				LSR						; get bits 4,5,6
+				LSR
+				LSR
+				AND #$07				; A has encoded row
+				BEQ kik_decode_col		; if row=0 done
+
+				INC TMP1				; set bit 0 of result
+@loop1:			; shift result left row number of times
+				ASL TMP1
+				DEC
+				BNE @loop1
+				
+kik_decode_col:
+				STZ TMP1+1				; clear result col
+				LDA TMP0
+				AND #$07				; mask lower 3 bits to get encoded col
+				BEQ kik_check_key		; if col=0 done
+
+				INC TMP1+1				; set bit 0 of result
+@loop2:			; shift result left col number of times
+				ASL TMP1+1
+				DEC
+				BNE @loop2
+				
+kik_check_key:	LDA TMP1				; load row bit
+				STA VIA1+VIA_ORA        ; Write 0s to ALL rows
+				LDA VIA1+VIA_IRB        ; Read columns
+				CMP TMP1+1				; compare to column bit
+				BNE kik_done 	        ; not matched key
+
+				SEC
+				RTS
+kik_done:
+				CLC
+				RTS
+
+;---------------------------------------------------------------
+; kbd_getkey - return keycode of pressed key in X
+kbd_getkey:
+				STZ TMP1				; result row
+				STZ TMP1+1				; result col
+
+                phxy
+				LDA #0					   ; 1st test all rows to see if anything is pressed
+				STA VIA1+VIA_ORA           ; Write 0s to ALL rows
+				LDA VIA1+VIA_IRB           ; Read columns
+				BNE kgk_getkey             ; Not 0 means: Found a key pressed
+kgk_nokey:
+				plxy
+				LDA #0
+				RTS
+kgk_getkey:
+                LDA #%11111110    ; Bit7 of B corresponds to Row A above
+								  ; set b0 to 0 to test row
+				STA KBD_CHAR	  ; store in temp, we'll ROL it later to test each row
+@save_loop:     STA VIA1+VIA_ORA       ; select a row
+				LDA VIA1+VIA_IRB       ; read column
+                STA scan_buffer,X ; and store for later interpretation
+                SEC               ; move on
+				ROL KBD_CHAR      ; to next row
+                LDA KBD_CHAR
+                INX
+                CPX #8
+                BNE @save_loop
+
+				LDA #$FF          ; Disconnect tows
+                STA VIA1+VIA_ORA
+				LDA #0			  ; done with temp var
+				STA KBD_CHAR
+
+; encode column into lower 3 bits and row into upper
+; for r in 0 to 7
+; 	if MASKED(scan_buffer[r])!=0 set bit r in ROW, set COL = scan_buffer[r]
+; set SHIFT and CTRL
+; encode, SHIFT, CTRL, ROW, COL
+
+				plxy
+				RTS
 

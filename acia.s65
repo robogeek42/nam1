@@ -18,8 +18,16 @@ ACIA_BUFFER_LENGTH = 10
 acia_init:        pha
                   lda #(ACIA_PARITY_DISABLE | ACIA_ECHO_DISABLE | ACIA_TX_INT_DISABLE_RTS_LOW | ACIA_RX_INT_DISABLE | ACIA_DTR_LOW)
                   sta ACIA_COMMAND
+.ifdef FASTCPU
+                  nop
+                  nop
+.endif
                   lda #(ACIA_STOP_BITS_1 | ACIA_DATA_BITS_8 | ACIA_CLOCK_INT | ACIA_BAUD_9600)
                   sta ACIA_CONTROL
+.ifdef FASTCPU
+                  nop
+                  nop
+.endif
 				  pla
 				  rts
 
@@ -27,6 +35,10 @@ acia_init:        pha
 acia_putc:        pha
 wait_txd_empty:   lda ACIA_STATUS
                   and #ACIA_STATUS_TX_EMPTY
+.ifdef FASTCPU
+                  nop
+                  nop
+.endif
                   beq wait_txd_empty
                   pla
                   sta ACIA_DATA
@@ -58,12 +70,17 @@ not_special:      ;JSR acia_putc
 ; Wait until a character was reveiced on serial port and return it in A
 acia_getc:         
 wait_rxd_full:    
-                  ;jsr kbd_scan                  ; Real Keyboard scan first
-                  ;bcs key_press                 ; Handle a keypress
                   lda ACIA_STATUS
+.ifdef FASTCPU
+                  nop
+                  nop
+.endif
                   and #ACIA_STATUS_RX_FULL
                   beq wait_rxd_full
                   lda ACIA_DATA
+.ifdef FASTCPU
+                  nop
+.endif
                   rts
 
 ; Wait until a \n terminated string was received and store it at (R0)

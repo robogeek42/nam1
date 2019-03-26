@@ -30,7 +30,7 @@ vls_write_block:
                 LDX #24             ;; write 24 blocks of 256 (3*2K)
                 LDY #00
 vls_loop1:      LDA (TMP0),Y
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 INY
                 BNE vls_loop1
                 INC TMP0+1          ;; inc char addr by 256

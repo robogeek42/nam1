@@ -56,7 +56,17 @@ vdp_set_mode:   STA ZP_VDP_MODE
 vdp_sm_loop:    LDA (ZP_TMP0), Y        ; Load register value from mode tab
                 STA VDP_REGS,Y       ; Save it in zero page
                 STA VDP_WR_REG          ; set registers directly as subroutine uses Y for reg num
+.ifdef FASTCPU
+                NOP
+                NOP
+                NOP
+.endif
                 STX VDP_WR_REG
+.ifdef FASTCPU
+                NOP
+                NOP
+                NOP
+.endif
                 INY
                 INX
                 CPY #8
@@ -135,7 +145,7 @@ vlc_load:       ld16 TMP0,CHAR_TAB  ;; character defs
                 LDX #04             ;; write 4 blocks of 256
                 LDY #00
 lc_loop1:       LDA (TMP0),Y
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 INY
                 BNE lc_loop1
                 INC TMP0+1          ;; inc char addr by 256
@@ -148,7 +158,7 @@ lc_loop1:       LDA (TMP0),Y
                 LDY #00
 lc_loop2:       LDA (TMP0),Y
                 EOR #$FF
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 INY
                 BNE lc_loop2
                 INC TMP0+1          ;; inc char addr by 256
@@ -190,7 +200,7 @@ lgc_loop1:      ASL ZP_TMP0
 
                 PLA                 ;; color
                 LDY #$00           
-lgc_loop:       STA VDP_WR_VRAM
+lgc_loop:       JSR vdp_write
                 INY
                 CPY #$20             ;; 32 entries
                 BNE lgc_loop
@@ -215,7 +225,7 @@ vdp_load_g2_col:
                 LDX #24             ;; 24*256=3*2k
 lgc2_loop_outer:
                 LDY #00
-lgc2_loop:      STA VDP_WR_VRAM
+lgc2_loop:      JSR vdp_write
                 INY
                 BNE lgc2_loop
                 DEX
@@ -264,7 +274,7 @@ cs_write_spaces:
                 LDA #$20                
                 LDY #24                 ; Screens are 24 chars high
 cs_loop_row:    LDX ZP_VDP_CHAR_WIDTH   ; and either 32 or 40 wide
-cs_loop_col:    STA VDP_WR_VRAM
+cs_loop_col:    JSR vdp_write
                 DEX
                 BNE cs_loop_col
                 DEY
@@ -287,7 +297,7 @@ cs_clear_multicolor:
                 LDX #8
                 LDY #0
                 LDA #0
-cs_loop1:       STA VDP_WR_VRAM
+cs_loop1:       JSR vdp_write
                 INY
                 BNE cs_loop1
                 DEX
@@ -303,7 +313,7 @@ vdp_dump_page:
                 LDY #0                  ;; set VDP VRAM read address (and test 256 bytes)
 				LDA ZP_TMP0				;; page
                 JSR vdp_set_addr_r
-vt1_loop1:      LDA VDP_RD_VRAM         ;; read back
+vt1_loop1:      JSR vdp_read            ;; read back
                 STA (RES),Y
                 INY
                 BNE vt1_loop1
@@ -452,7 +462,7 @@ vdp_move_line_down:
 				PHA
 				LDY ZP_VDP_CHAR_WIDTH
 				LDA #$20			;; and write a space
-@loop_clrline:	STA VDP_WR_VRAM
+@loop_clrline:	JSR vdp_write
 				DEY
 				BNE @loop_clrline
 				JSR vdp_move_to_start_line
@@ -626,7 +636,7 @@ vdp_load_number_name_table:
                 STA TMP0            
                 LDY #3
                 LDX #00
-gt1_loop:       STA VDP_WR_VRAM
+gt1_loop:       JSR vdp_write
                 INC TMP0
                 LDA TMP0
                 INX
@@ -643,7 +653,7 @@ gt1_loop:       STA VDP_WR_VRAM
                 LDA #$00
                 STA TMP0
                 LDX #$C0
-gt1_loop2:      STA VDP_WR_VRAM
+gt1_loop2:      JSR vdp_write
                 INC TMP0
                 LDA TMP0
                 DEX
@@ -703,7 +713,7 @@ vlsnt_loop3:    LDA #4
                 
 vlsnt_loop2:    LDY #$20            ;; count 32 chars per row
                 LDX TMP0            ;; starting name value for this row
-vlsnt_loop1:    STX VDP_WR_VRAM
+vlsnt_loop1:    JSR vdp_write
                 INX
                 DEY
                 BNE vlsnt_loop1
@@ -732,7 +742,7 @@ vdp_copy:
                 LDA ZP_TMP0+1           ;; in ZP_TMP0/1
                 JSR vdp_set_addr_r
                 LDY #0
-@loop1:         LDA VDP_RD_VRAM         ;; read from VDP
+@loop1:         JSR vdp_read            ;; read from VDP
                 STA (RES),Y             ;; save in CPU
                 INY
                 CPY TMP2                ;; number of bytes (0=256)
@@ -745,7 +755,7 @@ vdp_copy:
                 JSR vdp_set_addr_w
                 LDY #0
 @loop2:         LDA (RES),Y             ;; read from CPU
-                STA VDP_WR_VRAM         ;; write to VDP
+                JSR vdp_write           ;; write to VDP
                 INY
                 CPY TMP2                ;; number of bytes (0=256)
                 BNE @loop2

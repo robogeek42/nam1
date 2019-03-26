@@ -192,7 +192,11 @@ loop:           ld16 R0, prompt
 ; -- Strings 
 prompt:     .byte "nam-mon-> ", $00
 assign_arrow:   .byte " <- ", $00
+.ifdef FASTCPU
+msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics Fast CPU",$0d,$0a, $00
+.else
 msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics",$0d,$0a, $00
+.endif
 msg_unknown:    .byte "Unknown command", $0d, $0a, $00
 msg_help:   .byte "m <addr> - dump mem",$0d,$0a
             .byte "p <page> - dump page",$0d,$0a

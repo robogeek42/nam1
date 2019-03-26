@@ -90,12 +90,20 @@ vdp_init_sprites:
                 LDX #$D0    ;; D0 in vertical pos turns off sprite processing
                 LDA #0      ;; zero in other 3 fields
 vis_loop:       STX VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+                NOP
+                NOP
+                NOP
+                NOP
+                NOP
+.endif
                 DEY             ;; 2 cycles = 2us at 1MHz
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 DEY
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 DEY
-                STA VDP_WR_VRAM
+                JSR vdp_write
                 DEY
                 BNE vis_loop
 				plaxy
@@ -119,6 +127,9 @@ ves_loop:		LDA ZP_VDP_SAB+1	; hi
 				JMP @dowrite
 @enable:		LDA #0 
 @dowrite:		STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				INY					; move to next sprite
 				INY
 				INY
@@ -145,9 +156,15 @@ vdp_set_sprite_pos:
 				NOP
 				LDA ZP_TMP2			; Y first
 				STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				NOP
 				LDA ZP_TMP1			; then X
 				STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				play
 				RTS
 
@@ -166,6 +183,9 @@ vdp_set_sprite_col:
                 LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
 				LDA VDP_RD_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				AND #$F0			; preserve the clock bit
 				ORA ZP_TMP1			; and write new color
 				STA ZP_TMP1			; save
@@ -173,6 +193,9 @@ vdp_set_sprite_col:
 				JSR vdp_set_addr_w	; set address again - write this time
 				LDA ZP_TMP1			; write modified color to VRAM
 				STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				play
 				RTS
 
@@ -191,6 +214,9 @@ vdp_set_sprite_early:
                 LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
 				LDA VDP_RD_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				AND #$0F			; preserve the colour nibble
 				ORA ZP_TMP1
 				STA ZP_TMP1			; save
@@ -198,6 +224,9 @@ vdp_set_sprite_early:
 				JSR vdp_set_addr_w	; set address again - write this time
 				LDA ZP_TMP1			; write modified color to VRAM
 				STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				play
 				RTS
 
@@ -218,6 +247,9 @@ vdp_set_sprite_pattern:
 				JSR vdp_set_addr_w	; set write address
 				LDA ZP_TMP1
 				STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				play
 				RTS
 
@@ -249,6 +281,9 @@ vssp_setvram:	LDY TMP2			;; set vram write address
 				LDY #0				;; copy data into vram
 @vssp_loop:		LDA (ZP_TMP0),Y
 				STA VDP_WR_VRAM
+.ifdef FASTCPU
+                NOP
+.endif
 				INY
 				CPY #8
 				BNE @vssp_loop

@@ -424,6 +424,8 @@ TK_VPTR		= TK_TWOPI+1	; VARPTR token
 TK_LEFTS		= TK_VPTR+1		; LEFT$ token
 TK_RIGHTS		= TK_LEFTS+1	; RIGHT$ token
 TK_MIDS		= TK_RIGHTS+1	; MID$ token
+TK_ISKEY 	= TK_MIDS+1			; ISKEY
+TK_GETKEY 	= TK_ISKEY+1			; GETKEY
 
 ; offsets from a base of X or Y
 
@@ -8305,13 +8307,12 @@ LAB_CAT
 
 .endif
 
+.ifdef SDIO
 ; return a Filesystem error and do warm start
-LAB_FSER
-	LDX	#$24			; error code $24 ("Filesystem" error)
-	JMP	LAB_XERR		; do error #X, then warm start
-
 LAB_DO_FSER2
 	JMP LAB_FSER
+.endif
+
 ;----------------------------------------------------------------
 ; Load Mode 2 image (compressed)
 LAB_IMGLOAD
@@ -8335,8 +8336,50 @@ LAB_IMGLOAD
 	JSR V_INPT
 	BCC @loop
 
-.endif
+.endif	; SDIO
 	RTS
+
+.ifdef KEYB
+FAR_LAB_AYFC
+	JMP LAB_AYFC
+;-----------------------------------------------------------------
+; Function : ISKEY(keycode)   Is key with code keycode pressed currently?
+; Parameter: keycode
+; Returns  : 1 if key is pressed
+LAB_ISKEY
+	JSR	LAB_EVBY		; evaluate byte expression, result in X
+	JSR kbd_iskey
+	BCC @notpressed
+	LDY #1
+	LDA #0
+	JMP @pressed
+@notpressed:
+	LDY #0
+	LDA #0
+@pressed:
+	JMP LAB_AYFC		; always save and convert integer AY to FAC1 and return
+
+	RTS
+
+;-----------------------------------------------------------------
+; Function : GETKEY           Get keycode of currently pressed key, or 0
+; Parameter: none
+; Returns  : Keycode in X
+LAB_GETKEY
+	LDY #14
+	LDA #0
+	JMP LAB_AYFC
+	RTS
+
+
+.else ; KEYB not defined 
+
+LAB_ISKEY
+	RTS
+LAB_GETKEY
+	RTS
+
+.endif ; KEYB
 
 ;-----------------------------------------------------------------
 
@@ -8655,6 +8698,8 @@ LAB_FTPM	= LAB_FTPL+$01
 	.word	LAB_LRMS-1		; LEFT$()	process string expression
 	.word	LAB_LRMS-1		; RIGHT$()		"
 	.word	LAB_LRMS-1		; MID$()		"
+	.word	LAB_PPFN-1		; ISKEY()   process numeric expression in ()
+	.word	LAB_PPBI-1		; GETKEY	advance pointer
 
 ; action addresses for functions
 
@@ -8695,6 +8740,8 @@ LAB_FTBM	= LAB_FTBL+$01
 	.word	LAB_LEFT-1		; LEFT$()
 	.word	LAB_RIGHT-1		; RIGHT$()
 	.word	LAB_MIDS-1		; MID$()
+	.word	LAB_ISKEY-1		; ISKEY
+	.word	LAB_GETKEY-1	; GETKEY
 
 ; hierarchy and action addresses for operator
 
@@ -8856,6 +8903,8 @@ LBB_CHRS
 	.byte	"HR$(",TK_CHRS	; CHR$(
 LBB_CLEAR
 	.byte	"LEAR",TK_CLEAR	; CLEAR
+LBB_COL
+	.byte	"OL",TK_COL 	; COL
 LBB_CONT
 	.byte	"ONT",TK_CONT	; CONT
 LBB_COS
@@ -8900,6 +8949,8 @@ LBB_FRE
 	.byte	"RE(",TK_FRE	; FRE(
 	.byte	$00
 TAB_ASCG
+LBB_GETKEY
+	.byte	"ETKEY",TK_GETKEY		; GETKEY
 LBB_GET
 	.byte	"ET",TK_GET		; GET
 LBB_GOSUB
@@ -8924,6 +8975,8 @@ LBB_INT
 	.byte	"NT(",TK_INT	; INT(
 LBB_IRQ
 	.byte	"RQ",TK_IRQ		; IRQ
+LBB_ISKEY
+	.byte	"SKEY(",TK_ISKEY		; ISKEY
 	.byte	$00
 TAB_ASCL
 LBB_LCASES
@@ -9053,8 +9106,6 @@ LBB_TAB
 	.byte	"AB(",TK_TAB	; TAB(
 LBB_TAN
 	.byte	"AN(",TK_TAN	; TAN(
-LBB_COL
-	.byte	"OL",TK_COL 	; COL
 LBB_THEN
 	.byte	"HEN",TK_THEN	; THEN
 LBB_TO
@@ -9188,7 +9239,7 @@ LAB_KEYT
 	.word	LBB_MODE		; VDP MODE
 	.byte	3,'C'
 	.word	LBB_CLS			; VDP CLS
-	.byte	7,'T'
+	.byte	3,'C'
 	.word	LBB_COL			; VDP COL
 ;	.byte	4,'L'
 ;	.word	LBB_LOAD		; LOAD
@@ -9345,6 +9396,10 @@ LAB_KEYT
 	.word	LBB_RIGHTS		; RIGHT$
 	.byte	5,'M'			;
 	.word	LBB_MIDS		; MID$
+	.byte	6,'I'
+	.word	LBB_ISKEY	; ISKEY(
+	.byte	6,'G'
+	.word	LBB_GETKEY	; GETKEY
 
 ; BASIC messages, mostly error messages
 

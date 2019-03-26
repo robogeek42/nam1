@@ -164,7 +164,7 @@ dr1_loop_main:
 		;LDA (TMP1),Y				; load the char to write
 		JSR rl1_get_char
 dr1_loop_rc:
-		STA VDP_WR_VRAM				; write char
+        JSR vdp_write
 		DEX							; X times
 		BNE dr1_loop_rc
 
@@ -192,7 +192,7 @@ dr1_loop_uc:
 
 		;LDA (TMP1),Y				; load the char to write
 		JSR rl1_get_char
-		STA VDP_WR_VRAM				; write char
+        JSR vdp_write				; write char
 		DEX							; X times
 		BNE dr1_loop_uc
 		; done uc loop

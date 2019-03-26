@@ -39,6 +39,8 @@
 .export vdp_setaddr_sprite_attribute_table
 .export vdp_setaddr_sprite_pattern_table
 .export vdp_setaddr_pattern_table_offset
+.export vdp_write
+.export vdp_read
 
 .bss
 VDP_REGS:   .res  8,0
@@ -58,7 +60,13 @@ vdp_getstatus:   LDA VDP_RD_STATUS
 ; Write a value to one of seven registers
 ; Data is in Acc, Register number+$80 is in Y
 vdp_regwrite:   STA VDP_WR_REG        ; Data
+.ifdef FASTCPU
+                NOP
+.endif
                 STY VDP_WR_REG        ; Register 80...87
+.ifdef FASTCPU
+                NOP
+.endif
                 RTS
 
 ; 3. Write Address
@@ -67,14 +75,28 @@ vdp_regwrite:   STA VDP_WR_REG        ; Data
 vdp_set_addr_w: AND #$3F
                 ORA #$40
                 STY VDP_ADDR_SET      ; Address lo byte
+.ifdef FASTCPU
+                NOP
+.endif
                 STA VDP_ADDR_SET      ; Address hi byte
+.ifdef FASTCPU
+                NOP
+.endif
                 RTS
 ; 3. Read Address
 ; Set an address in VRAM. Low byte in Y, High byte in A
 ; This should be followed by a series of reads from VDP_RD_VRAM
 vdp_set_addr_r: AND #$3F
                 STY VDP_ADDR_SET      ; Address lo byte
+.ifdef FASTCPU
+                NOP
+                NOP
+.endif
                 STA VDP_ADDR_SET      ; Address hi byte
+.ifdef FASTCPU
+                NOP
+                NOP
+.endif
                 RTS
 ;----------------------------------------------------------------
 
@@ -139,3 +161,25 @@ vdp_setaddr_color_table_g2:
                 JSR vdp_set_addr_w
                 RTS
 
+;----------------------------------------------------------------
+; VDP Write VRAM
+vdp_write:
+                STA VDP_WR_VRAM
+                NOP
+.ifdef FASTCPU
+                NOP
+                NOP
+                NOP
+                NOP
+                NOP
+.endif
+                RTS
+;----------------------------------------------------------------
+; VDP Read VRAM
+vdp_read:
+                NOP
+.ifdef FASTCPU
+                NOP
+.endif
+                LDA VDP_RD_VRAM
+                RTS

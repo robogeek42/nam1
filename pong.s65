@@ -12,6 +12,7 @@
 .include "video_registers.inc65"
 .include "sprite.inc65"
 .include "bcd.inc65"
+.include "kbdvia.inc65"
 
 .export pong
 
@@ -90,15 +91,47 @@ pong:
 		LDA #$0F				; Colour white / no early bit set
 @next_sprite:
 		STY VDP_WR_VRAM			; Pos X
+.ifdef FASTCPU
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+.endif
         NOP
         NOP
 		STY VDP_WR_VRAM			; Pos Y
+.ifdef FASTCPU
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+.endif
         NOP
         NOP
 		STX VDP_WR_VRAM			; Pattern
+.ifdef FASTCPU
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+.endif
         NOP
         NOP
 		STA VDP_WR_VRAM			; Colour
+.ifdef FASTCPU
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+.endif
 		INX
 		CPX #5
 		BNE @next_sprite
@@ -112,7 +145,7 @@ pong:
 		LDY #0
 @load_char:
 		LDA (ZP_TMP0),Y
-		STA VDP_WR_VRAM
+        JSR vdp_write
 		INY
 		CPY #16
 		BNE @load_char
@@ -131,10 +164,10 @@ pong:
 		LDA ZP_TMP1
 		JSR vdp_set_addr_w
 		LDA #0				; write 2 chars to split centre
-		STA VDP_WR_VRAM
+        JSR vdp_write
 		LDA #1
         NOP
-		STA VDP_WR_VRAM
+        JSR vdp_write
 		
 		add8To16 #$20, ZP_TMP0 ; add screen width
 		DEX
@@ -182,9 +215,15 @@ gl_dogame:
 ;---------------------------------------
 ; Get input from ACIA
 get_input:
+
+.ifdef KEYB
+		JSR kbd_scan
+		BCC gi_done
+.else
 		LDA ACIA_STATUS
 		AND #ACIA_STATUS_RX_FULL
 		BEQ gi_done
+.endif
 		LDA ACIA_DATA
 		CMP #'a'
 		BEQ gi_movelup
@@ -205,6 +244,7 @@ gi_check_s:
 		STA pp_game
 gi_done:
 		RTS
+
 gi_movelup:
 		LDA pp_batly
 		CMP #BATSPEED			; top=0+BATSPEED
@@ -406,7 +446,7 @@ disable_ball:
 		LDA ZP_VDP_SAB+1
 		JSR vdp_set_addr_w
 		LDA #$D0
-		STA VDP_WR_VRAM
+        JSR vdp_write
 		RTS
 
 ;---------------------------------------
