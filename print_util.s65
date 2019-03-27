@@ -9,7 +9,7 @@
         .export print_memory256
 
 .bss
-                BUFFER_LENGTH = 80
+                BUFFER_LENGTH = 8
 buffer:         .res BUFFER_LENGTH + 1, 0
 
 .code

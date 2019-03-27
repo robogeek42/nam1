@@ -67,7 +67,7 @@ pong:
 		JSR spr_set_small
 		JSR spr_set_mag_off
 		LDA #5					; enable 5 sprites
-		STA ZP_TMP0
+		STA ZP_TMP0				; Pass number of sprites in ZP_TMP0
 		JSR vdp_enable_sprites
 
 ; Load patterns
@@ -216,15 +216,19 @@ gl_dogame:
 ; Get input from ACIA
 get_input:
 
+		LDA ACIA_STATUS
+		AND #ACIA_STATUS_RX_FULL
+		BEQ gi_check_keyb
+		LDA ACIA_DATA
+		JMP gi_got_key
+gi_check_keyb:
 .ifdef KEYB
 		JSR kbd_scan
 		BCC gi_done
-.else
-		LDA ACIA_STATUS
-		AND #ACIA_STATUS_RX_FULL
-		BEQ gi_done
 .endif
-		LDA ACIA_DATA
+		CMP #0
+		BEQ gi_done
+gi_got_key:
 		CMP #'a'
 		BEQ gi_movelup
 		CMP #'z'
