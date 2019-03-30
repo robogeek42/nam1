@@ -8036,7 +8036,16 @@ LAB_LOAD
     LDA #>SDREAD
     STA VEC_IN+1
 
+    ; set ouput vector to null
+    LDA #<DUMMY_INCHAR
+    STA VEC_OUT
+    LDA #>DUMMY_INCHAR
+    STA VEC_OUT+1
+
 	RTS
+
+DUMMY_INCHAR:
+    RTS
 
 SDREAD:
     phx
@@ -8059,6 +8068,10 @@ load_eof:
     STA VEC_IN
     LDA #>CHARin
     STA VEC_IN+1
+	LDA #<CHARout		; resttore normal output device
+    STA VEC_OUT
+    LDA #>CHARout
+    STA VEC_OUT+1
 	STZ ccflag			; reenable ctrl-c
 
     ply
