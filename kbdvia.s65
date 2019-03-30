@@ -123,6 +123,7 @@ kbd_init:       LDA #$FF
 				STA KBD_CHAR_LAST		; Last key detected
 				STA KBD_RPT_CNT
 				STA KBD_RPT_CNT+1
+                STA KBD_DB_CNT
                 RTS
 
 ;---------------------------------------------------------------
@@ -136,9 +137,16 @@ kbd_scan:       phxy
 				BNE kbd_save_cols          ; Not 0 means: Found a key pressed
 
 ; No key pressed, return C=0, KBD_CHAR=0
-no_key:         LDA #0
+no_key:         
+                ; debounce
+                LDA KBD_DB_CNT
+                BEQ nk_resetlast            ; debounce ctr=0 so reset last to really register a key-up
+                DEC KBD_DB_CNT              ; otherwise decrement last and don't register a different key
+                JMP same_as_last
+nk_resetlast:
+                LDA #0
                 STA KBD_CHAR
-				STA KBD_CHAR_LAST			; maybe should be debounced ?
+				STA KBD_CHAR_LAST
 				STA KBD_RPT_CNT
 				STA KBD_RPT_CNT+1
                 plxy                       ; restore x&y 
@@ -305,8 +313,15 @@ all_keys_found:
 
 found_modifier_key:
 found_special_key:
+                ; debounce
+                LDA KBD_DB_CNT
+                BEQ fk_resetlast            ; debounce ctr=0 so reset last to really register a key-up
+                DEC KBD_DB_CNT              ; otherwise decrement last and don't register a different key
+                JMP same_as_last
+
+fk_resetlast:
 				LDA #0
-				STA KBD_CHAR_LAST			; maybe should be debounced ?
+				STA KBD_CHAR_LAST
 				STA KBD_RPT_CNT
 				STA KBD_RPT_CNT+1
 				;LDA #0
@@ -318,6 +333,8 @@ found_real_key:
 				CMP KBD_CHAR_LAST
 				BEQ same_as_last
 				STA KBD_CHAR_LAST
+                LDA #$10
+                STA KBD_DB_CNT
 				JSR set_repeat_count_long
                 plxy
 				LDA KBD_CHAR
