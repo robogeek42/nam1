@@ -65,15 +65,6 @@ LAB_stlp:
 				;JSR print_16bit_hex_string      ; print it
                 ;JSR acia_put_newline
 
-.ifdef SDIO
-				; SD Card and filesystem
-				LDA #(SD_CLK | SD_CS | SD_DI)	; Set output pins
-				sta VIA2 + VIA_DDRB				; SD card is attached to PortB of VIA2
-	
-				JSR init_sdcard
-				JSR init_fs
-.endif
-
                 ; display welcome message in the Serial Console
                 ld16 R0, msg_welcome
                 JSR acia_puts
@@ -85,6 +76,21 @@ LAB_stlp:
                 ; display welcome message on video screen
                 ld16 R0, msg_welcome
                 JSR vdp_write_text
+
+.ifdef SDIO
+.ifdef KEYB
+                JSR kbd_scan
+                BCS skip_sdinit
+.endif
+                
+				; SD Card and filesystem
+				LDA #(SD_CLK | SD_CS | SD_DI)	; Set output pins
+				sta VIA2 + VIA_DDRB				; SD card is attached to PortB of VIA2
+	
+				JSR init_sdcard
+				JSR init_fs
+skip_sdinit:
+.endif
 
                 ; clear address used for 'm' memory dump command
                 LDA #0
