@@ -167,8 +167,8 @@ vdp_write:
                 STA VDP_WR_VRAM
                 NOP
 .ifdef FASTCPU
-                NOP
-                NOP
+;                NOP
+;                NOP
                 NOP
                 NOP
                 NOP
