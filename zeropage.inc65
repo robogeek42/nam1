@@ -8,18 +8,17 @@ TMP2     = $2A
 MACROTMP = $2C
 BCD_IN   = $2C ; overloaded for BCD conv
 
-ZP_TMP0  = $2D
-ZP_TMP1  = $2E
+ZP_CURSOR   = $2D	; Cursor char to print 0=cursor off
 
-ZP_CURSOR  = $2F	; Cursor char to print 0=cursor off
+; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
+ZP_TMP0     = $2E
+ZP_TMP1     = $2F
+ZP_TMP2     = $30
+ZP_TMP3     = $31
 
-R2      = $30
-R3      = $32
-R4      = $34
-
-;-----------------------------------------------------------
-; Output LIST to SD card if !=0
-OUT_LIST_SD = $36
+R2     	    = $32		; 2byte temp
+R3     	    = $34		; 2byte temp
+R4          = $36		; 2byte temp
 
 ;-----------------------------------------------------------
 ; VDP - 16 bytes
@@ -34,12 +33,15 @@ ZP_VDP_YPOS = $3f
 
 ;-----------------------------------------------------------
 ; Sprite movement
-ZP_SPR_NUM = $40
+ZP_SPR_NUM  = $40
 
-; ZP_TMP2/3 currently only used by VDP blit, and SD save routine
-ZP_TMP2    = $42
-ZP_TMP3    = $43
+;-----------------------------------------------------------
+; Output LIST to SD card if !=0
+;
+OUT_LIST_SD = $41
 
+; spare     = $42
+; spare     = $43
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver
@@ -67,6 +69,4 @@ KBD_CHAR_LAST  = $ED
 KBD_FLAGS      = $EB
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
 KBD_SPECIAL    = $EC
-; Debounce counter (2 bytes)
-;KBD_DBCOUNT    = $ED
 ;-----------------------------------------------------------
