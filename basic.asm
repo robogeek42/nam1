@@ -356,10 +356,11 @@ TK_SPR_PATTERN 		= TK_SPR_LOADP+1		; SPR_PATTERN
 TK_SPR_POS 			= TK_SPR_PATTERN+1		; SPR_POS
 TK_SPR_SET_TYPE 	= TK_SPR_POS+1			; SPR_SET_TYPE
 TK_IMGLOAD 	= TK_SPR_SET_TYPE+1			; SPR_IMGLOAD
+TK_PONG		= TK_IMGLOAD+1		; PONG token
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB		= TK_IMGLOAD+1		; TAB token
+TK_TAB		= TK_PONG+1		; TAB token
 TK_ELSE		= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -449,8 +450,12 @@ VEC_CC		= ccnull+1	; ctrl c check vector
 
 VEC_IN		= VEC_CC+2	; input vector
 VEC_OUT		= VEC_IN+2	; output vector
-VEC_LD		= VEC_OUT+2	; load vector
-VEC_SV		= VEC_LD+2	; save vector
+;VEC_LD		= VEC_OUT+2	; load vector
+;VEC_SV		= VEC_LD+2	; save vector
+MY_IRQ_vec = VEC_OUT+2
+IRQ_vec    = VEC_OUT+2+3    ; IRQ code vector (points to IRQ_CODE in main.s65)
+NMI_vec    = IRQ_vec+$0A    ; NMI code vector
+
 
 ; Ibuffs can now be anywhere in RAM, ensure that the max length is < $80
 
@@ -7566,6 +7571,10 @@ LAB_CLS
 	JSR vdp_clear_screen
 	RTS
 
+LAB_PONG
+    JSR pong
+	RTS
+
 ; perform COL <FGCol>,<BGCol> (affects Text)
 LAB_COL
 	JSR LAB_GADB		; get 2 integers seperated by comma
@@ -8403,10 +8412,10 @@ V_INPT
 	JMP	(VEC_IN)		; non halting scan input device
 V_OUTP
 	JMP	(VEC_OUT)		; send byte to output device
-V_LOAD
-	JMP	(VEC_LD)		; load BASIC program
-V_SAVE
-	JMP	(VEC_SV)		; save BASIC program
+;V_LOAD
+;	JMP	(VEC_LD)		; load BASIC program
+;V_SAVE
+;	JMP	(VEC_SV)		; save BASIC program
 
 ; The rest are tables messages and code for RAM
 
@@ -8671,6 +8680,7 @@ LAB_CTBL
 	.word	LAB_SPR_POS-1			; SPR_POS			VDP command
 	.word	LAB_SPR_SET_TYPE-1		; SPR_SET_TYPE		VDP command
 	.word	LAB_IMGLOAD-1		; IMGLOAD		VDP command
+    .word	LAB_PONG-1		; PONG			Built-in Game
 
 ; function pre process routine table
 
@@ -9049,6 +9059,8 @@ LBB_PI
 	.byte	"I",TK_PI		; PI
 LBB_POKE
 	.byte	"OKE",TK_POKE	; POKE
+LBB_PONG
+	.byte	"ONG",TK_PONG	; PONG
 LBB_POS
 	.byte	"OS(",TK_POS	; POS(
 LBB_PRINT
@@ -9282,6 +9294,8 @@ LAB_KEYT
 	.word	LBB_SPR_SET_TYPE	; SPR_SET_TYPE
 	.byte	7,'I'
 	.word	LBB_IMGLOAD	; IMGLOAD
+	.byte	4,'P'
+	.word	LBB_PONG	; PONG
 
 ; secondary commands (can't start a statement)
 

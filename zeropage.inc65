@@ -8,7 +8,7 @@ TMP2     = $2A
 MACROTMP = $2C
 BCD_IN   = $2C ; overloaded for BCD conv
 
-ZP_CURSOR   = $2D	; Cursor char to print 0=cursor off
+ZP_CURSOR   = $2D    ; Cursor char to print 0=cursor off
 
 ; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
 ZP_TMP0     = $2E
@@ -16,9 +16,9 @@ ZP_TMP1     = $2F
 ZP_TMP2     = $30
 ZP_TMP3     = $31
 
-R2     	    = $32		; 2byte temp
-R3     	    = $34		; 2byte temp
-R4          = $36		; 2byte temp
+R2          = $32        ; 2byte temp
+R3          = $34        ; 2byte temp
+R4          = $36        ; 2byte temp
 
 ;-----------------------------------------------------------
 ; VDP - 16 bytes
@@ -40,23 +40,23 @@ ZP_SPR_NUM  = $40
 ;
 OUT_LIST_SD = $41
 
-; spare     = $42
-; spare     = $43
+KBD_ROW     = $42
+KBD_COL     = $43
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver
 ; SD card driver parameters
 ; File system parameters
-fs_bootsect	= $44		; 4 Start of partition (usually 0x0000)
-fs_fatsect	= $48		; 4 Start of FAT tables
-fs_rootsect	= $4C		; 4 Start of Root Directory
-fs_datasect	= $50		; 4 Start of Data Area
-fs_dirsect	= $54		; 4 Current directory
+fs_bootsect    = $44        ; 4 Start of partition (usually 0x0000)
+fs_fatsect     = $48        ; 4 Start of FAT tables
+fs_rootsect    = $4C        ; 4 Start of Root Directory
+fs_datasect    = $50        ; 4 Start of Data Area
+fs_dirsect     = $54        ; 4 Current directory
 
-sd_slo		= $E0		; 1 Sector pointer low
-sd_shi		= $E1		; 1 Sector pointer high
-sd_sect		= $E2		; 4 SD Card sector address
-sd_addr		= $E6		; 4 SD Card byte address
+sd_slo         = $E0        ; 1 Sector pointer low
+sd_shi         = $E1        ; 1 Sector pointer high
+sd_sect        = $E2        ; 4 SD Card sector address
+sd_addr        = $E6        ; 4 SD Card byte address
 ;-----------------------------------------------------------
 
 ;-----------------------------------------------------------

@@ -54,6 +54,10 @@ VDP_REGS:   .res  8,0
 ;
 ; 1. Read Status Register - reads into Acc
 vdp_getstatus:   LDA VDP_RD_STATUS
+                 LDA VDP_RD_STATUS
+                 LDA VDP_RD_STATUS
+                 LDA VDP_RD_STATUS
+                 NOP
                  RTS
 
 ; 2. Write VDP Register
@@ -62,9 +66,11 @@ vdp_getstatus:   LDA VDP_RD_STATUS
 vdp_regwrite:   STA VDP_WR_REG        ; Data
 .ifdef FASTCPU
                 NOP
+                NOP
 .endif
                 STY VDP_WR_REG        ; Register 80...87
 .ifdef FASTCPU
+                NOP
                 NOP
 .endif
                 RTS
@@ -126,7 +132,7 @@ vdp_setaddr_pattern_table_g1:
                 JSR vdp_set_addr_w
                 RTS
 vdp_setaddr_pattern_table_g2:
-                LDA VDP_REGS+4   ;; Pattern Table
+                LDA VDP_REGS+4      ;; Pattern Table
                 AND #$04            ;; just want upper bit (of the 3 that are used)
                 ASL
                 ASL
@@ -168,7 +174,7 @@ vdp_write:
                 NOP
 .ifdef FASTCPU
 ;                NOP
-;                NOP
+                NOP
                 NOP
                 NOP
                 NOP

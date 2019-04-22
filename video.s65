@@ -55,7 +55,7 @@ vdp_set_mode:   STA ZP_VDP_MODE
                 LDY #0
 vdp_sm_loop:    LDA (ZP_TMP0), Y        ; Load register value from mode tab
                 STA VDP_REGS,Y       ; Save it in zero page
-                STA VDP_WR_REG          ; set registers directly as subroutine uses Y for reg num
+                STA VDP_WR_REG          ; set registers directly as subroutine uses X for reg num
 .ifdef FASTCPU
                 NOP
                 NOP
@@ -208,12 +208,12 @@ lgc_loop:       JSR vdp_write
 ;----------------------------------------------------------------
 
 ;================================================================
-; Load Color Table for Graphics Mode I characters
+; Load Color Table for Graphics Mode II characters
 ; 8 colors per 8 bytes (i.e per character) - sections like pattern table
 ;
 vdp_load_g2_col:
                 PHA                 ;; color in Acc
-                LDA VDP_REGS+3   ;; Color table
+                LDA VDP_REGS+3      ;; Color table
                 AND #$80            ;; just want upper bit
                 CLC
                 ROR

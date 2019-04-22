@@ -16,15 +16,15 @@
 .include "decomp.inc65"
 
 .import pong
-
-IRQ_vec	= VEC_SV+2		; IRQ code vector
-NMI_vec	= IRQ_vec+$0A	; NMI code vector
+.import pacman
+.import PONG_IRQ
 
 .segment "VECTORS"
 
                 .word   NMI_vec
-				.word   RES_vec
-				.word   IRQ_vec
+                .word   RES_vec
+                .word   MY_IRQ_vec
+;                .word   IRQ_vec
 
 .bss
 ;-----------------------------------------------------
@@ -36,19 +36,19 @@ buffer:         .res BUFFER_LENGTH+1, 0
 .code
 
 RES_vec:
-main:           CLD   		; Clear decimal bit
-				LDX #$ff	; Reset stack
+main:           CLD           ; Clear decimal bit
+                LDX #$ff    ; Reset stack
                 TXS
 
-				; set up vectors and interrupt code, copy them to page 3
-				LDY	#END_CODE-LAB_vec	; set index/count
+                ; set up vectors and interrupt code, copy them to page 3
+                LDY    #END_CODE-LAB_vec    ; set index/count
 LAB_stlp:
-				LDA	LAB_vec-1,Y		; get byte from interrupt code
-				STA	VEC_IN-1,Y		; save to RAM
-				DEY					; decrement index/count
-				BNE	LAB_stlp		; loop if more to do
+                LDA    LAB_vec-1,Y        ; get byte from interrupt code
+                STA    VEC_IN-1,Y        ; save to RAM
+                DEY                    ; decrement index/count
+                BNE    LAB_stlp        ; loop if more to do
 
-				STZ OUT_LIST_SD
+                STZ OUT_LIST_SD
 
                 ; initialise ACIA serial comms
                 JSR acia_init
@@ -62,7 +62,7 @@ LAB_stlp:
                 ;JSR acia_put_newline
                 ;LDX #<VDP_REGS
                 ;LDA #>VDP_REGS
-				;JSR print_16bit_hex_string      ; print it
+                ;JSR print_16bit_hex_string      ; print it
                 ;JSR acia_put_newline
 
                 ; display welcome message in the Serial Console
@@ -72,7 +72,7 @@ LAB_stlp:
                 ; Setup video with Mode 0
                 LDA #0
                 JSR vdp_set_mode
-				
+                
                 ; display welcome message on video screen
                 ld16 R0, msg_welcome
                 JSR vdp_write_text
@@ -83,12 +83,12 @@ LAB_stlp:
                 BCS skip_sdinit
 .endif
                 
-				; SD Card and filesystem
-				LDA #(SD_CLK | SD_CS | SD_DI)	; Set output pins
-				sta VIA2 + VIA_DDRB				; SD card is attached to PortB of VIA2
-	
-				JSR init_sdcard
-				JSR init_fs
+                ; SD Card and filesystem
+                LDA #(SD_CLK | SD_CS | SD_DI)    ; Set output pins
+                sta VIA2 + VIA_DDRB                ; SD card is attached to PortB of VIA2
+    
+                JSR init_sdcard
+                JSR init_fs
 skip_sdinit:
 .endif
 
@@ -98,10 +98,10 @@ skip_sdinit:
                 STA RES+1
 
 ; Go straight to BASIC!
-				LDA #<LAB_COLD
-				STA TMP0
-				LDA #>LAB_COLD
-				STA TMP0+1
+                LDA #<LAB_COLD
+                STA TMP0
+                LDA #>LAB_COLD
+                STA TMP0+1
                 JMP (TMP0)
 
 ; ---------------------------------------------------------
@@ -118,64 +118,64 @@ loop:           ld16 R0, prompt
 
                 ; m = print memory address
 @cmd_m:         cmp #'m'
-				bne @cmd_m_end
+                bne @cmd_m_end
                 jsr cmd_memory
                 jmp loop
-				@cmd_m_end:
+                @cmd_m_end:
 
                 ; p = dump memory page
 @cmd_p:         cmp #'p'
-				bne @cmd_p_end
+                bne @cmd_p_end
                 jsr cmd_dump_page
                 jmp loop
-				@cmd_p_end:
+                @cmd_p_end:
 
                 ; w = write data to adrress
 @cmd_w:         cmp #'w'
-				bne @cmd_w_end
+                bne @cmd_w_end
                 jsr cmd_write
                 jmp loop
-				@cmd_w_end:
+                @cmd_w_end:
                 
                 ; j = jump to address
 @cmd_j:         cmp #'j'
-				bne @cmd_j_end
+                bne @cmd_j_end
                 jsr cmd_jump
                 jmp loop
-				@cmd_j_end:
+                @cmd_j_end:
 
 @cmd_b:         cmp #'b'
-				bne @cmd_b_end
-				jsr cmd_basic
+                bne @cmd_b_end
+                jsr cmd_basic
                 jmp loop
-				@cmd_b_end:
+                @cmd_b_end:
 
-@cmd_vd:		cmp #'v'
-				bne @cmd_vd_end
-				lda buffer+1
-				cmp #'d'
-				bne @cmd_vd_end
-				lda buffer+2
-				cmp #' '
-				bne @cmd_vd_end
-				jsr cmd_vram_dump
-				jmp loop
-				@cmd_vd_end:
+@cmd_vd:        cmp #'v'
+                bne @cmd_vd_end
+                lda buffer+1
+                cmp #'d'
+                bne @cmd_vd_end
+                lda buffer+2
+                cmp #' '
+                bne @cmd_vd_end
+                jsr cmd_vram_dump
+                jmp loop
+                @cmd_vd_end:
 
-@cmd_sd:		cmp #'s'
-				bne @cmd_sd_end
-				lda buffer+1
-				cmp #'d'
-				bne @cmd_sd_end
+@cmd_sd:        cmp #'s'
+                bne @cmd_sd_end
+                lda buffer+1
+                cmp #'d'
+                bne @cmd_sd_end
                 jsr cmd_dir
-				jmp loop
-				@cmd_sd_end:
+                jmp loop
+                @cmd_sd_end:
 
 @cmd_l:         cmp #'l'
-				bne @cmd_l_end
-				jsr cmd_loadimage
+                bne @cmd_l_end
+                jsr cmd_loadimage
                 jmp loop
-				@cmd_l_end:
+                @cmd_l_end:
 
                 ; h = print help
 @cmd_h:         cmp #'h'
@@ -186,8 +186,8 @@ loop:           ld16 R0, prompt
 
                 ; check for empty line - display prompt again
 @cmd_empty:     cmp #$00
-				bne @cmd_unknown
-				jmp loop
+                bne @cmd_unknown
+                jmp loop
 
                 ; (fall through - unknown command)
 @cmd_unknown:   ld16 R0, msg_unknown
@@ -204,18 +204,19 @@ msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics Fast CPU",$0d,$0a, $00
 msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics",$0d,$0a, $00
 .endif
 msg_unknown:    .byte "Unknown command", $0d, $0a, $00
-msg_help:   .byte "m <addr> - dump mem",$0d,$0a
-            .byte "p <page> - dump page",$0d,$0a
-            .byte "j <addr> - jmp",$0d,$0a
-            .byte "w <addr> <byte> - write byte",$0d,$0a
-            .byte "b - basic bw=warm start",$0d,$0a
-            .byte "vd <page> - dump VRAM page",$0d,$0a
-			.byte "pp - play pong",$0d,$0a
-            .byte $00
-msg_error:  .byte "Error", $0d, $0a, $00
+msg_help:       .byte "m <addr> - dump mem",$0d,$0a
+                .byte "p <page> - dump page",$0d,$0a
+                .byte "j <addr> - jmp",$0d,$0a
+                .byte "w <addr> <byte> - write byte",$0d,$0a
+                .byte "b - basic bw=warm start",$0d,$0a
+                .byte "vd <page> - dump VRAM page",$0d,$0a
+                .byte "pp - play pong",$0d,$0a
+                .byte "pa - play pacman",$0d,$0a
+                .byte $00
+msg_error:      .byte "Error", $0d, $0a, $00
 ;msg_vdp_welcome:  .byte "Assif 6502 & EhBasic", $0d, $0a, $00
 msg_init_keyboard:
-            .byte "Init keyboard",$0d,$0a,$00
+                .byte "Init keyboard",$0d,$0a,$00
 
 ; ---------------------------------------------------------
 ; -- execute commands
@@ -250,21 +251,26 @@ print_address:  jsr print_memory16
                 RTS
 
 ; Dump a page of CPU memory
-cmd_dump_page:	LDA buffer+1
-				CMP #' '
-				BNE check_pong
-				ld16 R0, buffer+2
+cmd_dump_page:  LDA buffer+1
+                CMP #' '
+                BNE check_pong
+                ld16 R0, buffer+2
                 JSR scan_hex        ; scan 2 byte hex value into acc
                 STA ZP_TMP1
-				STZ ZP_TMP0
-				JSR print_memory256
-				RTS
+                STZ ZP_TMP0
+                JSR print_memory256
+                RTS
 ; pp - play pong
-check_pong:		
-				CMP #'p'
-				BNE cmd_m_error
-				JSR pong
-				RTS
+check_pong:        
+                CMP #'p'
+                BNE check_pacman
+                JSR pong
+                RTS
+check_pacman:   CMP #'a'
+                BNE cmd_m_error
+                JSR pacman
+                RTS
+                
 
 ; Write a byte to memory
 ; w <address> <byte>
@@ -319,110 +325,109 @@ cmd_jump:         ld16 R0, buffer + 2
 ;-----------------------------------------------------
 ; vd <page> - dump 256 bytes from <page> 
 cmd_vram_dump:
-				ld16 R0, buffer+3
+                ld16 R0, buffer+3
                 JSR scan_hex        ; scan 2 byte hex value into acc
                 STA ZP_TMP0
-				JSR vdp_dump_page
-				RTS
+                JSR vdp_dump_page
+                RTS
 
 ; SD DIR command
 cmd_dir:
-				pha
-				phx
-				phy
-				JSR fs_dir_root_start		; Start at root
+                pha
+                phx
+                phy
+                JSR fs_dir_root_start        ; Start at root
 cd_dir_show_entry:
-				CLC							; Only looking for valid files
-				JSR fs_dir_find_entry		; Find a valid entry
-				BCS cd_dir_done				; If C then no more entries so done
-				JSR sdfs_set_dir_ptr		; load addr of fh_dir into X(lo)A(hi)
-				STX R0	    				; store them in string pointer so we can print
-				STA R0+1
-				JSR	acia_puts				; print string (file name)
+                CLC                            ; Only looking for valid files
+                JSR fs_dir_find_entry        ; Find a valid entry
+                BCS cd_dir_done                ; If C then no more entries so done
+                JSR sdfs_set_dir_ptr        ; load addr of fh_dir into X(lo)A(hi)
+                STX R0                        ; store them in string pointer so we can print
+                STA R0+1
+                JSR    acia_puts                ; print string (file name)
                 LDY R1                      ; number of chars printed is put into R1
-                LDA #' '					; print spaces to pad to 14
+                LDA #' '                    ; print spaces to pad to 14
 cd_dir_pad:
-				JSR acia_putc
-				INY							; pad to 14 chars
-				CPY #14
-				BNE cd_dir_pad
+                JSR acia_putc
+                INY                            ; pad to 14 chars
+                CPY #14
+                BNE cd_dir_pad
 
-                JSR sdfs_set_dir_filesize_ptr	; put filesize into X/A
-				JSR print_16bit_hex_string      ; print it
-				jsr acia_put_newline
+                JSR sdfs_set_dir_filesize_ptr    ; put filesize into X/A
+                JSR print_16bit_hex_string      ; print it
+                jsr acia_put_newline
 
-				JMP cd_dir_show_entry			; Find another entry
+                JMP cd_dir_show_entry            ; Find another entry
 
 cd_dir_done:
-				CLC
-				ply
-				plx
-				pla
-				RTS
+                CLC
+                ply
+                plx
+                pla
+                RTS
 
 ; print 4digit hex string from X/A A(hi)
 ; destroys buffer
 print_16bit_hex_string:
-				PHX
-				PHA
-				ld16 R0,buffer
-				PLA
-				JSR fmt_hex_string
-				JSR acia_puts
-				PLX
+                PHX
+                PHA
+                ld16 R0,buffer
+                PLA
+                JSR fmt_hex_string
+                JSR acia_puts
+                PLX
                 TXA
-				JSR fmt_hex_string
-				JSR acia_puts
-				RTS
+                JSR fmt_hex_string
+                JSR acia_puts
+                RTS
 
 ;-----------------------------------------------------
 ; test bcd printing
 cmd_test_bcd:
-;				ld16 R0, buffer + 2
-;				JSR scan_hex			; scan 2 byte hex value into Acc
-;				JSR BINBCD8				; convert to BCD and write in RES,RES+1
-;				ld16 R0, buffer			; output buffer
-;				JSR BCD2STR				; convert BCD to string
-;				JSR acia_puts			; print it
-;				JSR acia_put_newline
-;				RTS
+;                ld16 R0, buffer + 2
+;                JSR scan_hex            ; scan 2 byte hex value into Acc
+;                JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;                ld16 R0, buffer            ; output buffer
+;                JSR BCD2STR                ; convert BCD to string
+;                JSR acia_puts            ; print it
+;                JSR acia_put_newline
+;                RTS
 
 ;-----------------------------------------------------
 ; Load a compressed image (test)
 cmd_loadimage:
-;				; switch to mode 2 (Screen2)
+;                ; switch to mode 2 (Screen2)
 ;                LDA #2
 ;                JSR vdp_set_mode
-;				; put address into TMP1
-;				LDA #<image_smashmario_COMP
-;				STA TMP1
-;				LDA #>image_smashmario_COMP
-;				STA TMP1+1
-;				; load image
-;				JSR decompRLE1_SC2
-				RTS
+;                ; put address into TMP1
+;                LDA #<image_smashmario_COMP
+;                STA TMP1
+;                LDA #>image_smashmario_COMP
+;                STA TMP1+1
+;                ; load image
+;                JSR decompRLE1_SC2
+                RTS
+;image_smashmario_COMP:
+;    .include "smashmario_COMP.inc65"
 
 ;-----------------------------------------------------
 ; run Basic - b[cw]
 ;
-cmd_basic:		
-				; set JMP address for Cold boot (default)
-				LDA #<LAB_COLD
-				STA TMP0
-				LDA #>LAB_COLD
-				STA TMP0+1
-				; setup read from input string
-				LDA buffer+1
-				CMP #'w'
-				BNE @boot_basic
-				LDA #<LAB_WARM
-				STA TMP0
-				LDA #>LAB_WARM
-				STA TMP0+1
-@boot_basic:	JMP (TMP0)
-
-;image_smashmario_COMP:
-;	.include "smashmario_COMP.inc65"
+cmd_basic:        
+                ; set JMP address for Cold boot (default)
+                LDA #<LAB_COLD
+                STA TMP0
+                LDA #>LAB_COLD
+                STA TMP0+1
+                ; setup read from input string
+                LDA buffer+1
+                CMP #'w'
+                BNE @boot_basic
+                LDA #<LAB_WARM
+                STA TMP0
+                LDA #>LAB_WARM
+                STA TMP0+1
+@boot_basic:    JMP (TMP0)
 
 ;-----------------------------------------------------
 ; BASIC linkage
@@ -433,95 +438,97 @@ cmd_basic:
 ; vector tables
 
 LAB_vec:
-    .word	CHARin		; byte in from ACIA or Keyboard
-	.word	CHARout		; byte out to ACIA and video
-	.word	LOAD		; load vector for EhBASIC
-	.word	SAVE		; save vector for EhBASIC
+        .word    CHARin        ; byte in from ACIA or Keyboard
+        .word    CHARout        ; byte out to ACIA and video
+;        .word    LOAD        ; load vector for EhBASIC
+;        .word    SAVE        ; save vector for EhBASIC
+; 4 bytes - replace with a real IRQ indirection vector
+        JMP IRQ_CODE          ; 3 bytes - this will be labeled MY_IRQ_vec when  it gets copied to page 2
 
 ; EhBASIC IRQ support
 
 IRQ_CODE
-	PHA				; save A
-	LDA	IrqBase		; get the IRQ flag byte
-	LSR				; shift the set b7 to b6, and on down ...
-	ORA	IrqBase		; OR the original back in
-	STA	IrqBase		; save the new IRQ flag byte
-	PLA				; restore A
-	RTI
+        PHA                ; save A
+        LDA    IrqBase        ; get the IRQ flag byte
+        LSR                ; shift the set b7 to b6, and on down ...
+        ORA    IrqBase        ; OR the original back in
+        STA    IrqBase        ; save the new IRQ flag byte
+        PLA                ; restore A
+        RTI
 
 ; EhBASIC NMI support
 
 NMI_CODE
-	PHA				; save A
-	LDA	NmiBase		; get the NMI flag byte
-	LSR				; shift the set b7 to b6, and on down ...
-	ORA	NmiBase		; OR the original back in
-	STA	NmiBase		; save the new NMI flag byte
-	PLA				; restore A
-	RTI
+        PHA                ; save A
+        LDA    NmiBase        ; get the NMI flag byte
+        LSR                ; shift the set b7 to b6, and on down ...
+        ORA    NmiBase        ; OR the original back in
+        STA    NmiBase        ; save the new NMI flag byte
+        PLA                ; restore A
+        RTI
 
 END_CODE
 
 ; Output to serial & video
 CHARout:
-	JSR ACIAout
-	JSR vdp_write_char
-	RTS
+        JSR ACIAout
+        JSR vdp_write_char
+        RTS
 
 ; Output only to serial port
 ACIAout:
-	PHA				; A contains char to print
+        PHA                ; A contains char to print
 @wait_txd_empty:
-	LDA ACIA_STATUS
-    AND #ACIA_STATUS_TX_EMPTY
-    BEQ @wait_txd_empty
-	PLA				; ready to output, restore A
-	STA ACIA_DATA	; and output
-    RTS
-
+        LDA ACIA_STATUS
+        AND #ACIA_STATUS_TX_EMPTY
+        BEQ @wait_txd_empty
+        PLA                ; ready to output, restore A
+        STA ACIA_DATA    ; and output
+        RTS
+        
 ; Input from ACIA and KBD if configured
 CHARin:
-	LDA	ACIA_STATUS
-	AND #ACIA_STATUS_RX_FULL
-	BEQ	@nobyw		; branch if no byte waiting
-	LDA	ACIA_DATA
-	AND	#$7F			; clear high bit
-	SEC			  		; flag byte received
-	RTS
+        LDA    ACIA_STATUS
+        AND #ACIA_STATUS_RX_FULL
+        BEQ    @nobyw        ; branch if no byte waiting
+        LDA    ACIA_DATA
+        AND    #$7F            ; clear high bit
+        SEC                      ; flag byte received
+        RTS
 @nobyw:
-	CLC				; flag no byte received
+        CLC                ; flag no byte received
 .ifdef KEYB
-    JSR kbd_scan
-    BCC aciain_end
-    LDA KBD_CHAR
+        JSR kbd_scan
+        BCC aciain_end
+        LDA KBD_CHAR
 .endif
 aciain_end:
-    RTS
+        RTS
 
 LOAD:
-	RTS
+        RTS
 SAVE:
-	RTS
+        RTS
 
 DObackspace:
-	PHA
-	JSR ANSI_BKSP
-	PLA
-	JSR vdp_backspace
-	RTS
-	
+        PHA
+        JSR ANSI_BKSP
+        PLA
+        JSR vdp_backspace
+        RTS
+    
 ANSI_BKSP:
-	  ; output ANSI "Cursor back"
-	  lda #$1b
-	  jsr ACIAout
-	  lda #'['
-	  jsr ACIAout
-	  lda #'D'
-	  jsr ACIAout
-	  lda #$1b
-	  jsr ACIAout
-	  lda #'['
-	  jsr ACIAout
-	  lda #'K'
-	  jsr ACIAout
-	  RTS
+        ; output ANSI "Cursor back"
+        lda #$1b
+        jsr ACIAout
+        lda #'['
+        jsr ACIAout
+        lda #'D'
+        jsr ACIAout
+        lda #$1b
+        jsr ACIAout
+        lda #'['
+        jsr ACIAout
+        lda #'K'
+        jsr ACIAout
+        RTS

@@ -15,19 +15,44 @@
 .include "kbdvia.inc65"
 
 .export pong
+.export PONG_IRQ
 
-; pong vars in basic zeropage vars
-pp_ballx  = $EA
-pp_bally  = $EB
-pp_batly  = $EC
-pp_batry  = $ED
-pp_ballxv = $EE	; ball velocity in X
-pp_ballyv = $EF	; ball velocity in Y
-pp_scorel = $F0
-pp_scorer = $F1
-pp_game   = $F2 ; Game state. 0=not started, 1=playing, FF=quit
+; pong vars in basic program area
+pong_vars = $7000
+pp_ballx  = pong_vars+0
+pp_bally  = pong_vars+1
+pp_batly  = pong_vars+2
+pp_batry  = pong_vars+3
+pp_ballxv = pong_vars+4; ball velocity in X
+pp_ballyv = pong_vars+5; ball velocity in Y
+pp_scorel = pong_vars+6
+pp_scorer = pong_vars+7
+pp_game   = pong_vars+8; Game state. 0=not started, 1=playing, FF=quit
+;pp_kbdrow = pong_vars+9;
+;pp_kbdcol = pong_vars+10;
+IRQ_COUNT = pong_vars+9
+IRQ_OLD   = pong_vars+10 ; 2 bytes
+pp_interval = pong_vars+12  ; number of 1/60sec intervals between updating screen
+
+pp_bsx_pos = pong_vars+15      ; positive value of current ball speed in x
+pp_bsy_pos = pong_vars+16      ; positive value of current ball speed in x
+pp_bsx_neg = pong_vars+17      ; negative value of current ball speed in y
+pp_bsy_neg = pong_vars+18      ; negative value of current ball speed in y
+
+strbuf = pong_vars + 20;
+
+BALLSPEEDX = $02            ; starting ball speeds
+BALLSPEEDXNEG = $FE
+BALLSPEEDY = $02
+BALLSPEEDYNEG = $FE
 
 BATSPEED  = 4
+
+BATL_POS = 16
+BATR_POS = 238
+
+; IRQ location - points to address part of JMP xxxx
+IRQ_ADDR = $20A
 
 .bss
 score_buffer:
@@ -97,13 +122,11 @@ pong:
         NOP
         NOP
         NOP
-        NOP
 .endif
         NOP
         NOP
 		STY VDP_WR_VRAM			; Pos Y
 .ifdef FASTCPU
-        NOP
         NOP
         NOP
         NOP
@@ -119,13 +142,11 @@ pong:
         NOP
         NOP
         NOP
-        NOP
 .endif
         NOP
         NOP
 		STA VDP_WR_VRAM			; Colour
 .ifdef FASTCPU
-        NOP
         NOP
         NOP
         NOP
@@ -153,7 +174,7 @@ pong:
 ; Draw board & Score
 ; Central dotted line
 		LDX #24				; height mode 1
-		LDA VDP_REGS+2
+        LDA VDP_REGS+2      ; Name table
 		ASL
 		ASL
 		STA ZP_TMP1
@@ -183,20 +204,72 @@ pong:
 		STA pp_bally
 		LDA #80-4
 		STA pp_ballx
-		LDA #1
-		STA pp_ballyv
-		STA pp_ballxv
 		STZ pp_game
 
+        LDA #BALLSPEEDX
+        STA pp_bsx_pos
+        STA pp_ballyv       ; current ball speed
+        LDA #BALLSPEEDY
+        STA pp_bsy_pos
+        STA pp_ballxv       ; current ball speed
+        LDA #BALLSPEEDXNEG
+        STA pp_bsx_neg
+        LDA #BALLSPEEDYNEG
+        STA pp_bsy_neg
+
 		JSR draw_score
+
+;=======================================
+; Setup interrupt handler
+pih_save_old:
+        LDA IRQ_ADDR
+        STA IRQ_OLD
+        LDA IRQ_ADDR+1
+        STA IRQ_OLD+1
+
+        LDA #$01
+        STA pp_interval
+        STA IRQ_COUNT
+
+pih_setup_new:
+        LDA #<PONG_IRQ
+        STA IRQ_ADDR
+        LDA #>PONG_IRQ
+        STA IRQ_ADDR+1
+
+; Enable VDP IRQ output (every 1/60th second)
+pih_enable_vdp_irq:
+        LDA VDP_REGS+1      ;; data to write is existing Reg1 (was set by MODE command)
+        ORA #$20            ;; with bit2 set - actually bit 5 if numbered from LSb like sensible chips
+        STA VDP_REGS+1
+        LDY #$81            ;; register to write (1)
+        JSR vdp_regwrite
+
+        JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
+; Start allowing interrupts at CPU
+        CLI
 
 ;=======================================
 ; Game loop
 game_loop:
 
-		JSR get_input
+        JSR get_input_serial
+
+check_irq_count:
+        LDA IRQ_COUNT
+        BNE gl_skip_update
+        ;ld16 R0,irq_message
+		;JSR acia_puts
+        LDA pp_interval                 ;; start counting again (pp_interval * 1/60th)
+        STA IRQ_COUNT
+
+.if KEYB
+        JSR get_input_keyboard
+.endif
+ 
 		JSR draw_paddles
-		
+
 		LDA pp_game		; check game state:
 		CMP #$00		; 	game not started?
 		BEQ game_loop	; 		yes, keep just checking input and drawing paddles
@@ -209,33 +282,27 @@ gl_dogame:
 		JSR draw_ball
 		JSR check_game
 		JSR draw_score
-		JSR delay
+		;JSR delay
+
+gl_skip_update:
 		JMP game_loop
 
 ;---------------------------------------
 ; Get input from ACIA
-get_input:
+get_input_serial:
 
 		LDA ACIA_STATUS
 		AND #ACIA_STATUS_RX_FULL
-		BEQ gi_check_keyb
+        BEQ gi_done
 		LDA ACIA_DATA
-		JMP gi_got_key
-gi_check_keyb:
-.ifdef KEYB
-		JSR kbd_scan
-		BCC gi_done
-.endif
-		CMP #0
-		BEQ gi_done
 gi_got_key:
-		CMP #'a'
-		BEQ gi_movelup
-		CMP #'z'
-		BEQ gi_moveldown
-		CMP #';'
-		BEQ gi_moverup
-		CMP #'.'
+;		CMP #'a'
+;		BEQ gi_movelup
+;		CMP #'z'
+;		BEQ gi_moveldown
+;		CMP #';'
+;		BEQ gi_moverup
+;		CMP #'.'
 		BEQ gi_moverdown
 		CMP #'q'
 		BNE gi_check_s
@@ -243,9 +310,28 @@ gi_got_key:
 		STA pp_game
 gi_check_s:
 		CMP #'s'
-		BNE gi_done
+        BNE gi_check_minus
 		LDA #$01
 		STA pp_game
+        JMP gi_done
+gi_check_minus:
+        CMP #'-'
+        BNE gi_check_plus
+        DEC pp_interval
+        JSR gi_print_interval
+
+gi_check_plus:
+        CMP #'+'
+        BNE gi_done
+        INC pp_interval
+
+gi_print_interval:
+        ld16 R0,strbuf
+        LDA pp_interval
+        JSR fmt_hex_string
+        JSR acia_puts
+        JSR acia_put_newline
+        
 gi_done:
 		RTS
 
@@ -286,20 +372,89 @@ gi_moverdown:
 		STA pp_batry
 		RTS
 
+.if KEYB
+;---------------------------------------
+; Get input from KEYBOARD
+get_input_keyboard:
+        JSR kbd_getkey              ; result in KBD_COL, KBD_ROW (zero-page)
+        BCC gik_done
+
+;;; DEBUG
+;        ld16 R0,strbuf
+;        LDA KBD_ROW
+;        JSR fmt_bin_string
+;        JSR acia_puts
+;        LDA #' '
+;        JSR acia_putc
+;        LDA KBD_COL
+;        JSR fmt_bin_string
+;        JSR acia_puts
+;        JSR acia_put_newline
+;        RTS 
+;;; DEBUG
+
+gik_got_key:
+        ; q in row 0
+        ; azs are in row 1
+        ; km in row 4
+        BBS0 KBD_ROW,gik_test_row0
+        BBS1 KBD_ROW,gik_test_row1
+        BBS6 KBD_ROW,gik_test_row6
+        JMP gik_done
+
+gik_test_row0:
+        ; ROW0, COL6 = "q"
+        BBR6 KBD_COL,gik_clr_row0   ; If not "q", then done
+        LDA #$FF                    ; else mark end-of-game
+        STA pp_game                 ; in game state variable
+
+gik_clr_row0:
+        RMB0 KBD_ROW                ; clear row 0, check for other keys
+        JMP gik_got_key
+
+gik_test_row1:
+        BBR2 KBD_COL, @check_z      ; check for "a"
+		JSR gi_movelup
+@check_z:
+        BBR4 KBD_COL, @check_s      ; check for "z"
+		JSR gi_moveldown
+@check_s:
+        BBR5 KBD_COL, gik_clr_row1      ; check for "s" (start game)
+		LDA #$01
+		STA pp_game
+
+gik_clr_row1:
+        RMB1 KBD_ROW                ; clear row 1, check for other keys
+        JMP gik_got_key
+
+gik_test_row6:
+        BBR2 KBD_COL, @check_m      ; check for ";"
+		JSR gi_moverup
+@check_m:
+        BBR3 KBD_COL, gik_clr_row6      ; check for "\"
+		JSR gi_moverdown
+
+gik_clr_row6:
+        RMB6 KBD_ROW                ; clear row 6 and finish
+
+gik_done:
+		RTS
+.endif
+
 ;---------------------------------------
 ; Draw paddles
 draw_paddles:
 		;; draw left paddle
 		LDA #0
 		STA ZP_TMP0		; S
-		LDA #16
+		LDA #BATL_POS
 		STA ZP_TMP1		; X
 		LDA pp_batly
 		STA ZP_TMP2		; Y
 		JSR vdp_set_sprite_pos
 		LDA #1
 		STA ZP_TMP0		; S
-		LDA #16
+		LDA #BATL_POS
 		STA ZP_TMP1		; X
 		LDA pp_batly
 		CLC
@@ -309,14 +464,14 @@ draw_paddles:
 		;; draw right paddle
 		LDA #2
 		STA ZP_TMP0		; S
-		LDA #238
+		LDA #BATR_POS
 		STA ZP_TMP1		; X
 		LDA pp_batry
 		STA ZP_TMP2		; Y
 		JSR vdp_set_sprite_pos
 		LDA #3
 		STA ZP_TMP0		; S
-		LDA #238
+		LDA #BATR_POS
 		STA ZP_TMP1		; X
 		LDA pp_batry
 		CLC
@@ -332,45 +487,29 @@ draw_paddles:
 move_ball:
 		; if y<top or y>bot then invert yspeed
 		LDA pp_bally
-		CMP #1
-		BCC mb_yspeed_pos	; A < 3
-		CMP #193-8-1
-		BCS	mb_yspeed_neg	; A >= 183
+        CMP #1
+        BCC mb_yspeed_pos	; A < ballspeed y, bounce
+		CMP #192-8
+        BCS	mb_yspeed_neg	; ball is at bottom edge, bounce
 		JMP mb_checkx
 mb_yspeed_pos:
-		LDA #1				; make Y-velocity positive
+        LDA pp_bsy_pos		; make Y-velocity positive
 		STA pp_ballyv
 		JMP mb_checkx
 mb_yspeed_neg:
-		LDA #$FF			; make Y-velocity negative
-		STA pp_ballyv		; invert Y-velocity
+        LDA pp_bsy_neg		; make Y-velocity negative
+		STA pp_ballyv		;
 		JMP mb_checkx
 
 ; X direction
-;
-; Conditions for ball to hit bat - more oblique as they go down
-; BX == BLX+3 & BY+4 >= BLY & BY < BLY+13  (straight hit - invert X, same speed)
-;
-; BX == BLX+2 & BY+5 >= BLY 
-; BX == BLX+2 & BY   <  BLY+14  
-;
-; BX == BLX+1 & BY+6 >= BLY 
-; BX == BLX+1 & BY   <   BLY+15
-;
-; BX == BLX   & BY+7 >= BLY 
-; BX == BLX   & BY   <   BLY+16
-; 
-; Miss but ball moves up into bat or down into bat
-; Ball X speed +ve & BY+8==BLY     & BX<BLX & BX+8>BLX
-; Ball X speed -ve & BY  ==BLY+16  & BX<BLX & BX+8>BLX
 
 mb_checkx:
 		; find out if we need to check Left/Right or neither
 		LDA pp_ballx
-		CMP #20
+        CMP #BATL_POS+2
 		BCC mb_check_batl		; Ballx < 18
-		CMP #234
-		BCS mb_check_batr		; Ballx >= 230
+		CMP #BATR_POS-2
+		BCS mb_check_batr		; Ballx >= 237
 		JMP mb_add_speed
 
 mb_check_batl:
@@ -387,14 +526,19 @@ mb_check_batl:
 		CMP pp_bally
 		BCC mb_add_speed	; bat bot < ball top
 
+        ; if ball is already past bat don't hit
+        LDA pp_ballx
+        CMP #BATL_POS-2
+        BCC mb_add_speed
+
 		; hit bat - make ball speed positive again
 mb_xspeed_pos:
-		LDA #1
+        LDA pp_bsx_pos
 		STA pp_ballxv
 		JMP mb_add_speed
 
 mb_xspeed_neg:
-		LDA #$FF
+        LDA pp_bsx_neg
 		STA pp_ballxv
 		JMP mb_add_speed
 
@@ -411,6 +555,11 @@ mb_check_batr:
 		ADC #15
 		CMP pp_bally
 		BCC mb_add_speed	; bat bot < ball top
+
+        ; if ball is already past bat don't hit
+        LDA pp_ballx
+        CMP #BATR_POS+2
+        BCS mb_add_speed
 
 		; hit bat - make ball speed negative again
 		JMP mb_xspeed_neg
@@ -504,7 +653,7 @@ check_game:
 
 	; Check if ball has gone off left
 		LDA pp_ballx
-		CMP #3
+		CMP #2
 		BCS cg_check_right		; still in play (X>0)
 
 		LDA pp_scorer
@@ -513,12 +662,12 @@ check_game:
 
 		LDA #96					; reset ball position
 		STA pp_ballx
-		LDA #1
+        LDA pp_bsx_pos
 		STA pp_ballxv		
 cg_check_right:
 	; Check if ball has gone off right
 		LDA pp_ballx
-		CMP #244
+		CMP #253
 		BCC cg_check_scores		; still in play (X<256)
 
 		LDA pp_scorel
@@ -527,7 +676,7 @@ cg_check_right:
 
 		LDA #96					; reset ball position
 		STA pp_ballx
-		LDA #$FF
+        LDA pp_bsx_neg
 		STA pp_ballxv		
 cg_check_scores:
 		LDA pp_scorel
@@ -555,6 +704,24 @@ cg_write_win_message:
 quit_game:
 		ld16 R0,quit_message
 		JSR acia_puts
+; restore interrupt vector 
+pih_restore_irq:
+        LDA IRQ_OLD
+        STA IRQ_ADDR
+        LDA IRQ_OLD+1
+        STA IRQ_ADDR+1
+; disable interrupts at CPU
+        SEI
+
+; disable interrupts from VDP
+        LDA VDP_REGS+1      ;; data to write is existing Reg1
+        AND #$DF            ;; unset interrupt bit
+        STA VDP_REGS+1
+        LDY #$81            ;; register to write (1)
+        JSR vdp_regwrite
+
+        JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
 		RTS
 
 ;---------------------------------------
@@ -571,9 +738,28 @@ d_loop1:
 		BNE d_loop2
 		RTS
 
+;---------------------------------------
+; Interrupt handler
+PONG_IRQ:
+        PHA
+
+        JSR vdp_getstatus           ;; read VDP status to reenable the VDP interrupt
+
+        LDA IRQ_COUNT               ;; if count >0
+        BEQ @skip
+        DEC IRQ_COUNT               ;; count--
+@skip:
+        PLA
+        RTI
+;---------------------------------------
+
+
+
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
 win_left_message:
 	.byte "Player 1 Wins!",$0d,$0a,$00
 win_right_message:
 	.byte "Player 2 Wins!",$0d,$0a,$00
+irq_message:
+    .byte "Hello",$0d,$0a,$00

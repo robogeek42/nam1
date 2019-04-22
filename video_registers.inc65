@@ -7,4 +7,9 @@ VDP_WR_REG    = $7F61
 VDP_RD_VRAM   = $7F62
 VDP_RD_STATUS = $7F63
 
-
+; VDP Operation           !CSW(a1) !CSR(!a1)  MODE(a0) Port
+;----------------------------------------------------------
+; Write to VRAM             0        1          0      xxx0
+; Write to Reg/Addr Set     0        1          1      xxx1
+; Read from VRAM            1        0          0      xxx2
+; Read Status Reg           1        0          1      xxx3

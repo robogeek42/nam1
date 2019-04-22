@@ -67,14 +67,13 @@
 .bss
 ;kbd_buffer:     .res KBD_BUFFER_LENGTH + 1, 0
 ;dbg_buffer:     .res DBG_BUFFER_LENGTH + 1, 0
-scan_buffer:     .res 15,0
 ;dbg_buffer:     .res 10,0
+
+scan_buffer:     .res 15,0
 KBD_TMP = scan_buffer+8
 KBD_RPT_CNT = scan_buffer+9
 KBD_DB_CNT = scan_buffer+11
 KBD_CODE = scan_buffer+12
-KBD_ROW = scan_buffer+13
-KBD_COL = scan_buffer+14
 
 .code
 
@@ -431,7 +430,7 @@ kik_done:
 				RTS
 
 ;---------------------------------------------------------------
-; kbd_getkey - return keycode of pressed key in X
+; kbd_getkey - return "keycode" in KBD_ROW, KBD_COL Carry is 0 if no key
 kbd_getkey:
 				STZ KBD_ROW				; result row
 				STZ KBD_COL				; result col
@@ -440,36 +439,63 @@ kbd_getkey:
 				LDA #0					   ; 1st test all rows to see if anything is pressed
 				STA VIA1+VIA_ORA           ; Write 0s to ALL rows
 				LDA VIA1+VIA_IRB           ; Read columns
-				BNE kgk_getkey             ; Not 0 means: Found a key pressed
+                CMP #$FF
+                BNE kgk_getkey             ; Some cols are 0: Found a key pressed
 kgk_nokey:
+				LDA #$FF                   ; Disconnect rows
+                STA VIA1+VIA_ORA
 				plxy
-				LDA #0
+			    CLC
 				RTS
 kgk_getkey:
-                LDA #%11111110    ; Bit7 of B corresponds to Row A above
-								  ; set b0 to 0 to test row
-				STA KBD_CHAR	  ; store in temp, we'll ROL it later to test each row
+                LDX #0
+                LDA #%01111111    ; Bit7 of B corresponds to Row A above
+				STA KBD_CHAR	  ; store in temp, we'll ROR it later to test each row
 @save_loop:     STA VIA1+VIA_ORA       ; select a row
 				LDA VIA1+VIA_IRB       ; read column
+                EOR #$FF            ; invert
                 STA scan_buffer,X ; and store for later interpretation
                 SEC               ; move on
-				ROL KBD_CHAR      ; to next row
+				ROR KBD_CHAR      ; to next row
                 LDA KBD_CHAR
                 INX
                 CPX #8
                 BNE @save_loop
 
-				LDA #$FF          ; Disconnect tows
+				LDA #$FF          ; Disconnect rows
                 STA VIA1+VIA_ORA
 				LDA #0			  ; done with temp var
 				STA KBD_CHAR
 
-; encode column into lower 3 bits and row into upper
-; for r in 0 to 7
-; 	if MASKED(scan_buffer[r])!=0 set bit r in ROW, set COL = scan_buffer[r]
-; set SHIFT and CTRL
-; encode, SHIFT, CTRL, ROW, COL
+; set KBD_ROW and KBD_COL
+;  First KBD_ROW
+kgk_set_outvars:
+                LDX #0
+                LDA #0
+@loop1:         LDA scan_buffer,X   ; check each column scanned
+                BNE @isset          ; if it has any cols set put 1 in KBD_ROW
+
+@notset:        CLC                 ; otherwise put 0
+                ROL KBD_ROW
+                BRA @over
+
+@isset:         SEC
+                ROL KBD_ROW
+
+@over:          INX                 ; next
+                CPX #8
+                BNE @loop1
+
+; Make KBD_COL an OR of all columns
+                LDX #0
+                LDA #0
+@loop2:         ORA scan_buffer,X
+                INX
+                CPX #8
+                BNE @loop2
+                STA KBD_COL
 
 				plxy
+                SEC
 				RTS
 

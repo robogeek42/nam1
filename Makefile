@@ -9,7 +9,8 @@ sd.s65 \
 kbdvia.s65 \
 bcd.s65 \
 pong.s65 \
-decomp.s65
+decomp.s65 \
+pacman.s65
 
 # May need to set CC65_LIB to path to compiler libs
 ifdef CC65_LIB
