@@ -14,10 +14,10 @@
 .include "sd.inc65"
 .include "kbdvia.inc65"
 .include "decomp.inc65"
+.include "sound.inc65"
 
 .import pong
 .import pacman
-.import PONG_IRQ
 
 .segment "VECTORS"
 
@@ -76,6 +76,10 @@ LAB_stlp:
                 ; display welcome message on video screen
                 ld16 R0, msg_welcome
                 JSR vdp_write_text
+
+.ifdef SOUND
+                JSR snd_all_off
+.endif
 
 .ifdef SDIO
 .ifdef KEYB

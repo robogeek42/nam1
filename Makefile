@@ -10,7 +10,8 @@ kbdvia.s65 \
 bcd.s65 \
 pong.s65 \
 decomp.s65 \
-pacman.s65
+pm.s65 \
+sound.s65
 
 # May need to set CC65_LIB to path to compiler libs
 ifdef CC65_LIB
@@ -22,7 +23,7 @@ endif
 # Compile with physical keyboard by default as the SIM now supports it
 KEYB ?= 1
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF)
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND)
 
 ifdef SDIO
 $(info ** Compile with SD card support **)
@@ -35,6 +36,10 @@ endif
 ifdef FASTCPU
 $(info ** Compile with FAST CPU support **)
 	FASTCPU_DEF = -D FASTCPU=$(FASTCPU)
+endif
+ifdef SOUND
+$(info ** Compile with SN76489 Sound support **)
+	SOUND_DEF = -D SOUND=$(SOUND)
 endif
 
 

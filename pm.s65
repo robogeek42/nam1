@@ -1,0 +1,318 @@
+; pacman - draw map
+
+.setcpu "65C02"
+
+.include "macros.inc65"
+.include "zeropage.inc65"
+.include "acia.inc65"
+.include "io.inc65"
+.include "string.inc65"
+.include "video.inc65"
+.include "video_common.inc65"
+.include "video_registers.inc65"
+.include "sprite.inc65"
+.include "bcd.inc65"
+.include "kbdvia.inc65"
+
+.export pacman
+
+; pacman vars in basic program area
+pm_vars = $7000
+; positions (x,y) and direction for each actor
+pm_positions = pm_vars + 0
+
+PM_X = pm_positions+0
+PM_Y = pm_positions+1
+PM_D = pm_positions+2
+G1_X = pm_positions+3
+G1_Y = pm_positions+4
+G1_D = pm_positions+5
+G2_X = pm_positions+6
+G2_Y = pm_positions+7
+G2_D = pm_positions+8
+G3_X = pm_positions+9
+G3_Y = pm_positions+10
+G3_D = pm_positions+11
+
+; sprite data table, 4 bytes per sprite
+; Y, X, Pattern No, Color/EarlyFlag
+; starts with number of sprites enabled
+
+pm_update_sprites = pm_positions + 12 ; flag 1 = update sprites
+
+pm_sprite_table = pm_positions + 13
+
+pm_numprites = pm_sprite_table+0
+pm_st_spr1_y = pm_sprite_table+1
+pm_st_spr1_x = pm_sprite_table+2
+pm_st_spr1_p = pm_sprite_table+3
+pm_st_spr1_c = pm_sprite_table+4
+
+pm_st_spr2_y = pm_sprite_table+5
+pm_st_spr2_x = pm_sprite_table+6
+pm_st_spr2_p = pm_sprite_table+7
+pm_st_spr2_c = pm_sprite_table+8
+
+pm_st_spr3_y = pm_sprite_table+9
+pm_st_spr3_x = pm_sprite_table+10
+pm_st_spr3_p = pm_sprite_table+11
+pm_st_spr3_c = pm_sprite_table+12
+
+pm_st_spr4_y = pm_sprite_table+13
+pm_st_spr4_x = pm_sprite_table+14
+pm_st_spr4_p = pm_sprite_table+15
+pm_st_spr4_c = pm_sprite_table+16
+
+pm_st_spr5_y = pm_sprite_table+17
+pm_st_spr5_x = pm_sprite_table+18
+pm_st_spr5_p = pm_sprite_table+19
+pm_st_spr5_c = pm_sprite_table+20
+
+pm_local =  pm_sprite_table+21
+
+IRQ_OLD      = pm_local+0  ; 2 bytes
+IRQ_COUNT    = pm_local+2
+
+; IRQ location - points to address part of JMP xxxx
+IRQ_ADDR = $20A
+
+.bss
+pm_score_buffer:
+	.res 4,0
+
+
+.code
+
+;------------------------------------------------------------------
+; 1. Load chars to consecutive locations in 
+; MODE 2 pattern table
+;
+pm_loadchars:
+            ld16 TMP0,PM_CHAR_TAB       ; character defs
+            ;LDX #28                    ; 28 characters
+pmdm_loop2: LDY #0
+pmdm_loop1: LDA (TMP0),Y
+            JSR vdp_write
+            INY
+            ;CPY #248                    ; 31 char, 8 bytes per char
+            BNE pmdm_loop1
+            ;add8To16 #8, TMP0
+            ;LDY #0
+            ;DEX
+            ;BNE pmdm_loop2
+            RTS
+pacman:
+pm_drawmaze:
+            phx
+            phy
+            LDA #2                      ; MODE 2
+            JSR vdp_set_mode
+            LDA #$F0
+            JSR vdp_set_base_colors
+
+            JSR vdp_setaddr_pattern_table
+            JSR pm_loadchars
+
+            ; load chars twice more
+            LDA #$08
+            STA TMP0
+            JSR vdp_setaddr_pattern_table_offset
+            JSR pm_loadchars
+
+            LDA #$10
+            STA TMP0
+            JSR vdp_setaddr_pattern_table_offset
+            JSR pm_loadchars
+
+;------------------------------------------------------------------
+; 2. Colours - Blue for maze, yellow for pills & dots
+pm_loadcols:
+            LDA #3
+            STA TMP0+1
+
+            LDA VDP_REGS+3      ;; Color table
+            AND #$80            ;; just want upper bit
+            CLC
+            ROR
+            ROR
+            STA TMP0            ; TMP 0 has msb of color table
+pmdm_colloop:
+            LDY #0
+            LDA TMP0
+            JSR vdp_set_addr_w
+
+            LDA #$40                    ; Blue/black
+            LDX #28                     ; 28 characters
+pmdm_loop4: LDY #8                      ; 8 bytes per char
+pmdm_loop3: JSR vdp_write
+            DEY
+            BNE pmdm_loop3
+            DEX
+            BNE pmdm_loop4
+
+            LDA #$b0                    ; Yellow/black
+            LDX #4                      ; 4 characters
+pmdm_loop6: LDY #8                      ; 8 bytes per char
+pmdm_loop5: JSR vdp_write
+            DEY
+            BNE pmdm_loop5
+            DEX
+            BNE pmdm_loop6
+         
+            CLC                         ; Add 2048 to address (8 to hi)
+            LDA TMP0
+            ADC #$08
+            STA TMP0
+
+            DEC TMP0+1                  ; we do the colour load 3 times
+            LDA TMP0+1
+            BNE pmdm_colloop
+
+;------------------------------------------------------------------
+; 3. Load pattern to name table
+;    Screen is 32x24 characters
+pm_loadnames:
+            JSR vdp_setaddr_name_table
+            ld16 TMP0, PACMAN_MAZE
+            LDX #24
+pmdm_loop8: LDY #0 
+pmdm_loop7: LDA (TMP0),Y
+            JSR vdp_write
+            INY
+            CPY #32                     ; 32 chars per line
+            BNE pmdm_loop7
+            add8To16 #32, TMP0
+            DEX
+            BNE pmdm_loop8
+
+;------------------------------------------------------------------
+; Init and Set sprite type (8x8 unmag)
+            JSR vdp_init_sprites
+            JSR spr_set_small
+            JSR spr_set_mag_off
+;           LDA #5                     ; enable 5 sprites
+;           STA ZP_TMP0                ; Pass number of sprites in ZP_TMP0
+;           JSR vdp_enable_sprites
+
+;------------------------------------------------------------------
+; Load patterns
+            ld16 ZP_TMP0, PM_SPRITES
+            STZ ZP_TMP2                ; load into P=0,1 ...
+@next_pattern:
+            JSR vdp_load_sprite_data_from_mem
+            CLC
+            add8To16 #8,ZP_TMP0        ; move data ptr to next pattern
+            INC ZP_TMP2                ; inrement pattern numner
+            LDA ZP_TMP2
+            CMP #4
+            BNE @next_pattern
+
+;------------------------------------------------------------------
+; Setup interrupt handler
+pmih_save_old:
+            LDA IRQ_ADDR
+            STA IRQ_OLD
+            LDA IRQ_ADDR+1
+            STA IRQ_OLD+1
+
+            LDA #$00
+            STA IRQ_COUNT
+
+            LDA #<PM_IRQ
+            STA IRQ_ADDR
+            LDA #>PM_IRQ
+            STA IRQ_ADDR+1
+
+; Enable VDP IRQ output (every 1/60th second)
+            LDA VDP_REGS+1      ;; data to write is existing Reg1 (was set by MODE command)
+            ORA #$20            ;; with bit2 set - actually bit 5 if numbered from LSb like sensible chips
+            STA VDP_REGS+1
+            LDY #$81            ;; register to write (1)
+            JSR vdp_regwrite
+
+            JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
+; Start allowing interrupts at CPU
+            CLI
+;------------------------------------------------------------------
+; GAME LOOP
+;
+
+;------------------------------------------------------------------
+; Exit
+            JSR pm_quit_game
+            ply
+            plx
+            RTS
+
+;==================================================================
+; Subroutines
+
+
+;------------------------------------------------------------------
+; Quit
+pm_quit_game:
+		ld16 R0,quit_message
+		JSR acia_puts
+; restore interrupt vector 
+        LDA IRQ_OLD
+        STA IRQ_ADDR
+        LDA IRQ_OLD+1
+        STA IRQ_ADDR+1
+; disable interrupts at CPU
+        SEI
+
+; disable interrupts from VDP
+        LDA VDP_REGS+1      ;; data to write is existing Reg1
+        AND #$DF            ;; unset interrupt bit
+        STA VDP_REGS+1
+        LDY #$81            ;; register to write (1)
+        JSR vdp_regwrite
+
+        JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
+		RTS
+
+;------------------------------------------------------------------
+; IRQ Handler
+PM_IRQ:		PHA
+            JSR pm_draw_sprites
+			LDA IRQ_COUNT               ;; if count >0
+			BEQ @skip
+			DEC IRQ_COUNT               ;; count--
+@skip:		JSR vdp_getstatus           ;; read VDP status to reenable the VDP interrupt
+            PLA 
+			RTI
+
+;------------------------------------------------------------------
+; draw sprites from table
+pm_draw_sprites:
+            LDA pm_update_sprites
+            CMP #0
+            BNE @draw_sprites
+            RTS
+@draw_sprites:
+			phx
+			LDX pm_numprites
+			BEQ dst_done
+
+dst_done:
+			plx
+            RTS
+            
+
+;------------------------------------------------------------------
+pm_drawpacman:
+            LDA #0
+            STA ZP_TMP0
+            LDA PM_X
+            STA ZP_TMP1
+            LDA PM_Y
+            STA ZP_TMP2
+            
+quit_message:
+	.byte "Goodbye!",$0d,$0a,$00
+
+.include "pm_char_set.inc65"
+.include "pm_char_map.inc65"
+.include "pm_sprites.inc65"

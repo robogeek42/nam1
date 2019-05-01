@@ -1,0 +1,41 @@
+; SN76489 Sound Chip
+;
+        .setcpu "65C02"
+        .include "zeropage.inc65"
+        .include "acia.inc65"
+        .include "string.inc65"
+        .include "macros.inc65"
+        .include "io.inc65"
+
+.export snd_all_off
+
+.code
+
+snd_all_off:
+        phx
+        pha
+        LDA #%10011111
+        STA SND_REG
+        LDX #16
+        JSR snd_delay
+        LDA #%10111111
+        STA SND_REG
+        LDX #16
+        JSR snd_delay
+        LDA #%11011111
+        STA SND_REG
+        LDX #16
+        JSR snd_delay
+        LDA #%11111111
+        STA SND_REG
+        LDX #16
+        JSR snd_delay
+        pla
+        plx
+        RTS
+
+snd_delay:
+@loop:  NOP
+        DEX
+        BNE @loop
+        RTS
