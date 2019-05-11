@@ -18,67 +18,85 @@
 
 ; pacman vars in basic program area
 pm_vars = $7000
-; positions (x,y) and direction for each actor
-pm_positions = pm_vars + 0
+;pm_map  = $6D00    ; 768 bytes for "map" = 32*24 same as screen
 
-PM_X = pm_positions+0
-PM_Y = pm_positions+1
-PM_D = pm_positions+2
+; game state 0 = not started 1 = playing  FF =  quit
+pm_game = pm_vars + 0
+pm_allowed = pm_vars + 1
+
+; positions (x,y) and direction for each actor
+pm_positions = pm_vars + 2
+
+; PACMAN position info
+PM_NT_LO = pm_positions+0   ; map (name table) position
+PM_NT_HI = pm_positions+1   ; map (name table) position
+PM_D = pm_positions+2   ; Direction
+; Ghost 1
 G1_X = pm_positions+3
 G1_Y = pm_positions+4
 G1_D = pm_positions+5
-G2_X = pm_positions+6
-G2_Y = pm_positions+7
-G2_D = pm_positions+8
-G3_X = pm_positions+9
-G3_Y = pm_positions+10
-G3_D = pm_positions+11
+G1_M = pm_positions+6   ; Mode (0=norm 1=scared)
+; Ghost 2
+G2_X = pm_positions+7
+G2_Y = pm_positions+8
+G2_D = pm_positions+9
+G2_M = pm_positions+10
+; Ghost 3
+G3_X = pm_positions+11
+G3_Y = pm_positions+12
+G3_D = pm_positions+13
+G3_M = pm_positions+14
+; only 3 for now ...
+pm_positions_end = pm_positions+14      ; (15)
 
 ; sprite data table, 4 bytes per sprite
 ; Y, X, Pattern No, Color/EarlyFlag
 ; starts with number of sprites enabled
 
-pm_update_sprites = pm_positions + 12 ; flag 1 = update sprites
+PM_UPDATE_FLAG = pm_positions_end +1 ; flag 1 = update sprites
 
-pm_sprite_table = pm_positions + 13
+pm_sprite_table = pm_positions_end + 2
 
-pm_numprites = pm_sprite_table+0
-pm_st_spr1_y = pm_sprite_table+1
-pm_st_spr1_x = pm_sprite_table+2
-pm_st_spr1_p = pm_sprite_table+3
-pm_st_spr1_c = pm_sprite_table+4
+PM_NUMPRITES = pm_sprite_table+0
 
-pm_st_spr2_y = pm_sprite_table+5
-pm_st_spr2_x = pm_sprite_table+6
-pm_st_spr2_p = pm_sprite_table+7
-pm_st_spr2_c = pm_sprite_table+8
+PM_ST_SPR1_Y = pm_sprite_table+1    ; (19)
+PM_ST_SPR1_X = pm_sprite_table+2
+PM_ST_SPR1_P = pm_sprite_table+3
+PM_ST_SPR1_C = pm_sprite_table+4
 
-pm_st_spr3_y = pm_sprite_table+9
-pm_st_spr3_x = pm_sprite_table+10
-pm_st_spr3_p = pm_sprite_table+11
-pm_st_spr3_c = pm_sprite_table+12
+PM_ST_SPR2_Y = pm_sprite_table+5
+PM_ST_SPR2_X = pm_sprite_table+6
+PM_ST_SPR2_P = pm_sprite_table+7
+PM_ST_SPR2_C = pm_sprite_table+8
 
-pm_st_spr4_y = pm_sprite_table+13
-pm_st_spr4_x = pm_sprite_table+14
-pm_st_spr4_p = pm_sprite_table+15
-pm_st_spr4_c = pm_sprite_table+16
+PM_ST_SPR3_Y = pm_sprite_table+9
+PM_ST_SPR3_X = pm_sprite_table+10
+PM_ST_SPR3_P = pm_sprite_table+11
+PM_ST_SPR3_C = pm_sprite_table+12
 
-pm_st_spr5_y = pm_sprite_table+17
-pm_st_spr5_x = pm_sprite_table+18
-pm_st_spr5_p = pm_sprite_table+19
-pm_st_spr5_c = pm_sprite_table+20
+PM_ST_SPR4_Y = pm_sprite_table+13
+PM_ST_SPR4_X = pm_sprite_table+14
+PM_ST_SPR4_P = pm_sprite_table+15
+PM_ST_SPR4_C = pm_sprite_table+16
 
-pm_local =  pm_sprite_table+21
+PM_ST_SPR5_Y = pm_sprite_table+17
+PM_ST_SPR5_X = pm_sprite_table+18
+PM_ST_SPR5_P = pm_sprite_table+19
+PM_ST_SPR5_C = pm_sprite_table+20
+
+pm_sprite_table_end = pm_sprite_table+20
+
+pm_local =  pm_sprite_table_end+1
 
 IRQ_OLD      = pm_local+0  ; 2 bytes
-IRQ_COUNT    = pm_local+2
+PM_IRQCOUNT    = pm_local+2
+PM_INTERRUPT = pm_local+3
+
+PM_SCORE = pm_local+8       ; 2 bytes
+PM_STR_BUFFER = pm_local+10  ; 12 bytes
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
-
-.bss
-pm_score_buffer:
-	.res 4,0
 
 
 .code
@@ -89,17 +107,11 @@ pm_score_buffer:
 ;
 pm_loadchars:
             ld16 TMP0,PM_CHAR_TAB       ; character defs
-            ;LDX #28                    ; 28 characters
 pmdm_loop2: LDY #0
 pmdm_loop1: LDA (TMP0),Y
             JSR vdp_write
             INY
-            ;CPY #248                    ; 31 char, 8 bytes per char
-            BNE pmdm_loop1
-            ;add8To16 #8, TMP0
-            ;LDY #0
-            ;DEX
-            ;BNE pmdm_loop2
+            BNE pmdm_loop1              ; loop 256 times = 32 8byte chars
             RTS
 pacman:
 pm_drawmaze:
@@ -150,7 +162,7 @@ pmdm_loop3: JSR vdp_write
             DEX
             BNE pmdm_loop4
 
-            LDA #$b0                    ; Yellow/black
+            LDA #$90                    ; Yellow/black
             LDX #4                      ; 4 characters
 pmdm_loop6: LDY #8                      ; 8 bytes per char
 pmdm_loop5: JSR vdp_write
@@ -184,18 +196,29 @@ pmdm_loop7: LDA (TMP0),Y
             add8To16 #32, TMP0
             DEX
             BNE pmdm_loop8
+;------------------------------------------------------------------
+; 4. Load game map 32x24
+;            ld16 TMP2, pm_map           ; set address of internal map
+;            ld16 TMP0, PACMAN_MAP       ; 
+;            LDX #3                      ; 3 * 256
+;pmdm_loop10: LDY #0 
+;pmdm_loop9: LDA (TMP0),Y
+;            STA (TMP2),Y
+;            INY
+;            BNE pmdm_loop9
+;            add8To16 #32, TMP0
+;            add8To16 #32, TMP2
+;            DEX
+;            BNE pmdm_loop10
 
 ;------------------------------------------------------------------
 ; Init and Set sprite type (8x8 unmag)
             JSR vdp_init_sprites
             JSR spr_set_small
             JSR spr_set_mag_off
-;           LDA #5                     ; enable 5 sprites
-;           STA ZP_TMP0                ; Pass number of sprites in ZP_TMP0
-;           JSR vdp_enable_sprites
 
 ;------------------------------------------------------------------
-; Load patterns
+; Load sprite patterns
             ld16 ZP_TMP0, PM_SPRITES
             STZ ZP_TMP2                ; load into P=0,1 ...
 @next_pattern:
@@ -204,8 +227,52 @@ pmdm_loop7: LDA (TMP0),Y
             add8To16 #8,ZP_TMP0        ; move data ptr to next pattern
             INC ZP_TMP2                ; inrement pattern numner
             LDA ZP_TMP2
-            CMP #4
+            CMP #PM_NUM_SPRITE_PATTERNS
             BNE @next_pattern
+
+;------------------------------------------------------------------
+; Initialise sprite table
+            LDA #112
+            STA PM_ST_SPR1_X
+            LDA #144
+            STA PM_ST_SPR1_Y
+            LDA #0
+            STA PM_ST_SPR1_P
+            LDA #11
+            STA PM_ST_SPR1_C
+
+            LDA #0
+            STA PM_ST_SPR2_X
+            LDA #0
+            STA PM_ST_SPR2_Y
+            LDA #9
+            STA PM_ST_SPR2_P
+            LDA #14
+            STA PM_ST_SPR2_C
+
+            LDA #1
+            STA PM_NUMPRITES
+;------------------------------------------------------------------
+; Initialise Positon data
+; start at (14,18) = (14+18*32)=590=$24E
+            LDA #$4E
+            STA PM_NT_LO
+            LDA #$02
+            STA PM_NT_HI
+            LDA #1          ; left
+            STA PM_D
+
+;------------------------------------------------------------------
+; Enable sprites
+            LDA #1                     ; enable 1 sprite
+            STA ZP_TMP0                ; Pass number of sprites in ZP_TMP0
+            JSR vdp_enable_sprites
+
+;------------------------------------------------------------------
+; write score
+            STZ PM_SCORE
+            STZ PM_SCORE+1
+            JSR pm_draw_score
 
 ;------------------------------------------------------------------
 ; Setup interrupt handler
@@ -216,7 +283,7 @@ pmih_save_old:
             STA IRQ_OLD+1
 
             LDA #$00
-            STA IRQ_COUNT
+            STA PM_IRQCOUNT
 
             LDA #<PM_IRQ
             STA IRQ_ADDR
@@ -234,12 +301,207 @@ pmih_save_old:
 
 ; Start allowing interrupts at CPU
             CLI
+
 ;------------------------------------------------------------------
 ; GAME LOOP
 ;
+            STZ pm_game         ; start at state 0 - not playing yet
+            JSR pm_readmap      ; get allowed directions
+            STA pm_allowed
+
+game_loop:
+            JSR get_input_serial
+
+.if KEYB
+            ;JSR get_input_keyboard
+.endif
+            LDA pm_game		; check game state:
+            CMP #$00		; 	game not started?
+            BEQ game_loop	; 		yes, keep just checking input
+            CMP #$FF		; 	quit requested?
+            BNE gl_dogame	; 		no, then continue
+            JMP quit_game	; 		yes, quit
+
+gl_dogame:
+            LDA PM_INTERRUPT        ; check interrupt has happened
+            BNE gl_do_update
+            JMP gl_skip_update
+gl_do_update:
+            JSR pm_readmap
+            STA pm_allowed
+
+			; check if is in square
+            LDA PM_D                ; check depends on direction of movement U/D or L/R
+            CMP #2                  ;
+            BCS gl_check_vert
+
+            LDA PM_ST_SPR1_X
+            AND #$04				; 0-3, in square, 4-7 in square to right
+			BNE gl_update_pm        ; not in square
+            BRA gl_do_insquare
+
+gl_check_vert:
+            LDA PM_ST_SPR1_Y
+            AND #$04				; 0-3, in square, 4-7 in square to right
+			BNE gl_update_pm        ; not in square
+			
+gl_do_insquare:
+            JSR pm_read_nametable
+            CMP #28                 ; 28 = dot
+            BEQ gl_is_dot
+            CMP #29
+            BEQ gl_is_pill
+            
+            JMP gl_update_pm
+
+gl_is_dot:
+            ; dot = add 10 to score
+			add8To16 #10, PM_SCORE
+            JMP gl_update_score
+            
+gl_is_pill:
+            ; pill = add 50 to score
+			add8To16 #50, PM_SCORE
+
+gl_update_score:
+            ; display new score
+            JSR pm_draw_score
+
+            ; write to name table - space
+            JSR pm_write_nametable
+
+gl_update_pm:
+			JSR pm_update_pm_sprite
+
+			;JSR pm_update_debug_square
+
+            LDA #1
+            STA PM_UPDATE_FLAG   ; tell update routine to update sprites
+
+gl_move_pacman:
+            LDA PM_IRQCOUNT                 ; update every N ticks
+            AND #$03                        
+            BNE gl_reset_interrupt_flag
+            LDA PM_D
+            CMP #0
+            BEQ gl_move_right
+            CMP #1
+            BEQ gl_move_left
+            CMP #2
+            BEQ gl_move_up
+            CMP #3
+            BEQ gl_move_down
+            JMP gl_reset_interrupt_flag
+
+gl_move_right:
+            JSR pm_move_right
+            JMP gl_reset_interrupt_flag
+gl_move_left:
+            JSR pm_move_left
+            JMP gl_reset_interrupt_flag
+gl_move_up:
+            JSR pm_move_up
+            JMP gl_reset_interrupt_flag
+gl_move_down:
+            JSR pm_move_down
+
+gl_reset_interrupt_flag:
+            LDA #0
+            STA PM_INTERRUPT        ; reset interrupt flag
+
+gl_skip_update:
+            JMP game_loop
 
 ;------------------------------------------------------------------
+pm_move_left:
+            ; if pos is at left of current square then move
+            ; to next square of pos. Otherwise just move
+            LDA PM_ST_SPR1_X
+            AND #$07
+            BNE pml_decx         ; not 0 (fully in square) so keep moving
+
+            ; check allowed directions
+            LDA pm_allowed
+            AND #DIR_L
+            BEQ pml_skipx
+
+            ; decrement PM pos (absolute)
+            dec16 PM_NT_LO
+pml_decx:
+            DEC PM_ST_SPR1_X
+pml_skipx:
+            RTS
+pm_move_right:
+            ; if pos is at far right of current square then move
+            ; to next square of pos. Otherwise just move
+            LDA PM_ST_SPR1_X
+            AND #$07
+            CMP #$07
+            BNE pml_incx         ; not 7 so keep moving
+
+            ; check allowed directions
+            LDA pm_allowed
+            AND #DIR_R
+            BEQ pml_skipx
+
+            ; increment PM pos (absolute)
+            inc16 PM_NT_LO
+            INC PM_ST_SPR1_X
+            RTS
+pml_incx:
+            ; check allowed directions
+            LDA pm_allowed
+            AND #DIR_R
+            BEQ pml_skipx
+            INC PM_ST_SPR1_X
+            RTS
+
+pm_move_up:
+            ; if pos is at top of current square then move
+            ; to next square of pos. Otherwise just move
+            LDA PM_ST_SPR1_Y
+            AND #$07
+            BNE pml_decy         ; not 0 (fully in square) so keep moving
+
+            ; check allowed directions
+            LDA pm_allowed
+            AND #DIR_U
+            BEQ pml_skipy
+
+            ; subtract 32 from PM pos (absolute)
+            sub8From16 #32, PM_NT_LO
+pml_decy:
+            DEC PM_ST_SPR1_Y
+pml_skipy:
+            RTS
+pm_move_down:
+            ; if pos is at bottom right of current square then move
+            ; to next square of pos. Otherwise just move
+            LDA PM_ST_SPR1_Y
+            AND #$07
+            CMP #$07
+            BNE pml_incy         ; not 7 so keep moving
+
+            ; check allowed directions
+            LDA pm_allowed
+            AND #DIR_D
+            BEQ pml_skipy
+
+            ; add 32 to PM pos (absolute)
+            add8To16 #32, PM_NT_LO
+            INC PM_ST_SPR1_Y
+            RTS
+pml_incy:
+            LDA pm_allowed
+            AND #DIR_D
+            BEQ pml_skipy
+            INC PM_ST_SPR1_Y
+            RTS
+ 
+ 
+;------------------------------------------------------------------
 ; Exit
+quit_game:
             JSR pm_quit_game
             ply
             plx
@@ -248,71 +510,302 @@ pmih_save_old:
 ;==================================================================
 ; Subroutines
 
+; Read game map at position PM_NT_LO/HI
+pm_readmap: CLC
+            LDA #<PACMAN_MAP
+            ADC PM_NT_LO
+            STA TMP2
+            LDA #>PACMAN_MAP
+            ADC PM_NT_HI
+            STA TMP2+1
+            LDY #0
+            LDA (TMP2),Y
+            RTS
+
+; read from name table
+pm_read_nametable:
+            LDY PM_NT_LO             ;; Set VRAM address to name table (VDP_REG2 * 0x400) + PM_NT_LO/HI
+            LDA VDP_REGS+2
+            ASL
+            ASL
+            CLC
+            ADC PM_NT_HI
+            JSR vdp_set_addr_r
+            LDA VDP_RD_VRAM
+            RTS
+; write to name table
+pm_write_nametable:
+            LDY PM_NT_LO             ;; Set VRAM address to name table (VDP_REG2 * 0x400) + PM_NT_LO/HI
+            LDA VDP_REGS+2
+            ASL
+            ASL
+            CLC
+            ADC PM_NT_HI
+            JSR vdp_set_addr_w
+            LDA #0
+            STA VDP_WR_VRAM
+            RTS
+
+;---------------------------------------
+; Get input from ACIA
+get_input_serial:
+            LDA ACIA_STATUS
+            AND #ACIA_STATUS_RX_FULL
+            BEQ gi_done
+            LDA ACIA_DATA
+
+            CMP #'q'
+            BNE @gis_check_space
+            LDA #$FF
+            STA pm_game
+            RTS
+@gis_check_space:
+            CMP #' '
+            BNE gi_check_wasd
+            LDA #$01
+            STA pm_game
+            RTS
+gi_check_wasd:
+            STA ZP_TMP0
+            LDA PM_D
+            CMP #2
+            BCS gi_curr_is_UD
+            
+gi_curr_is_LR:            
+            LDA ZP_TMP0
+            CMP #'a'
+            BEQ gi_dir_left
+            CMP #'d'
+            BEQ gi_dir_right
+
+            LDA PM_ST_SPR1_X
+            AND #$07            ; if X%8==0
+            BEQ gi_check_ud
+            CMP #$01            ; if X%8==1
+            BNE gi_done
+            LDA PM_ST_SPR1_X    ; push to align
+            AND #$F8            ; by setting position in square to 0
+            STA PM_ST_SPR1_X
+
+gi_check_ud:
+            LDA ZP_TMP0
+            CMP #'w'
+            BEQ gi_dir_up
+            CMP #'s'
+            BEQ gi_dir_down
+gi_done:
+            RTS
+gi_curr_is_UD:            
+            LDA ZP_TMP0
+            CMP #'w'
+            BEQ gi_dir_up
+            CMP #'s'
+            BEQ gi_dir_down
+
+            LDA PM_ST_SPR1_Y
+            AND #$07            ; if Y%8==0
+            BEQ gi_check_lr
+            CMP #$01            ; if Y%8==1
+            BNE gi_done
+            LDA PM_ST_SPR1_Y    ; push to align
+            AND #$F8
+            STA PM_ST_SPR1_Y
+
+gi_check_lr:
+            LDA ZP_TMP0
+            CMP #'a'
+            BEQ gi_dir_left
+            CMP #'d'
+            BEQ gi_dir_right
+            RTS
+
+gi_dir_right:
+            LDA PM_D
+            LDA pm_allowed
+            AND #DIR_R
+            BEQ @skip
+            LDA #0
+            STA PM_D
+@skip:      RTS
+gi_dir_left:
+            LDA pm_allowed
+            AND #DIR_L
+            BEQ @skip
+            LDA #1
+            STA PM_D
+@skip:      RTS
+gi_dir_up:
+            LDA pm_allowed
+            AND #DIR_U
+            BEQ @skip
+            LDA #2
+            STA PM_D
+@skip:      RTS
+gi_dir_down:
+            LDA pm_allowed
+            AND #DIR_D
+            BEQ @skip
+            LDA #3
+            STA PM_D
+@skip:      RTS
 
 ;------------------------------------------------------------------
 ; Quit
 pm_quit_game:
-		ld16 R0,quit_message
-		JSR acia_puts
+            ld16 R0,quit_message
+            JSR acia_puts
 ; restore interrupt vector 
-        LDA IRQ_OLD
-        STA IRQ_ADDR
-        LDA IRQ_OLD+1
-        STA IRQ_ADDR+1
+            LDA IRQ_OLD
+            STA IRQ_ADDR
+            LDA IRQ_OLD+1
+            STA IRQ_ADDR+1
 ; disable interrupts at CPU
-        SEI
+            SEI
 
 ; disable interrupts from VDP
-        LDA VDP_REGS+1      ;; data to write is existing Reg1
-        AND #$DF            ;; unset interrupt bit
-        STA VDP_REGS+1
-        LDY #$81            ;; register to write (1)
-        JSR vdp_regwrite
+            LDA VDP_REGS+1      ;; data to write is existing Reg1
+            AND #$DF            ;; unset interrupt bit
+            STA VDP_REGS+1
+            LDY #$81            ;; register to write (1)
+            JSR vdp_regwrite
 
-        JSR vdp_getstatus   ;; clear interrupt flag in VDP
+            JSR vdp_getstatus   ;; clear interrupt flag in VDP
 
-		RTS
+            RTS
 
 ;------------------------------------------------------------------
 ; IRQ Handler
-PM_IRQ:		PHA
+PM_IRQ:		PHP                         ; save status flags (so BCD is correct)
+            PHA
             JSR pm_draw_sprites
-			LDA IRQ_COUNT               ;; if count >0
-			BEQ @skip
-			DEC IRQ_COUNT               ;; count--
+			DEC PM_IRQCOUNT             ;; count--
+            DEC PM_INTERRUPT            ;; make interrupt flag != 0
+
 @skip:		JSR vdp_getstatus           ;; read VDP status to reenable the VDP interrupt
             PLA 
+            PLP
 			RTI
 
 ;------------------------------------------------------------------
 ; draw sprites from table
 pm_draw_sprites:
-            LDA pm_update_sprites
-            CMP #0
-            BNE @draw_sprites
+            LDA PM_UPDATE_FLAG
+            BNE pm_do_draw
             RTS
-@draw_sprites:
-			phx
-			LDX pm_numprites
-			BEQ dst_done
+pm_do_draw:
+            phx
+            phy
+            LDA PM_NUMPRITES            
+            BEQ pds_done
+            ASL                         ; 4 bytes per sprite
+            ASL
+            TAX                         ; X has size of table
 
-dst_done:
-			plx
+            LDY ZP_VDP_SAB              ; set vdp up to write to Sprite Attrib Base
+            LDA ZP_VDP_SAB+1
+            JSR vdp_set_addr_w
+            LDY #0                      ; index into table
+pds_loop1:
+            LDA PM_ST_SPR1_Y,Y          ; read byte from table
+            JSR vdp_write               ; wrie to VDP
+            INY
+            DEX
+            BNE pds_loop1
+pds_done:
+            STZ PM_UPDATE_FLAG
+            ply
+            plx
             RTS
             
 
 ;------------------------------------------------------------------
-pm_drawpacman:
-            LDA #0
-            STA ZP_TMP0
-            LDA PM_X
-            STA ZP_TMP1
-            LDA PM_Y
-            STA ZP_TMP2
+; Draw score to screen
+pm_draw_score:
+            ; put score into R1,R+1
+            LDA PM_SCORE
+            STA R1
+            LDA PM_SCORE+1
+            STA R1+1
+            ; convert to decimal
+            JSR BINBCD16
+            ld16 R0,PM_STR_BUFFER
+            JSR BCD4BYTE2STR
             
+            LDA #27             ; X
+            LDY #9              ; Y
+            JSR vdp_set_pos
+            JSR vdp_write_text  
+            RTS
+            
+pm_print_debug:
+            ld16 R0,PM_STR_BUFFER
+            LDA R4+1
+            JSR fmt_hex_string
+            add8To16 #2, R0
+            LDA R4
+            JSR fmt_hex_string
+            ld16 R0,PM_STR_BUFFER
+            LDA #27             ; X
+            LDY #13             ; Y
+            JSR vdp_set_pos
+            JSR vdp_write_text  
+            RTS
+
+;------------------------------------------------------------------
+; update the PM sprite animation
+pm_update_pm_sprite:
+            LDA PM_IRQCOUNT
+            AND #%00011000          ; change sprite from 0-3 every 8th tick
+            LSR
+            LSR
+            LSR
+            ; add 4*PM_D
+            STA TMP0
+            LDA PM_D                ; direction 
+            ASL
+            ASL
+            CLC
+            ADC TMP0
+            ; lookup sprite number
+            TAY
+            LDA PM_SPR_INDEX,Y
+            ; store in pattern
+            STA PM_ST_SPR1_P
+			RTS
+
+;------------------------------------------------------------------
+; update the white Debug square (in sprite 2)
+pm_update_debug_square:
+			; debug square sprite
+			; calculate X/Y from the memory position in PM_NT_HI/LO
+			LDA PM_NT_HI
+			STA R3+2
+			LDA PM_NT_LO
+			STA R3
+			AND #$1F        ; remainder after divide by 32
+			ASL
+			ASL
+			ASL             ; * 8 to give X
+			STA PM_ST_SPR2_X
+			
+			CLC
+			LDA R3
+			AND #$E0
+			STA R3
+
+			ROR R3+2    ; /2
+			ROR R3
+			CLC
+			ROR R3+2    ; /4
+			ROR R3
+			LDA R3
+			STA PM_ST_SPR2_Y
+			RTS
+
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
 
 .include "pm_char_set.inc65"
 .include "pm_char_map.inc65"
 .include "pm_sprites.inc65"
+.include "pm_map.inc65"

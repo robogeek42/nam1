@@ -1,2 +1,4 @@
 .import BINBCD8
+.import BINBCD16
 .import BCD2STR
+.import BCD4BYTE2STR

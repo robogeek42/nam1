@@ -3,7 +3,9 @@
 .include "zeropage.inc65"
 
 .export BINBCD8
+.export BINBCD16
 .export BCD2STR
+.export BCD4BYTE2STR
 
 .code
 
@@ -39,6 +41,48 @@ CNVBIT:
 		
 		PLX
 		RTS		; All Done.
+;-----------------------------------------------------------------------
+; Assif - a 16 bit version of above
+; Input in R1,R1+1 
+; Output to R2,R2+1,R2+2 (R2&R3)
+; 2^16-1 = 65535 in BCD this needs 3 bytes (5 nibbles)
+BINBCD16:
+		PHX
+        PHY
+		SED			; Switch to decimal mode
+		LDA #0		; Ensure the result is clear
+		STA R2+0
+		STA R2+1
+		STA R2+2
+		STA R2+3
+        LDY #1      ; number of bytes in word
+BB16_BYTELOOP:
+        LDX #8		; The number of source bits in byte
+        LDA R1,Y    ; start with MSB
+        STA BCD_IN
+BB16_BITLOOP:
+		ASL BCD_IN	; Shift out one bit
+		LDA R2+0	; And add into result
+		ADC R2+0
+		STA R2+0
+		LDA R2+1	; propagating any carry
+		ADC R2+1
+		STA R2+1
+        LDA R2+2	; propagating any carry to third byte
+		ADC R2+2
+		STA R2+2
+        ;LDA R2+3	; and to fourth byte
+		;ADC R2+3
+		;STA R2+3
+		DEX		    ; And repeat for next bit
+		BNE BB16_BITLOOP
+        DEY
+        BPL BB16_BYTELOOP   ; for 1 & 0
+		CLD		    ; Back to binary
+		
+        PLY
+		PLX
+		RTS		    ; All Done.
 ;-----------------------------------------------------------------------
 
 
@@ -76,6 +120,7 @@ b2s_write_term_null:
         pla
 		RTS
 
+;-----------------------------------------------------------------------
 ; subroutine to read a byte and write out digits
 b2s_read_byte:
 		TXA						; byte to convert in X
@@ -101,3 +146,41 @@ b2s_do_write_digit:
 		STA (R0),Y				; write digit
 		INY						; move write pointer
 		RTS
+
+;-----------------------------------------------------------------------
+; Assif:
+; Convert the BCD value in R2,R2+1,R2+3 to string pointed to by R0
+; ASCII 0 = $30 , no leading zeros
+BCD4BYTE2STR:
+        pha
+        phx
+        phy
+		LDY #0 					; point to pos in string
+
+		LDX R2+2				; MMSB
+		CPX #0
+        BNE b4s_do_mmsb			; not zero, so convert all 3 bytes
+
+		LDX R2+1				; MSB
+		CPX #0
+        BNE b4s_do_msb			; not zero, so convert MSB down
+
+		LDX R2					; LSB
+		CPX #0
+		BNE b4s_do_lsb			; MSB is zero, only need to convert LSB
+
+        LDA #'0'				; all bytes are zero so
+		STA (R0),Y				; write a zero
+		INY
+		JMP b2s_write_term_null	; and finish
+
+b4s_do_mmsb:
+		JSR b2s_read_byte		; MSB
+b4s_do_msb:
+        LDX R2+1
+		JSR b2s_read_byte		; MSB
+b4s_do_lsb:
+		LDX R2
+		JSR b2s_read_byte		; LSB
+
+        JMP b2s_write_term_null

@@ -108,3 +108,14 @@ _mlbl_skip: dec reg
 	adc #0
 	sta word+1
 .endmacro
+; subtract a 8 bit value from a 16 bit word
+; destroys A
+.macro sub8From16 val, word
+    sec
+	lda word
+    sbc val
+	sta word
+	lda word+1
+    sbc #0
+	sta word+1
+.endmacro
