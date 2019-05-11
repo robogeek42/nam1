@@ -3,6 +3,7 @@
 .import vdp_clear_screen
 .import vdp_load_chars
 .import vdp_load_g1_col
+.import vdp_set_pos
 .import vdp_write_char
 .import vdp_write_text
 .import vdp_backspace

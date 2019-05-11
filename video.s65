@@ -352,17 +352,14 @@ vdp_start_str_w:
 ;------------------------------------------------
 ; Set screen position.
 ; Start VDP write at given location and set cursor vars.
-; X - xpos, A - ypos, preserve Y
-vdp_set_pos:	phy
-				STX ZP_VDP_XPOS
-				STA ZP_VDP_YPOS
-				TAY
-				LDA #0
-				STA ZP_VDP_CURS
-				STA ZP_VDP_CURS+1
-				CPY #0
+; A - xpos, Y - ypos, dont touch X
+vdp_set_pos:	STA ZP_VDP_XPOS     ; X
+                STA ZP_VDP_CURS     ; start abs curs position with X
+				STY ZP_VDP_YPOS     ; Y
+				STZ ZP_VDP_CURS+1
+                CPY #0              ; if Y was 0 then we already have position
 				BEQ vsp_done
-vsp_loop:		CLC
+vsp_loop:		CLC                 ; otherwise add screen width * Y
 				LDA ZP_VDP_CURS
 				ADC ZP_VDP_CHAR_WIDTH
 				STA ZP_VDP_CURS
@@ -373,14 +370,13 @@ vsp_loop:		CLC
 				BNE vsp_loop
 vsp_done:
 				JSR vdp_start_str_w
-				ply
 				RTS
 				 
 ;------------------------------------------------
 ; Write the zero terminated string pointed to by R0 to screen
 ; to current cursor pos
 ; Screen pos will wrap lines, but not pages
-; The screen position is handled internall - not suitable for BASIC inteface
+; The screen position is handled internaly - not suitable for BASIC inteface
 vdp_write_text: 
                 JSR vdp_start_str_w
                 LDY #0              ;; max 255 chars, in case not zero term
