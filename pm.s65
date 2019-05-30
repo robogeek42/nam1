@@ -18,19 +18,21 @@
 
 ; pacman vars in basic program area
 pm_vars = $7000
-;pm_map  = $6D00    ; 768 bytes for "map" = 32*24 same as screen
 
 ; game state 0 = not started 1 = playing  FF =  quit
 pm_game = pm_vars + 0
 pm_allowed = pm_vars + 1
+pm_input_dir = pm_vars + 2
+KBD_LAST_ROW = pm_vars + 3
+KBD_LAST_COL = pm_vars + 4
 
 ; positions (x,y) and direction for each actor
-pm_positions = pm_vars + 2
+pm_positions = pm_vars + 5
 
 ; PACMAN position info
 PM_NT_LO = pm_positions+0   ; map (name table) position
 PM_NT_HI = pm_positions+1   ; map (name table) position
-PM_D = pm_positions+2   ; Direction
+PM_DIR = pm_positions+2   ; Direction
 ; Ghost 1
 G1_X = pm_positions+3
 G1_Y = pm_positions+4
@@ -97,7 +99,6 @@ PM_STR_BUFFER = pm_local+10  ; 12 bytes
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
-
 
 .code
 
@@ -259,8 +260,8 @@ pmdm_loop7: LDA (TMP0),Y
             STA PM_NT_LO
             LDA #$02
             STA PM_NT_HI
-            LDA #1          ; left
-            STA PM_D
+            LDA #PM_DIR_L              ; facing left
+            STA PM_DIR
 
 ;------------------------------------------------------------------
 ; Enable sprites
@@ -310,11 +311,12 @@ pmih_save_old:
             STA pm_allowed
 
 game_loop:
-            JSR get_input_serial
-
+            JSR pm_get_input_serial
 .if KEYB
-            ;JSR get_input_keyboard
+            JSR pm_get_input_keyboard
 .endif
+            JSR pm_process_input
+
             LDA pm_game		; check game state:
             CMP #$00		; 	game not started?
             BEQ game_loop	; 		yes, keep just checking input
@@ -331,9 +333,9 @@ gl_do_update:
             STA pm_allowed
 
 			; check if is in square
-            LDA PM_D                ; check depends on direction of movement U/D or L/R
-            CMP #2                  ;
-            BCS gl_check_vert
+            LDA PM_DIR                ; check depends on direction of movement U/D or L/R
+            CMP #PM_DIR_D             ;
+            BCS gl_check_vert         ; >= Down = Down/Up
 
             LDA PM_ST_SPR1_X
             AND #$04				; 0-3, in square, 4-7 in square to right
@@ -342,7 +344,7 @@ gl_do_update:
 
 gl_check_vert:
             LDA PM_ST_SPR1_Y
-            AND #$04				; 0-3, in square, 4-7 in square to right
+            AND #$04				; 0-3, in square, 4-7 in square below
 			BNE gl_update_pm        ; not in square
 			
 gl_do_insquare:
@@ -382,14 +384,14 @@ gl_move_pacman:
             LDA PM_IRQCOUNT                 ; update every N ticks
             AND #$03                        
             BNE gl_reset_interrupt_flag
-            LDA PM_D
-            CMP #0
+            LDA PM_DIR
+            CMP #PM_DIR_R
             BEQ gl_move_right
-            CMP #1
+            CMP #PM_DIR_L
             BEQ gl_move_left
-            CMP #2
+            CMP #PM_DIR_U
             BEQ gl_move_up
-            CMP #3
+            CMP #PM_DIR_D
             BEQ gl_move_down
             JMP gl_reset_interrupt_flag
 
@@ -422,7 +424,7 @@ pm_move_left:
 
             ; check allowed directions
             LDA pm_allowed
-            AND #DIR_L
+            AND #PM_MAP_DIR_L_BIT
             BEQ pml_skipx
 
             ; decrement PM pos (absolute)
@@ -441,7 +443,7 @@ pm_move_right:
 
             ; check allowed directions
             LDA pm_allowed
-            AND #DIR_R
+            AND #PM_MAP_DIR_R_BIT
             BEQ pml_skipx
 
             ; increment PM pos (absolute)
@@ -451,7 +453,7 @@ pm_move_right:
 pml_incx:
             ; check allowed directions
             LDA pm_allowed
-            AND #DIR_R
+            AND #PM_MAP_DIR_R_BIT
             BEQ pml_skipx
             INC PM_ST_SPR1_X
             RTS
@@ -465,7 +467,7 @@ pm_move_up:
 
             ; check allowed directions
             LDA pm_allowed
-            AND #DIR_U
+            AND #PM_MAP_DIR_U_BIT
             BEQ pml_skipy
 
             ; subtract 32 from PM pos (absolute)
@@ -484,7 +486,7 @@ pm_move_down:
 
             ; check allowed directions
             LDA pm_allowed
-            AND #DIR_D
+            AND #PM_MAP_DIR_D_BIT
             BEQ pml_skipy
 
             ; add 32 to PM pos (absolute)
@@ -493,7 +495,7 @@ pm_move_down:
             RTS
 pml_incy:
             LDA pm_allowed
-            AND #DIR_D
+            AND #PM_MAP_DIR_D_BIT
             BEQ pml_skipy
             INC PM_ST_SPR1_Y
             RTS
@@ -548,105 +550,215 @@ pm_write_nametable:
 
 ;---------------------------------------
 ; Get input from ACIA
-get_input_serial:
+pm_get_input_serial:
             LDA ACIA_STATUS
             AND #ACIA_STATUS_RX_FULL
-            BEQ gi_done
+            BEQ gis_no_dir_input
             LDA ACIA_DATA
 
             CMP #'q'
-            BNE @gis_check_space
+            BNE gis_check_space
             LDA #$FF
             STA pm_game
             RTS
-@gis_check_space:
+gis_check_space:
             CMP #' '
-            BNE gi_check_wasd
+            BNE gis_check_wasd
             LDA #$01
             STA pm_game
             RTS
-gi_check_wasd:
-            STA ZP_TMP0
-            LDA PM_D
-            CMP #2
-            BCS gi_curr_is_UD
-            
-gi_curr_is_LR:            
-            LDA ZP_TMP0
+gis_check_wasd:
             CMP #'a'
-            BEQ gi_dir_left
-            CMP #'d'
-            BEQ gi_dir_right
+            BNE @check_d
+            LDA #PM_DIR_L
+            STA pm_input_dir
+            RTS
+@check_d:   CMP #'d'
+            BNE @check_w
+            LDA #PM_DIR_R
+            STA pm_input_dir
+            RTS
+@check_w:   CMP #'w'
+            BNE @check_s
+            LDA #PM_DIR_U
+            STA pm_input_dir
+            RTS
+@check_s:   CMP #'s'
+            BNE gis_no_dir_input
+            LDA #PM_DIR_D
+            STA pm_input_dir
+            RTS
+gis_no_dir_input:
+            ;LDA #$FF
+            ;STA pm_input_dir
+            RTS
+
+.if KEYB
+;---------------------------------------
+; Get input from KEYBOARD
+pm_get_input_keyboard:
+            JSR kbd_getkey              ; result in KBD_COL, KBD_ROW (zero-page)
+            BCC gik_done
+            LDA KBD_ROW                 ; if the same key again
+            CMP KBD_LAST_ROW
+            BNE gik_got_key             ; just skip decode
+            LDA KBD_COL
+            CMP KBD_LAST_COL
+            BNE gik_got_key
+            LDA KBD_ROW                 ; save last
+            STA KBD_LAST_ROW
+            LDA KBD_COL
+            STA KBD_LAST_COL
+
+            JMP gik_done
+
+gik_got_key:
+            ; q and <spc> in row 0
+            ; a, w, s are in row 1
+            ; d in row 2
+            BBS0 KBD_ROW,gik_test_row0
+            BBS1 KBD_ROW,gik_test_row1
+            BBS2 KBD_ROW,gik_test_row2
+            JMP gik_done
+
+gik_test_row0:
+			BBS4 KBD_COL,gik_do_spc
+			BBS6 KBD_COL,gik_do_q
+			RMB0 KBD_ROW				; no columns set (anymore) so reset row bit
+			BRA gik_got_key
+gik_test_row1:
+			BBS1 KBD_COL,gik_do_w
+			BBS2 KBD_COL,gik_do_a
+			BBS5 KBD_COL,gik_do_s
+			RMB1 KBD_ROW				; no columns set (anymore) so reset row bit
+			BRA gik_got_key
+gik_test_row2:
+			BBS2 KBD_COL,gik_do_d
+			RMB2 KBD_ROW				; no columns set (anymore) so reset row bit
+			BRA gik_got_key
+
+gik_do_spc:								; SPACE = Start Game
+			LDA #$01					; Start game flag
+            STA pm_game
+			RMB4 KBD_COL
+			BRA gik_got_key
+gik_do_q:								; Q = Quit Game
+            LDA #$FF                    ; else mark end-of-game
+            STA pm_game                 ; in game state variable
+			RMB6 KBD_COL
+			BRA gik_got_key
+gik_do_w:								; W = Up
+            LDA #PM_DIR_U
+            STA pm_input_dir
+			RMB1 KBD_COL
+			BRA gik_got_key
+gik_do_a:								; A = Left
+            LDA #PM_DIR_L
+            STA pm_input_dir
+			RMB2 KBD_COL
+			BRA gik_got_key
+gik_do_s:								; S = Down
+            LDA #PM_DIR_D
+            STA pm_input_dir
+			RMB5 KBD_COL
+			BRA gik_got_key
+gik_do_d:								; D = Right
+			LDA #PM_DIR_R
+			STA pm_input_dir
+			RMB2 KBD_COL
+			BRA gik_got_key
+gik_done:
+            RTS
+.endif
+
+
+;---------------------------------------
+; Process input in terms of 0=L,1=R,2=U,3=D
+pm_process_input:
+            LDA pm_input_dir
+            BMI pi_done         ; $FF = no input
+            LDA PM_DIR          ; check current direction
+            CMP #PM_DIR_D
+            BCS pi_curr_is_UD   ; 2 or 3 D/U
+
+pi_curr_is_LR:            
+            LDA pm_input_dir
+            CMP #PM_DIR_L
+            BEQ pi_dir_left
+            CMP #PM_DIR_R
+            BEQ pi_dir_right
 
             LDA PM_ST_SPR1_X
             AND #$07            ; if X%8==0
-            BEQ gi_check_ud
+            BEQ pi_check_ud     ;   then fully in square so can check U/D as well
             CMP #$01            ; if X%8==1
-            BNE gi_done
-            LDA PM_ST_SPR1_X    ; push to align
-            AND #$F8            ; by setting position in square to 0
+            BNE pi_done         ;   then almost in square so
+            LDA PM_ST_SPR1_X    ;   push to align
+            AND #$F8            ;   by setting position in square to 0
             STA PM_ST_SPR1_X
 
-gi_check_ud:
-            LDA ZP_TMP0
-            CMP #'w'
-            BEQ gi_dir_up
-            CMP #'s'
-            BEQ gi_dir_down
-gi_done:
+pi_check_ud:
+            LDA pm_input_dir
+            CMP #PM_DIR_U
+            BEQ pi_dir_up
+            CMP #PM_DIR_D
+            BEQ pi_dir_down
+pi_done:
+            LDA #$FF            ; clear input once it has been processed
+            STA pm_input_dir
             RTS
-gi_curr_is_UD:            
-            LDA ZP_TMP0
-            CMP #'w'
-            BEQ gi_dir_up
-            CMP #'s'
-            BEQ gi_dir_down
+
+pi_curr_is_UD:            
+            LDA pm_input_dir
+            CMP #PM_DIR_U
+            BEQ pi_dir_up
+            CMP #PM_DIR_D
+            BEQ pi_dir_down
 
             LDA PM_ST_SPR1_Y
             AND #$07            ; if Y%8==0
-            BEQ gi_check_lr
+            BEQ pi_check_lr     ;   then fully in square so can check L/R as well
             CMP #$01            ; if Y%8==1
-            BNE gi_done
-            LDA PM_ST_SPR1_Y    ; push to align
+            BNE pi_done         ;   then almost in square so
+            LDA PM_ST_SPR1_Y    ;   push to align
             AND #$F8
             STA PM_ST_SPR1_Y
 
-gi_check_lr:
-            LDA ZP_TMP0
-            CMP #'a'
-            BEQ gi_dir_left
-            CMP #'d'
-            BEQ gi_dir_right
+pi_check_lr:
+            LDA pm_input_dir
+            CMP #PM_DIR_L
+            BEQ pi_dir_left
+            CMP #PM_DIR_R
+            BEQ pi_dir_right
             RTS
 
-gi_dir_right:
-            LDA PM_D
+pi_dir_right:
             LDA pm_allowed
-            AND #DIR_R
+            AND #PM_MAP_DIR_R_BIT
             BEQ @skip
-            LDA #0
-            STA PM_D
+            LDA #PM_DIR_R
+            STA PM_DIR
 @skip:      RTS
-gi_dir_left:
+pi_dir_left:
             LDA pm_allowed
-            AND #DIR_L
+            AND #PM_MAP_DIR_L_BIT
             BEQ @skip
-            LDA #1
-            STA PM_D
+            LDA #PM_DIR_L
+            STA PM_DIR
 @skip:      RTS
-gi_dir_up:
+pi_dir_up:
             LDA pm_allowed
-            AND #DIR_U
+            AND #PM_MAP_DIR_U_BIT
             BEQ @skip
-            LDA #2
-            STA PM_D
+            LDA #PM_DIR_U
+            STA PM_DIR
 @skip:      RTS
-gi_dir_down:
+pi_dir_down:
             LDA pm_allowed
-            AND #DIR_D
+            AND #PM_MAP_DIR_D_BIT
             BEQ @skip
-            LDA #3
-            STA PM_D
+            LDA #PM_DIR_D
+            STA PM_DIR
 @skip:      RTS
 
 ;------------------------------------------------------------------
@@ -759,9 +871,9 @@ pm_update_pm_sprite:
             LSR
             LSR
             LSR
-            ; add 4*PM_D
+            ; add 4*PM_DIR
             STA TMP0
-            LDA PM_D                ; direction 
+            LDA PM_DIR                ; direction 
             ASL
             ASL
             CLC
