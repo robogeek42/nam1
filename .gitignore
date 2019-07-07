@@ -1,4 +1,9 @@
 *.lst
 *.o
-firmware
+firmware*
 map
+old
+*old
+*tmp
+*save
+foo.sr
