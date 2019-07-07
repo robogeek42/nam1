@@ -16,6 +16,7 @@
 .include "decomp.inc65"
 .include "sound.inc65"
 .include "bcd.inc65"
+.include "pckybd.inc65"
 
 .import pong
 .import pacman
@@ -66,6 +67,23 @@ LAB_stlp:
                 ;JSR print_16bit_hex_string      ; print it
                 ;JSR acia_put_newline
 
+                ; Initialise VIA2 for SD card and Sound and KBD
+                ; Port A output data for sound
+                LDA #$FF
+                STA VIA2 + VIA_DDRA
+                LDA #(SD_CLK | SD_CS | SD_DI | SND_VIA_WE_CE )    ; Set output pins
+                STA VIA2 + VIA_DDRB              ; SD card is attached to PortB of VIA2
+
+.ifdef SOUND
+                JSR snd_all_off
+.endif ; SOUND
+
+.ifdef PS2K
+                ld16 R0,msg_init_ps2k
+                JSR acia_puts
+                JSR KBINIT
+.endif
+                
                 ; display welcome message in the Serial Console
                 ld16 R0, msg_welcome
                 JSR acia_puts
@@ -78,24 +96,24 @@ LAB_stlp:
                 ld16 R0, msg_welcome
                 JSR vdp_write_text
 
-.ifdef SOUND
-                JSR snd_all_off
-.endif
-
 .ifdef SDIO
 .ifdef KEYB
+                ; Skip SD init if key is pressed
                 JSR kbd_scan
                 BCS skip_sdinit
 .endif
                 
                 ; SD Card and filesystem
-                LDA #(SD_CLK | SD_CS | SD_DI)    ; Set output pins
-                sta VIA2 + VIA_DDRB                ; SD card is attached to PortB of VIA2
-    
                 JSR init_sdcard
                 JSR init_fs
 skip_sdinit:
 .endif
+
+.ifdef SOUND
+                ; Play welcome sound
+                JSR snd_hello
+                JSR snd_all_off
+.endif ; SOUND
 
                 ; clear address used for 'm' memory dump command
                 LDA #0
@@ -185,14 +203,36 @@ loop:           ld16 R0, prompt
 @cmd_t:         cmp #'t'
                 bne @cmd_t_end
                 lda buffer+1
+
                 cmp #'b'
                 bne @cmd_t_test_w
+                ; test converting an 8 bit number to BCD
                 jsr cmd_test_bcd8
                 jmp loop
-        @cmd_t_test_w:
+
+                @cmd_t_test_w:
                 cmp #'w'
-                bne @cmd_empty
+                bne @cmd_t_test_s
+                ; test converting a 16 bit number to BCD
                 jsr cmd_test_bcd16
+                jmp loop
+
+                @cmd_t_test_s:
+                cmp #'s'
+                bne @cmd_t_test_k
+                ;test playing a sound file
+                LDA #<TEST_VGM_DATA
+                STA R2
+                LDA #>TEST_VGM_DATA
+                STA R2+1
+                JSR snd_play_vgmdata
+                jmp loop
+
+                @cmd_t_test_k:
+                cmp #'k'
+                bne @cmd_t_end
+                ; test keyboard
+                JSR test_ps2_keyboard
                 jmp loop
                 @cmd_t_end:
 
@@ -218,7 +258,7 @@ loop:           ld16 R0, prompt
 prompt:     .byte "nam-mon-> ", $00
 assign_arrow:   .byte " <- ", $00
 .ifdef FASTCPU
-msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics Fast CPU",$0d,$0a, $00
+    msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics 2.45MHz CPU",$0d,$0a, $00
 .else
 msg_welcome:    .byte "NAM-1 80K", $0d, $0a,"VDP Graphics",$0d,$0a, $00
 .endif
@@ -234,6 +274,9 @@ msg_help:       .byte "m <addr> - dump mem",$0d,$0a
                 .byte $00
 msg_error:      .byte "Error", $0d, $0a, $00
 ;msg_vdp_welcome:  .byte "Assif 6502 & EhBasic", $0d, $0a, $00
+
+msg_init_ps2k:
+                .byte "PS2 "
 msg_init_keyboard:
                 .byte "Init keyboard",$0d,$0a,$00
 
@@ -529,14 +572,32 @@ CHARin:
         RTS
 @nobyw:
         CLC                ; flag no byte received
-.ifdef KEYB
-        JSR kbd_scan
-        BCC aciain_end
+
+;.ifdef KEYB
+;        JSR kbd_scan
+;        BCC aciain_end
+;        LDA KBD_CHAR
+;        JMP aciain_end
+;.endif
+.ifdef PS2K
+        jsr KBSCAN
+        bcc aciain_nothing_waiting  ; C=0 means nothing waiting
+        phx
+        phy
+        jsr KBINPUT     ; there is something, decode to ASCII
+        ply
+        plx
         LDA KBD_CHAR
+        BEQ aciain_nothing_waiting
+        SEC
 .endif
+
 aciain_end:
         RTS
-
+aciain_nothing_waiting:
+        CLC
+        RTS
+;------------------------------------
 LOAD:
         RTS
 SAVE:
@@ -564,3 +625,8 @@ ANSI_BKSP:
         lda #'K'
         jsr ACIAout
         RTS
+
+TEST_VGM_DATA:
+ .include "BankPanic_GameStart.inc65"
+;.include "KingsOfTheBeach_MatchSummary.inc65"
+;.include "PingPong_Game_Entry.inc65"

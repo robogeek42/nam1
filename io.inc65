@@ -1,6 +1,6 @@
 ; Device map
 ; $7F00 - $7F1F : ACIA
-; $7F20 - $7F3F : Sound
+; $7F20 - $7F3F : Sound --- not anymore!
 ; $7F40 - $7F5F : VIA1 (Keyboard)
 ; $7F60 - $7F7F : VDP
 ; $7F80 - $7F9F : VIA2 (Joy & SD card)
@@ -200,4 +200,30 @@ FS_ERR_EOF				=	$01
 ;*********************************************************
 
 ; Sound Chip SN76489
-SND_REG                 = $7F20
+SND_VIA_DATA			= VIA2 + VIA_ORA
+SND_VIA_CTL				= VIA2 + VIA_ORB
+SND_VIA_WE				= %01000000
+SND_VIA_CE				= %00100000
+;SND_VIA_READY			= %00000010
+SND_VIA_WE_CE           = %01100000
+SND_VIA_NOT_WE_CE       = %10011111
+
+; PS2 Keyboard
+; see pckybd.s65
+;PS2K_CLK               = %00000010 ; $02
+;PS2K_DAT               = %00000100 ; $04
+;PS2K_DAT_OR_CLK        = %00000110 ; $06
+;PS2K_NOT_CLK           = %11111101 ; $FD
+;PS2K_NOT_DAT           = %11111011 ; $FB
+;PS2K_NOT_CLK_DAT       = %11111001 ; $F9
+;
+; VIA2 PORT B
+;  B0 SD CLK
+;  B1
+;  B2
+;  B3 SD CS
+;  B4 SD DI
+;  B5 SND CE
+;  B6 SND WE
+;  B7 SD DO
+;

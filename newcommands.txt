@@ -73,9 +73,12 @@ SPR_LOADP <ADDR>,<P>
 
 Image Load commands
 -------------------
-IMGLOAD
+LOADIMG <filename>
 	Load compressed data from file <filename> to Pattern Table assuming standard Name Table layout
 	Compressed using my RLE1 algorithm.  Use sc2_conv/convcomp to compress from an SC2 file (see http://msx.jannone.org/conv/) 
 	Amount of data loaded is dependent on graphics MODE
 	Valid for modes 2 (Graphics II) and 3 (Multicolor) only
 
+Binary data load
+----------------
+LOADBIN <filename> <address>

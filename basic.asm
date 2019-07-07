@@ -38,6 +38,8 @@ nums_1		= Itempl	; number to bin/hex string convert MSB
 nums_2		= nums_1+1	; number to bin/hex string convert
 nums_3		= nums_1+2	; number to bin/hex string convert LSB
 
+NAMTMP1     = $14		; not used yet
+
 ;-----------------------------------------
 ; Keep $20 - $5A free for my monitor, sd-card and video
 ;-----------------------------------------
@@ -355,12 +357,16 @@ TK_SPR_LOADP 		= TK_SPR_ENABLE+1		; SPR_LOADP
 TK_SPR_PATTERN 		= TK_SPR_LOADP+1		; SPR_PATTERN
 TK_SPR_POS 			= TK_SPR_PATTERN+1		; SPR_POS
 TK_SPR_SET_TYPE 	= TK_SPR_POS+1			; SPR_SET_TYPE
-TK_IMGLOAD 	= TK_SPR_SET_TYPE+1			; SPR_IMGLOAD
-TK_PONG		= TK_IMGLOAD+1		; PONG token
+TK_LOADIMG 	        = TK_SPR_SET_TYPE+1     ; LOADIMG
+TK_PONG		        = TK_LOADIMG+1          ; PONG token
+TK_PACMAN	        = TK_PONG+1             ; PACMAN token
+TK_LOADBIN          = TK_PACMAN+1           ; Binary load
+TK_PLAY             = TK_LOADBIN+1          ; Play sound file
+TK_SETHIMEM         = TK_PLAY+1             ; Set top of memory
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB		= TK_PONG+1		; TAB token
+TK_TAB		= TK_SETHIMEM+1		; TAB token
 TK_ELSE		= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -427,6 +433,9 @@ TK_RIGHTS		= TK_LEFTS+1	; RIGHT$ token
 TK_MIDS		= TK_RIGHTS+1	; MID$ token
 TK_ISKEY 	= TK_MIDS+1			; ISKEY
 TK_GETKEY 	= TK_ISKEY+1			; GETKEY
+TK_HIMEM    = TK_GETKEY+1
+TK_LOMEM    = TK_HIMEM+1
+TK_TOP    	= TK_LOMEM+1
 
 ; offsets from a base of X or Y
 
@@ -7564,15 +7573,12 @@ LAB_MODE
 	;JSR LAB_CRLF
 	TXA
 	JSR vdp_set_mode
+    JSR snd_all_off
 	RTS
 
 ; perform CLS (VDP Clear Screen)
 LAB_CLS
 	JSR vdp_clear_screen
-	RTS
-
-LAB_PONG
-    JSR pong
 	RTS
 
 ; perform COL <FGCol>,<BGCol> (affects Text)
@@ -7794,6 +7800,16 @@ LAB_TWOPI
 	LDA	#<LAB_2C7C		; set (2*pi) pointer low byte
 	LDY	#>LAB_2C7C		; set (2*pi) pointer high byte
 	JMP	LAB_UFAC		; unpack memory (AY) into FAC1 and return
+
+LAB_PONG
+    JSR pong
+    JSR snd_all_off
+	RTS
+
+LAB_PACMAN
+    JSR pacman
+    JSR snd_all_off
+	RTS
 
 ; Sprite Set type SPR_SET_TYPE <T>
 ;  	T=0  8x8   unmagnified
@@ -8034,8 +8050,11 @@ LAB_FSER
 LAB_LOAD
 	JSR SD_GETFILENAME	; read filename param as a file handle
 	JSR fs_open_read	; open file
-	BCS LAB_FSER		; File system error if failed to open
-
+    BCC ll_over 
+LAB_FILENOTFOUND
+    LDX	#$26			; error code $26 ("File not found" error)
+	JMP	LAB_XERR		; do error #X, then warm start
+ll_over
 	LDA #1
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 	
@@ -8055,6 +8074,7 @@ LAB_LOAD
 
 DUMMY_INCHAR:
     RTS
+
 
 SDREAD:
     phx
@@ -8095,7 +8115,7 @@ load_eof:
 LAB_DEL
     JSR SD_GETFILENAME
 	JSR fs_delete
-	BCS LAB_FSER		; File system error
+	BCS LAB_FILENOTFOUND
 	RTS
 
 ; Print string pointed to by X(lo)&A(Hi)
@@ -8195,6 +8215,7 @@ LAB_DO_FSER
 ; perform SD DIR
 ;
 msg_dir_header: .byte "Filename      Size",$0d,$0a,"------------------",$0d,$0a,$00
+msg_pause: .byte "--- Press any key ---",$00
 LAB_DIR
 	pha
 	phx
@@ -8203,6 +8224,8 @@ LAB_DIR
     ld16 R0, msg_dir_header
     JSR vdp_write_text
     JSR acia_puts
+
+    STZ PAGECNT
 
 	JSR fs_dir_root_start		; Start at root
 dir_show_entry
@@ -8221,6 +8244,24 @@ dir_pad
 	JSR sdfs_set_dir_filesize_ptr	; put filesize into X/A
 	JSR AM_PRINTHEX16				; print number in X/A
 	JSR LAB_CRLF
+
+    INC PAGECNT
+    LDA PAGECNT
+    CMP #21
+    BNE dir_skip_pause
+   
+    ld16 R0, msg_pause
+    JSR vdp_write_text
+    JSR acia_puts
+@loop
+	; wait for key press
+	JSR V_INPT
+	BCC @loop
+
+	JSR LAB_CRLF
+    STZ PAGECNT
+
+dir_skip_pause
 	BRA dir_show_entry			; Find another entry
 dir_done
 	CLC
@@ -8240,7 +8281,7 @@ LAB_CAT
     JSR SD_GETFILENAME
 
 	JSR fs_open_read
-	BCS LAB_DO_FSER		; File system error
+    BCS LAB_DO_FSER2		; File system error
 
 sdc_getkey_loop:
 	JSR fs_get_next_byte
@@ -8337,13 +8378,14 @@ LAB_DO_FSER2
 
 ;----------------------------------------------------------------
 ; Load Mode 2 image (compressed)
-LAB_IMGLOAD
+LAB_LOADIMG
 .ifdef SDIO
 	; get filename and open for SD version
     JSR SD_GETFILENAME
 	JSR fs_open_read
-	BCS LAB_DO_FSER2		; File system error
-	
+    BCC @over
+    JMP LAB_FILENOTFOUND
+@over
 	; switch to mode 2 (Screen2)
 	LDA #2
 	JSR vdp_set_mode
@@ -8353,13 +8395,65 @@ LAB_IMGLOAD
 	JSR decompRLE1_SC2
 	STZ OUT_LIST_SD
 
-@loop
-	; wait for key press
-	JSR V_INPT
-	BCC @loop
+;    LDA #","            ; scan for ,
+;	LDY	#$00			; clear index
+;	CMP	(Bpntrl),Y		; check next byte is = A
+;    BNE lli_wait        ; if no second parameter, assume we wait for KEY
+;    JSR LAB_IGBY        ; scan next value
+
+;lli_wait:
+;@loop
+;	; wait for key press
+;	JSR V_INPT
+;	BCC @loop
 
 .endif	; SDIO
 	RTS
+
+LAB_LOADBIN
+.ifdef SDIO
+	; get filename and open for SD version
+    JSR SD_GETFILENAME
+	JSR fs_open_read
+    BCC @over
+    JMP LAB_FILENOTFOUND
+@over
+    ; get address
+	JSR	LAB_1C01		; scan for "," , else do syntax error then warm start
+	JSR	LAB_EVNM		; evaluate expression and check is numeric,
+	    				; else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+              		    ; temp integer in ZP Itemph, Itempl
+
+    ; load binary data from file to memory
+
+    LDY #0
+@loop:
+    JSR fs_get_next_byte
+	BCS lb_eof			; C=1 means EOF reached
+    STA (Itempl),Y
+    INY
+    BNE @loop
+    INC Itemph
+    JMP @loop
+lb_eof:
+.endif	; SDIO
+	RTS
+
+LAB_PLAY
+.ifdef SOUND
+	JSR	LAB_EVNM		; evaluate expression and check is numeric,
+	    				; else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+              		    ; temp integer in ZP Itemph, Itempl
+    LDA Itempl
+    STA R2
+    LDA Itemph
+    STA R2+1
+    JSR snd_play_vgmdata
+    JSR snd_all_off
+.endif ; SOUND
+    RTS
 
 .ifdef KEYB
 FAR_LAB_AYFC
@@ -8369,18 +8463,17 @@ FAR_LAB_AYFC
 ; Parameter: keycode
 ; Returns  : 1 if key is pressed
 LAB_ISKEY
-	JSR	LAB_EVBY		; evaluate byte expression, result in X
-	JSR kbd_iskey
-	BCC @notpressed
-	LDY #1
-	LDA #0
-	JMP @pressed
-@notpressed:
-	LDY #0
-	LDA #0
-@pressed:
-	JMP LAB_AYFC		; always save and convert integer AY to FAC1 and return
-
+;	JSR	LAB_EVBY		; evaluate byte expression, result in X
+;	JSR kbd_iskey
+;	BCC @notpressed
+;	LDY #1
+;	LDA #0
+;	JMP @pressed
+;@notpressed:
+;	LDY #0
+;	LDA #0
+;@pressed:
+;	JMP LAB_AYFC		; always save and convert integer AY to FAC1 and return
 	RTS
 
 ;-----------------------------------------------------------------
@@ -8388,9 +8481,9 @@ LAB_ISKEY
 ; Parameter: none
 ; Returns  : Keycode in X
 LAB_GETKEY
-	LDY #14
-	LDA #0
-	JMP LAB_AYFC
+;	LDY #14
+;	LDA #0
+;	JMP LAB_AYFC
 	RTS
 
 
@@ -8403,6 +8496,48 @@ LAB_GETKEY
 
 .endif ; KEYB
 
+LAB_LOMEM
+	LDY Smeml
+	LDA Smemh
+	JMP LAB_AYFC
+LAB_HIMEM
+	LDY Ememl
+	LDA Ememh
+	JMP LAB_AYFC
+LAB_TOP
+	LDY Earryl
+	LDA Earryh
+	JMP LAB_AYFC
+; SETHIMEM <addr> will move Emem
+; not sure this is a good idea - at the least it should be executed 
+; before a program is loaded
+; code will check there are no strings declared to trample on
+LAB_SETHIMEM
+    ; check no strings are stored
+    LDA Ememh
+    CMP Sstorh
+    BNE sh_doerror
+    ; hi was same - check lo
+    LDA Ememl
+    CMP Sstorl
+    BNE sh_doerror
+    ; do it
+    ; get the address parameter
+	JSR	LAB_EVNM		; evaluate expression and check is numeric,
+	    				; else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
+              		    ; temp integer in ZP Itemph, Itempl
+    LDA Itempl
+    STA Ememl
+    STA Sstorl
+    LDA Itemph
+    STA Ememh
+    STA Sstorh
+    RTS
+sh_doerror
+    LDA #$28
+	JMP	LAB_XERR		; do error #X, then warm start
+    
 ;-----------------------------------------------------------------
 
 ; system dependant i/o vectors
@@ -8679,8 +8814,12 @@ LAB_CTBL
 	.word	LAB_SPR_PATTERN-1		; SPR_PATTERN		VDP command
 	.word	LAB_SPR_POS-1			; SPR_POS			VDP command
 	.word	LAB_SPR_SET_TYPE-1		; SPR_SET_TYPE		VDP command
-	.word	LAB_IMGLOAD-1		; IMGLOAD		VDP command
+	.word	LAB_LOADIMG-1		; LOADIMG		VDP command
     .word	LAB_PONG-1		; PONG			Built-in Game
+    .word	LAB_PACMAN-1		; PACMAN			Built-in Game
+    .word	LAB_LOADBIN-1		; LOADBIN   SD file command
+    .word	LAB_PLAY-1		; PLAY   sound command
+    .word	LAB_SETHIMEM-1		; SETHIMEM   sound command
 
 ; function pre process routine table
 
@@ -8723,6 +8862,9 @@ LAB_FTPM	= LAB_FTPL+$01
 	.word	LAB_LRMS-1		; MID$()		"
 	.word	LAB_PPFN-1		; ISKEY()   process numeric expression in ()
 	.word	LAB_PPBI-1		; GETKEY	advance pointer
+	.word	LAB_PPBI-1		; HIMEM         "
+	.word	LAB_PPBI-1		; LOMEM         "
+	.word	LAB_PPBI-1		; TOP           "
 
 ; action addresses for functions
 
@@ -8765,6 +8907,9 @@ LAB_FTBM	= LAB_FTBL+$01
 	.word	LAB_MIDS-1		; MID$()
 	.word	LAB_ISKEY-1		; ISKEY
 	.word	LAB_GETKEY-1	; GETKEY
+	.word	LAB_HIMEM-1	; 
+	.word	LAB_LOMEM-1	; 
+	.word	LAB_TOP-1	; 
 
 ; hierarchy and action addresses for operator
 
@@ -8984,12 +9129,12 @@ LBB_GOTO
 TAB_ASCH
 LBB_HEXS
 	.byte	"EX$(",TK_HEXS	; HEX$(
+LBB_HIMEM
+	.byte	"IMEM",TK_HIMEM	; HIMEM
 	.byte	$00
 TAB_ASCI
 LBB_IF
 	.byte	"F",TK_IF		; IF
-LBB_IMGLOAD
-	.byte	"MGLOAD",TK_IMGLOAD	; IMGLOAD
 LBB_INC
 	.byte	"NC",TK_INC		; INC
 LBB_INPUT
@@ -9013,10 +9158,16 @@ LBB_LET
 	.byte	"ET",TK_LET		; LET
 LBB_LIST
 	.byte	"IST",TK_LIST	; LIST
+LBB_LOADBIN
+	.byte	"OADBIN",TK_LOADBIN	; LOADBIN
+LBB_LOADIMG
+	.byte	"OADIMG",TK_LOADIMG	; LOADIMG
 LBB_LOAD
 	.byte	"OAD",TK_LOAD	; LOAD (SD Card)
 LBB_LOG
 	.byte	"OG(",TK_LOG	; LOG(
+LBB_LOMEM
+	.byte	"OMEM",TK_LOMEM	; LOMEM
 LBB_LOOP
 	.byte	"OOP",TK_LOOP	; LOOP
 	.byte	$00
@@ -9053,10 +9204,14 @@ LBB_OR
 	.byte	"R",TK_OR		; OR
 	.byte	$00
 TAB_ASCP
+LBB_PACMAN
+	.byte	"ACMAN",TK_PACMAN	; PACMAN
 LBB_PEEK
 	.byte	"EEK(",TK_PEEK	; PEEK(
 LBB_PI
 	.byte	"I",TK_PI		; PI
+LBB_PLAY
+	.byte	"LAY",TK_PLAY	; PLAY
 LBB_POKE
 	.byte	"OKE",TK_POKE	; POKE
 LBB_PONG
@@ -9095,6 +9250,8 @@ LBB_SAVE
 	.byte	"AVE",TK_SAVE	; SAVE (SD Card)
 LBB_SGN
 	.byte	"GN(",TK_SGN	; SGN(
+LBB_SETHIMEM
+	.byte	"ETHIMEM",TK_SETHIMEM	; SETHIMEM
 LBB_SIN
 	.byte	"IN(",TK_SIN	; SIN(
 LBB_SPC
@@ -9133,6 +9290,8 @@ LBB_TAN
 	.byte	"AN(",TK_TAN	; TAN(
 LBB_THEN
 	.byte	"HEN",TK_THEN	; THEN
+LBB_TOP
+	.byte	"OP",TK_TOP		; TOP
 LBB_TO
 	.byte	"O",TK_TO		; TO
 LBB_TWOPI
@@ -9292,10 +9451,18 @@ LAB_KEYT
 	.word	LBB_SPR_POS			; SPR_POS
 	.byte	12,'S'
 	.word	LBB_SPR_SET_TYPE	; SPR_SET_TYPE
-	.byte	7,'I'
-	.word	LBB_IMGLOAD	; IMGLOAD
+	.byte	7,'L'
+	.word	LBB_LOADIMG	; LOADIMG
 	.byte	4,'P'
 	.word	LBB_PONG	; PONG
+	.byte	6,'P'
+	.word	LBB_PACMAN	; PACMAN
+	.byte	7,'L'
+	.word	LBB_LOADBIN	; LOADBIN
+	.byte	4,'P'
+	.word	LBB_PLAY	; PLAY
+	.byte	8,'S'
+	.word	LBB_SETHIMEM	; SETHIMEM
 
 ; secondary commands (can't start a statement)
 
@@ -9427,6 +9594,12 @@ LAB_KEYT
 	.word	LBB_ISKEY	; ISKEY(
 	.byte	6,'G'
 	.word	LBB_GETKEY	; GETKEY
+	.byte	5,'L'
+	.word	LBB_LOMEM	; LOMEM
+	.byte	5,'H'
+	.word	LBB_HIMEM	; HIMEM
+	.byte	3,'T'
+	.word	LBB_TOP	; TOP
 
 ; BASIC messages, mostly error messages
 
@@ -9448,8 +9621,10 @@ LAB_BAER
 	.word	ERR_ST		;$1C string too complex
 	.word	ERR_CN		;$1E continue error
 	.word	ERR_UF		;$20 undefined function
-	.word ERR_LD		;$22 LOOP without DO
+	.word   ERR_LD		;$22 LOOP without DO
 	.word   ERR_FS      ;$24 Filesystem
+    .word   ERR_FU      ;$26 File not found
+    .word   ERR_NO      ;$28 No can do
 
 ; I may implement these two errors to force definition of variables and
 ; dimensioning of arrays before use.
@@ -9479,6 +9654,8 @@ ERR_CN	.byte	"Can't continue",$00
 ERR_UF	.byte	"Undefined function",$00
 ERR_LD	.byte	"LOOP without DO",$00
 ERR_FS  .byte   "Filesystem",$00
+ERR_FU  .byte   "File not found",$00
+ERR_NO  .byte   "No can do",$00
 
 ;ERR_UV	.byte	"Undefined variable",$00
 

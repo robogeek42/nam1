@@ -2,3 +2,4 @@
 .import kbd_scan
 .import kbd_iskey
 .import kbd_getkey
+.import scan_buffer

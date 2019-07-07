@@ -107,9 +107,9 @@ VDP_SETUP_MODE0: .byte $00, $D0, $02, $00, $00, $00, $00, $F0
 ; 4 00 : Patt Table 0000
 ; 5 28 : Spr Attrib 1400
 ; 6 02 : Spr Patt   1000
-; 7 b4 : Yellow text on blue
+; 7 CF : Dark green on white
 
-VDP_SETUP_MODE1: .byte $00, $c0, $02, $30, $00, $28, $02, $b4
+VDP_SETUP_MODE1: .byte $00, $c0, $02, $30, $00, $28, $02, $cf
 
 ;Mode 2: Graphics II 
 ;      : equivalent to "MSX1 SCREEN 2"

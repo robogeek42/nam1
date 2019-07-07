@@ -27,3 +27,26 @@ $7F80 - $7F9F  VIA2 - SD card & Joystick
 $7FA0 - $7FBF  Dallas RTC
 $7FC0 - $7FDF
 $7FE0 - $7FFF
+
+Basic
+---------
+
+$0200 - $02FF  Basic buffers
+$0300 - $7AFF  Basic program, arrays, vars and strings
+
+Smeml/h  (ZP $79 $7A) - Start of memory ($300)
+Svarl/h  (ZP $7B $7C) - Start of variable space
+Sarryl/h (ZP $7D $7E) - Start of Array space
+Earryl/h (ZP $7F $80) - End of Array space
+Sstorl/h (ZP $81 $82) - String store (moving down!) - starts=Emem
+Sutill/h (ZP $83 $84) - String utility pointer
+Ememl/h  (ZP $85 $86) - End of memory
+
+Smem         Svar       Sarry     Earry          Sstor        Emem
+  |  program   |   vars   |  arrays |    (free)    |<-- Strings |
+  
+LOMEM                              TOP                        HIMEM
+
+FRE(0) returns size of free space in bytes
+can change HIMEM using "SETHIMEM addr"
+

@@ -1,1 +1,4 @@
 .import snd_all_off
+.import snd_hello
+.import snd_write
+.import snd_play_vgmdata

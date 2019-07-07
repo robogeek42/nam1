@@ -311,27 +311,32 @@ pmih_save_old:
             STA pm_allowed
 
 game_loop:
+gl_dogame:
+            LDA PM_INTERRUPT        ; check interrupt has happened
+            BNE gl_get_input
+            JMP game_loop
+
+gl_get_input:
+            LDA #0
+            STA PM_INTERRUPT        ; reset interrupt flag
+
             JSR pm_get_input_serial
-.if KEYB
+.ifdef KEYB
             JSR pm_get_input_keyboard
 .endif
+            JSR pm_readmap
+            STA pm_allowed
+
             JSR pm_process_input
 
             LDA pm_game		; check game state:
             CMP #$00		; 	game not started?
             BEQ game_loop	; 		yes, keep just checking input
             CMP #$FF		; 	quit requested?
-            BNE gl_dogame	; 		no, then continue
+            BNE gl_do_update	; 		no, then continue
             JMP quit_game	; 		yes, quit
 
-gl_dogame:
-            LDA PM_INTERRUPT        ; check interrupt has happened
-            BNE gl_do_update
-            JMP gl_skip_update
 gl_do_update:
-            JSR pm_readmap
-            STA pm_allowed
-
 			; check if is in square
             LDA PM_DIR                ; check depends on direction of movement U/D or L/R
             CMP #PM_DIR_D             ;
@@ -383,7 +388,8 @@ gl_update_pm:
 gl_move_pacman:
             LDA PM_IRQCOUNT                 ; update every N ticks
             AND #$03                        
-            BNE gl_reset_interrupt_flag
+            CMP #$02
+            BNE gl_skip_update
             LDA PM_DIR
             CMP #PM_DIR_R
             BEQ gl_move_right
@@ -393,23 +399,19 @@ gl_move_pacman:
             BEQ gl_move_up
             CMP #PM_DIR_D
             BEQ gl_move_down
-            JMP gl_reset_interrupt_flag
+            JMP gl_skip_update
 
 gl_move_right:
             JSR pm_move_right
-            JMP gl_reset_interrupt_flag
+            JMP gl_skip_update
 gl_move_left:
             JSR pm_move_left
-            JMP gl_reset_interrupt_flag
+            JMP gl_skip_update
 gl_move_up:
             JSR pm_move_up
-            JMP gl_reset_interrupt_flag
+            JMP gl_skip_update
 gl_move_down:
             JSR pm_move_down
-
-gl_reset_interrupt_flag:
-            LDA #0
-            STA PM_INTERRUPT        ; reset interrupt flag
 
 gl_skip_update:
             JMP game_loop
@@ -593,26 +595,44 @@ gis_no_dir_input:
             ;STA pm_input_dir
             RTS
 
-.if KEYB
+.ifdef KEYB
+debug_row_col:
+            ; DEBUG
+            ld16 R0,PM_STR_BUFFER
+            LDA KBD_ROW
+            JSR fmt_bin_string
+            JSR acia_puts
+            LDA #' '
+            JSR acia_putc
+            LDA KBD_COL
+            JSR fmt_bin_string
+            JSR acia_puts
+            JSR acia_put_newline
+            RTS
 ;---------------------------------------
 ; Get input from KEYBOARD
 pm_get_input_keyboard:
             JSR kbd_getkey              ; result in KBD_COL, KBD_ROW (zero-page)
-            BCC gik_done
-            LDA KBD_ROW                 ; if the same key again
+            BCC gik_earlyexit           ; No key pressed
+            LDA KBD_ROW                 ; Check of the same key again
             CMP KBD_LAST_ROW
-            BNE gik_got_key             ; just skip decode
+            BNE gik_got_key             ; New key - process
             LDA KBD_COL
             CMP KBD_LAST_COL
-            BNE gik_got_key
+            BNE gik_got_key             ; New key - process
+
+gik_earlyexit:
+            RTS
+
+gik_got_key:
             LDA KBD_ROW                 ; save last
             STA KBD_LAST_ROW
             LDA KBD_COL
             STA KBD_LAST_COL
 
-            JMP gik_done
+            JSR debug_row_col
 
-gik_got_key:
+gik_repeat:
             ; q and <spc> in row 0
             ; a, w, s are in row 1
             ; d in row 2
@@ -625,48 +645,48 @@ gik_test_row0:
 			BBS4 KBD_COL,gik_do_spc
 			BBS6 KBD_COL,gik_do_q
 			RMB0 KBD_ROW				; no columns set (anymore) so reset row bit
-			BRA gik_got_key
+            BRA gik_repeat
 gik_test_row1:
 			BBS1 KBD_COL,gik_do_w
 			BBS2 KBD_COL,gik_do_a
 			BBS5 KBD_COL,gik_do_s
 			RMB1 KBD_ROW				; no columns set (anymore) so reset row bit
-			BRA gik_got_key
+            BRA gik_repeat
 gik_test_row2:
 			BBS2 KBD_COL,gik_do_d
 			RMB2 KBD_ROW				; no columns set (anymore) so reset row bit
-			BRA gik_got_key
+            BRA gik_repeat
 
 gik_do_spc:								; SPACE = Start Game
 			LDA #$01					; Start game flag
             STA pm_game
 			RMB4 KBD_COL
-			BRA gik_got_key
+            BRA gik_repeat
 gik_do_q:								; Q = Quit Game
             LDA #$FF                    ; else mark end-of-game
             STA pm_game                 ; in game state variable
 			RMB6 KBD_COL
-			BRA gik_got_key
+            BRA gik_repeat
 gik_do_w:								; W = Up
             LDA #PM_DIR_U
             STA pm_input_dir
 			RMB1 KBD_COL
-			BRA gik_got_key
+            BRA gik_repeat
 gik_do_a:								; A = Left
             LDA #PM_DIR_L
             STA pm_input_dir
 			RMB2 KBD_COL
-			BRA gik_got_key
+            BRA gik_repeat
 gik_do_s:								; S = Down
             LDA #PM_DIR_D
             STA pm_input_dir
 			RMB5 KBD_COL
-			BRA gik_got_key
+            BRA gik_repeat
 gik_do_d:								; D = Right
 			LDA #PM_DIR_R
 			STA pm_input_dir
 			RMB2 KBD_COL
-			BRA gik_got_key
+            BRA gik_repeat
 gik_done:
             RTS
 .endif
@@ -677,6 +697,11 @@ gik_done:
 pm_process_input:
             LDA pm_input_dir
             BMI pi_done         ; $FF = no input
+            ; if current dir is same as direction it is moving in, ignore
+            CMP PM_DIR
+            BEQ pi_done
+
+            ; switch to either processing up/down or left/right
             LDA PM_DIR          ; check current direction
             CMP #PM_DIR_D
             BCS pi_curr_is_UD   ; 2 or 3 D/U
@@ -691,11 +716,12 @@ pi_curr_is_LR:
             LDA PM_ST_SPR1_X
             AND #$07            ; if X%8==0
             BEQ pi_check_ud     ;   then fully in square so can check U/D as well
-            CMP #$01            ; if X%8==1
-            BNE pi_done         ;   then almost in square so
-            LDA PM_ST_SPR1_X    ;   push to align
-            AND #$F8            ;   by setting position in square to 0
-            STA PM_ST_SPR1_X
+            ;CMP #$01            ; if X%8==1
+            ;BNE pi_done         ;   then almost in square so
+            ;LDA PM_ST_SPR1_X    ;   push to align
+            ;AND #$F8            ;   by setting position in square to 0
+            ;STA PM_ST_SPR1_X
+            BRA pi_done
 
 pi_check_ud:
             LDA pm_input_dir
@@ -704,8 +730,8 @@ pi_check_ud:
             CMP #PM_DIR_D
             BEQ pi_dir_down
 pi_done:
-            LDA #$FF            ; clear input once it has been processed
-            STA pm_input_dir
+            ;LDA #$FF            ; clear input once it has been processed
+            ;STA pm_input_dir
             RTS
 
 pi_curr_is_UD:            
@@ -718,11 +744,12 @@ pi_curr_is_UD:
             LDA PM_ST_SPR1_Y
             AND #$07            ; if Y%8==0
             BEQ pi_check_lr     ;   then fully in square so can check L/R as well
-            CMP #$01            ; if Y%8==1
-            BNE pi_done         ;   then almost in square so
-            LDA PM_ST_SPR1_Y    ;   push to align
-            AND #$F8
-            STA PM_ST_SPR1_Y
+            ;CMP #$01            ; if Y%8==1
+            ;BNE pi_done         ;   then almost in square so
+            ;LDA PM_ST_SPR1_Y    ;   push to align
+            ;AND #$F8
+            ;STA PM_ST_SPR1_Y
+            BRA pi_done
 
 pi_check_lr:
             LDA pm_input_dir

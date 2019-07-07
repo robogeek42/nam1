@@ -32,8 +32,7 @@ ZP_VDP_XPOS = $3e
 ZP_VDP_YPOS = $3f
 
 ;-----------------------------------------------------------
-; Sprite movement
-ZP_SPR_NUM  = $40
+PAGECNT  = $40
 
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0
@@ -70,3 +69,4 @@ KBD_FLAGS      = $EB
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
 KBD_SPECIAL    = $EC
 ;-----------------------------------------------------------
+VDP_STATUS     = $EE

@@ -62,6 +62,7 @@
 .export kbd_scan
 .export kbd_iskey
 .export kbd_getkey
+.export scan_buffer
 
 ; Allocate KBD Buffer in RAM (.bss)
 .bss
@@ -440,7 +441,7 @@ kbd_getkey:
 				STA VIA1+VIA_ORA           ; Write 0s to ALL rows
 				LDA VIA1+VIA_IRB           ; Read columns
                 CMP #$FF
-                BNE kgk_getkey             ; Some cols are 0: Found a key pressed
+                BNE kgk_getkey             ; Not all 1s means found a key pressed
 kgk_nokey:
 				LDA #$FF                   ; Disconnect rows
                 STA VIA1+VIA_ORA
@@ -448,7 +449,7 @@ kgk_nokey:
 			    CLC
 				RTS
 kgk_getkey:
-                LDX #0
+                LDX #7
                 LDA #%01111111    ; Bit7 of B corresponds to Row A above
 				STA KBD_CHAR	  ; store in temp, we'll ROR it later to test each row
 @save_loop:     STA VIA1+VIA_ORA       ; select a row
@@ -458,9 +459,8 @@ kgk_getkey:
                 SEC               ; move on
 				ROR KBD_CHAR      ; to next row
                 LDA KBD_CHAR
-                INX
-                CPX #8
-                BNE @save_loop
+                DEX
+                BPL @save_loop
 
 				LDA #$FF          ; Disconnect rows
                 STA VIA1+VIA_ORA
@@ -470,7 +470,7 @@ kgk_getkey:
 ; set KBD_ROW and KBD_COL
 ;  First KBD_ROW
 kgk_set_outvars:
-                LDX #0
+                LDX #7
                 LDA #0
 @loop1:         LDA scan_buffer,X   ; check each column scanned
                 BNE @isset          ; if it has any cols set put 1 in KBD_ROW
@@ -482,17 +482,15 @@ kgk_set_outvars:
 @isset:         SEC
                 ROL KBD_ROW
 
-@over:          INX                 ; next
-                CPX #8
-                BNE @loop1
+@over:          DEX                 ; next
+                BPL @loop1
 
 ; Make KBD_COL an OR of all columns
-                LDX #0
+                LDX #7
                 LDA #0
 @loop2:         ORA scan_buffer,X
-                INX
-                CPX #8
-                BNE @loop2
+                DEX
+                BPL @loop2
                 STA KBD_COL
 
 				plxy

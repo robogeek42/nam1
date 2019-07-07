@@ -13,6 +13,9 @@
 .include "sprite.inc65"
 .include "bcd.inc65"
 .include "kbdvia.inc65"
+.include "sound.inc65"
+.include "colors.inc65"
+.include "pckybd.inc65"
 
 .export pong
 .export PONG_IRQ
@@ -39,7 +42,9 @@ pp_bsy_pos = pong_vars+16      ; positive value of current ball speed in x
 pp_bsx_neg = pong_vars+17      ; negative value of current ball speed in y
 pp_bsy_neg = pong_vars+18      ; negative value of current ball speed in y
 
-strbuf = pong_vars + 20;
+pp_c0_vol    = pong_vars + 20;
+pp_collision = pong_vars + 21
+strbuf       = pong_vars + 22;
 
 BALLSPEEDX = $02            ; starting ball speeds
 BALLSPEEDXNEG = $FE
@@ -50,6 +55,14 @@ BATSPEED  = 4
 
 BATL_POS = 16
 BATR_POS = 238
+
+; write to approx middle of screen 11*32=352=$0160
+;  screen 9*32=288 = $120
+;  screen 13*32=416 = $1A0
+LINE_HI = $01
+LINE9_LO = $20
+LINE11_LO = $60
+LINE13_LO = $A0
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -78,12 +91,21 @@ dot_line_char:
 	.byte $00,$80,$80,$00,$00,$80,$80,$00
 
 pong:
+; sound channels all off
+.ifdef SOUND
+        JSR snd_all_off
+.endif
+
 ; set mode
 		LDA #1					; Graphics I mode
 		JSR vdp_set_mode
-		LDA #$F4				; white on black
+        ;LDA #$FC				; white on dark green
+        LDA #FG_WHITE
+        ORA #BG_DRK_GREEN
 		JSR vdp_load_flat_colors
-		LDA #$F2				; white on green (background)
+        ;LDA #$F3				; white on light green (border)
+        LDA #FG_WHITE
+        ORA #BG_LIT_GREEN
 		LDY #$87
 		JSR vdp_regwrite
 
@@ -172,27 +194,7 @@ pong:
 		BNE @load_char
 		
 ; Draw board & Score
-; Central dotted line
-		LDX #24				; height mode 1
-        LDA VDP_REGS+2      ; Name table
-		ASL
-		ASL
-		STA ZP_TMP1
-		LDA #$0F			; start at position 15
-		STA ZP_TMP0
-@loop1:
-		LDY ZP_TMP0			; set vram write addr
-		LDA ZP_TMP1
-		JSR vdp_set_addr_w
-		LDA #0				; write 2 chars to split centre
-        JSR vdp_write
-		LDA #1
-        NOP
-        JSR vdp_write
-		
-		add8To16 #$20, ZP_TMP0 ; add screen width
-		DEX
-		BNE @loop1
+        JSR pp_draw_central_line
 
 ;; initialise game variables
 		LDA #96-8
@@ -250,6 +252,17 @@ pih_enable_vdp_irq:
 ; Start allowing interrupts at CPU
         CLI
 
+        LDA #LINE_HI
+        STA ZP_VDP_CURS+1
+        LDA #LINE9_LO
+        STA ZP_VDP_CURS
+        ld16 R0, msg_instructions
+        JSR vdp_write_text
+        LDA #LINE13_LO
+        STA ZP_VDP_CURS
+        ld16 R0, msg_press_s
+        JSR vdp_write_text
+
 ;=======================================
 ; Game loop
 game_loop:
@@ -264,19 +277,25 @@ check_irq_count:
         LDA pp_interval                 ;; start counting again (pp_interval * 1/60th)
         STA IRQ_COUNT
 
-.if KEYB
+        JSR sound_vol       ; reduce sound vol after a note
+
+.ifdef KEYB
         JSR get_input_keyboard
 .endif
- 
+.ifdef PS2K
+        JSR get_input_ps2k
+.endif
+
 		JSR draw_paddles
 
 		LDA pp_game		; check game state:
 		CMP #$00		; 	game not started?
 		BEQ game_loop	; 		yes, keep just checking input and drawing paddles
+        CMP #$02        ;   pause state?
+        BEQ game_loop
 		CMP #$FF		; 	quit requested?
 		BNE gl_dogame	; 		no, then continue
 		JMP quit_game	; 		yes, quit
-
 gl_dogame:
 		JSR move_ball
 		JSR draw_ball
@@ -313,6 +332,7 @@ gi_check_s:
         BNE gi_check_minus
 		LDA #$01
 		STA pp_game
+        JSR pp_clear_message
         JMP gi_done
 gi_check_minus:
         CMP #'-'
@@ -372,73 +392,169 @@ gi_moverdown:
 		STA pp_batry
 		RTS
 
-.if KEYB
+pp_draw_central_line:
+; Central dotted line
+		LDX #24				; height mode 1
+        LDA VDP_REGS+2      ; Name table
+		ASL
+		ASL
+		STA ZP_TMP1
+		LDA #$0F			; start at position 15
+		STA ZP_TMP0
+@loop1:
+		LDY ZP_TMP0			; set vram write addr
+		LDA ZP_TMP1
+		JSR vdp_set_addr_w
+		LDA #0				; write 2 chars to split centre
+        JSR vdp_write
+		LDA #1
+        NOP
+        JSR vdp_write
+		
+		add8To16 #$20, ZP_TMP0 ; add screen width
+		DEX
+		BNE @loop1
+        RTS
+
+pp_clear_message:
+        ; clear approx middle of screen 11*32+16-7=361=$0169
+        LDA #LINE_HI
+        STA ZP_VDP_CURS+1
+        LDA #LINE9_LO
+        STA ZP_VDP_CURS
+        ld16 R0, msg_clear
+        JSR vdp_write_text
+        LDA #LINE11_LO
+        STA ZP_VDP_CURS
+        JSR vdp_write_text
+        LDA #LINE13_LO
+        STA ZP_VDP_CURS
+        JSR vdp_write_text
+        JSR pp_draw_central_line
+        RTS
+
+.ifdef KEYB
 ;---------------------------------------
 ; Get input from KEYBOARD
 get_input_keyboard:
         JSR kbd_getkey              ; result in KBD_COL, KBD_ROW (zero-page)
         BCC gik_done
 
-;;; DEBUG
-;        ld16 R0,strbuf
-;        LDA KBD_ROW
-;        JSR fmt_bin_string
-;        JSR acia_puts
-;        LDA #' '
-;        JSR acia_putc
-;        LDA KBD_COL
-;        JSR fmt_bin_string
-;        JSR acia_puts
-;        JSR acia_put_newline
-;        RTS 
-;;; DEBUG
-
 gik_got_key:
-        ; q in row 0
-        ; azs are in row 1
-        ; km in row 4
-        BBS0 KBD_ROW,gik_test_row0
-        BBS1 KBD_ROW,gik_test_row1
-        BBS6 KBD_ROW,gik_test_row6
-        JMP gik_done
+        ; "spc" q in row 0 col 4, 6
+        ; azs are in row 1 cols 2,4,5
+        ; ":" ";" row 2,3
 
-gik_test_row0:
-        ; ROW0, COL6 = "q"
-        BBR6 KBD_COL,gik_clr_row0   ; If not "q", then done
+        LDX #0
+        LDA scan_buffer,X
+        AND #%00010000              ; ROW0 COL4 = "spc"
+        BEQ @check_q
+
+        JSR pp_clear_message
+        LDA #$01                    ; game state = playing
+        STA pp_game
+@check_q:
+        LDA scan_buffer,X
+        AND #%01000000              ; ROW0 COL6 = "q"
+        BEQ gik_test_row1
         LDA #$FF                    ; else mark end-of-game
         STA pp_game                 ; in game state variable
 
-gik_clr_row0:
-        RMB0 KBD_ROW                ; clear row 0, check for other keys
-        JMP gik_got_key
-
 gik_test_row1:
-        BBR2 KBD_COL, @check_z      ; check for "a"
+        LDX #1
+        LDA scan_buffer,X
+        AND #%00000100            ; ROW1 COL2 = "a"
+        BEQ @check_z
 		JSR gi_movelup
 @check_z:
-        BBR4 KBD_COL, @check_s      ; check for "z"
+        LDA scan_buffer,X
+        AND #%00010000            ; ROW1 COL4 = "z"
+        BEQ @check_s
 		JSR gi_moveldown
 @check_s:
-        BBR5 KBD_COL, gik_clr_row1      ; check for "s" (start game)
+        LDA scan_buffer,X
+        AND #%00100000            ; ROW1 COL5 = "s"
+        BEQ gik_test_row6
 		LDA #$01
 		STA pp_game
-
-gik_clr_row1:
-        RMB1 KBD_ROW                ; clear row 1, check for other keys
-        JMP gik_got_key
+        JSR pp_clear_message
 
 gik_test_row6:
-        BBR2 KBD_COL, @check_m      ; check for ";"
+        LDX #6
+        LDA scan_buffer,X
+        AND #%00000100            ; ROW6 COL2 = ";"
+        BEQ @check_m
 		JSR gi_moverup
 @check_m:
-        BBR3 KBD_COL, gik_clr_row6      ; check for "\"
+        LDA scan_buffer,X
+        AND #%00001000            ; ROW6 COL3 = "\"
+        BEQ gik_done
 		JSR gi_moverdown
-
-gik_clr_row6:
-        RMB6 KBD_ROW                ; clear row 6 and finish
 
 gik_done:
 		RTS
+.endif
+
+.ifdef PS2K
+gip_movelup:
+        jmp gi_movelup
+gip_moveldown:
+        jmp gi_moveldown
+gip_moverup:
+        jmp gi_moverup
+gip_moverdown:
+        jmp gi_moverdown
+
+gip_do_start:
+		LDA #$01
+		STA pp_game
+        jsr pp_clear_message
+		rts
+gip_do_stop:
+        LDA #$FF                    ; else mark end-of-game
+        STA pp_game                 ; in game state variable
+		rts
+
+get_input_ps2k:
+		jsr KBSCAN
+		bcc gip_done
+        jsr KBINPUT
+        lda KBD_CHAR
+		cmp #$00
+        beq gip_done
+jsr acia_putc
+lda KBD_CHAR
+		cmp #'s'
+		beq gip_do_start
+		cmp #'S'
+		beq gip_do_start
+		cmp #' '
+		beq gip_do_start
+		cmp #'q'
+		beq gip_do_stop
+		cmp #'Q'
+		beq gip_do_stop
+		cmp #'a'
+        beq gip_movelup
+		cmp #'A'
+        beq gip_movelup
+		cmp #'z'
+        beq gip_moveldown
+		cmp #'Z'
+        beq gip_moveldown
+		cmp #';'
+        beq gip_moverup
+		cmp #':'
+        beq gip_moverup
+		cmp #'.'
+        beq gip_moverdown
+		cmp #'>'
+        beq gip_moverdown
+		
+gip_done:
+;    lda #'.'
+;    jsr acia_putc
+		rts
 .endif
 
 ;---------------------------------------
@@ -491,78 +607,42 @@ move_ball:
         BCC mb_yspeed_pos	; A < ballspeed y, bounce
 		CMP #192-8
         BCS	mb_yspeed_neg	; ball is at bottom edge, bounce
-		JMP mb_checkx
+        JMP mb_check_collision
 mb_yspeed_pos:
         LDA pp_bsy_pos		; make Y-velocity positive
 		STA pp_ballyv
-		JMP mb_checkx
+        JSR sound_pong
+        JMP mb_check_collision
 mb_yspeed_neg:
         LDA pp_bsy_neg		; make Y-velocity negative
 		STA pp_ballyv		;
-		JMP mb_checkx
+        JSR sound_pong
+		JMP mb_check_collision
 
 ; X direction
 
-mb_checkx:
-		; find out if we need to check Left/Right or neither
-		LDA pp_ballx
-        CMP #BATL_POS+2
-		BCC mb_check_batl		; Ballx < 18
-		CMP #BATR_POS-2
-		BCS mb_check_batr		; Ballx >= 237
-		JMP mb_add_speed
+mb_check_collision:
+        ; sprite collision detection
+        LDA pp_collision
+        BEQ mb_add_speed        ; no collision
 
-mb_check_batl:
-		; check ball is above bat top
-		LDA pp_bally
-		CLC
-		ADC #7
-		CMP pp_batly
-		BCC mb_add_speed	; BallY+7 < bat top
-		; check ball is below bat bottom
-		LDA pp_batly
-		CLC
-		ADC #15
-		CMP pp_bally
-		BCC mb_add_speed	; bat bot < ball top
-
-        ; if ball is already past bat don't hit
-        LDA pp_ballx
-        CMP #BATL_POS-2
-        BCC mb_add_speed
+        ; sprite collision
+        STZ pp_collision        ; reset
+        LDA pp_ballxv
+        BPL mb_xspeed_neg
 
 		; hit bat - make ball speed positive again
 mb_xspeed_pos:
         LDA pp_bsx_pos
 		STA pp_ballxv
+        JSR sound_ping
 		JMP mb_add_speed
 
 mb_xspeed_neg:
         LDA pp_bsx_neg
 		STA pp_ballxv
+        JSR sound_ping
 		JMP mb_add_speed
-
-mb_check_batr:
-		; check ball is above bat top
-		LDA pp_bally
-		CLC
-		ADC #7
-		CMP pp_batry
-		BCC mb_add_speed	; ball is above bat top
-		; check ball is below bat bottom
-		LDA pp_batry
-		CLC
-		ADC #15
-		CMP pp_bally
-		BCC mb_add_speed	; bat bot < ball top
-
-        ; if ball is already past bat don't hit
-        LDA pp_ballx
-        CMP #BATR_POS+2
-        BCS mb_add_speed
-
-		; hit bat - make ball speed negative again
-		JMP mb_xspeed_neg
 
 mb_add_speed:
 		; add speed to x/y
@@ -645,39 +725,71 @@ ds_set_cursor_position:
 		LDA #2
 		STA ZP_VDP_YPOS
 		RTS
-		
+
+msg_press_space:
+    ;      01234567890123456789012345678901
+    .byte "    Press Space to continue     ",$00
+msg_instructions:
+    .byte " Left A Z   Q=Quit   Right  : / ",$00
+msg_press_s:
+    .byte "      Press 'S' to start        ",$00
+msg_clear:
+    .byte "                                ",$00
+pp_pause_game:
+        LDA #LINE_HI
+        STA ZP_VDP_CURS+1
+        LDA #LINE11_LO
+        STA ZP_VDP_CURS
+        ld16 R0, msg_press_space
+        JSR vdp_write_text
+        LDA #$02                ; put game into pause state
+        STA pp_game
+        RTS
+        
 ;---------------------------------------
 ; Check game conditions
 ; Check ball position - if going off left, inc R score
 check_game:
 
-	; Check if ball has gone off left
+        ; Check if ball has gone off left
 		LDA pp_ballx
 		CMP #2
 		BCS cg_check_right		; still in play (X>0)
 
+        ; Right player has scored
 		LDA pp_scorer
 		INC
 		STA pp_scorer
+        JSR sound_score
+        JSR pp_pause_game
 
-		LDA #96					; reset ball position
+		LDA #124				; reset ball position
 		STA pp_ballx
         LDA pp_bsx_pos
 		STA pp_ballxv		
+        JSR draw_ball
+
+        JMP cg_check_scores
+
 cg_check_right:
-	; Check if ball has gone off right
+        ; Check if ball has gone off right
 		LDA pp_ballx
 		CMP #253
 		BCC cg_check_scores		; still in play (X<256)
 
+        ; Left player has scored
 		LDA pp_scorel
 		INC
 		STA pp_scorel
+        JSR sound_score
+        JSR pp_pause_game
 
 		LDA #96					; reset ball position
 		STA pp_ballx
         LDA pp_bsx_neg
 		STA pp_ballxv		
+        JSR draw_ball
+
 cg_check_scores:
 		LDA pp_scorel
 		CMP #21
@@ -722,6 +834,10 @@ pih_restore_irq:
 
         JSR vdp_getstatus   ;; clear interrupt flag in VDP
 
+.ifdef SOUND
+        ; stop any sounds
+        JSR snd_all_off
+.endif
 		RTS
 
 ;---------------------------------------
@@ -744,7 +860,13 @@ PONG_IRQ:
         PHA
 
         JSR vdp_getstatus           ;; read VDP status to reenable the VDP interrupt
-
+        ; sprite collision detection
+        LDA VDP_STATUS
+        AND #%00100000
+        BEQ @no_colision
+        LDA #1
+        STA pp_collision
+@no_colision:
         LDA IRQ_COUNT               ;; if count >0
         BEQ @skip
         DEC IRQ_COUNT               ;; count--
@@ -752,8 +874,6 @@ PONG_IRQ:
         PLA
         RTI
 ;---------------------------------------
-
-
 
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
@@ -763,3 +883,44 @@ win_right_message:
 	.byte "Player 2 Wins!",$0d,$0a,$00
 irq_message:
     .byte "Hello",$0d,$0a,$00
+
+.ifdef SOUND
+sound_vol:
+        LDA pp_c0_vol
+        CMP #$0F
+        BCS @over
+        INC pp_c0_vol
+        LDA #%10010000 ; c0 vol
+        ORA pp_c0_vol
+        JSR snd_write
+@over:
+        RTS
+sound_ping:
+        ; Set frequency to %0001111111 = 127 -> 3.6864MHz/32*127 = 907Hz
+        LDA #%10001111  ; Freq Channel 1 (of 3)
+        JSR snd_write
+        LDA #%00000111  ; Freq DDDDDD 
+        JSR snd_write
+        LDA #%10010000 ; c0 vol = full (0)
+        JSR snd_write
+        STZ pp_c0_vol
+        RTS
+sound_pong:
+        ; Set frequency to %0100000110 = 262 -> 3.6864MHz/32*262 ~= 440Hz
+        LDA #%10000110  ; Freq Channel 1 (of 3)
+        JSR snd_write
+        LDA #%00010000  ; Freq DDDDDD 
+        JSR snd_write
+        LDA #%10010000 ; c0 vol = full (0)
+        JSR snd_write
+        STZ pp_c0_vol
+        RTS
+sound_score:
+        RTS
+.else
+sound_vol:
+sound_ping:
+sound_pong:
+sound_score:
+        RTS
+.endif

@@ -1,0 +1,14 @@
+; Designed and Written by Daryl Rictor (c) 2001   65c02@altavista.com
+; KBINPUT - wait for a key press and return with its assigned ASCII code in A.
+.import KBINPUT
+; KBGET   - wait for a key press and return with its unprocessed scancode in A.
+.import KBGET
+; KBSCAN  - Scan the keyboard for 105uS, returns 0 in A if no key pressed.
+;           Return ambiguous data in A if key is pressed.  Use KBINPUT OR KBGET
+;           to get the key information.  You can modify the code to automatically 
+;           jump to either routine if your application needs it.          
+.import KBSCAN
+; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
+.import KBINIT
+
+.import test_ps2_keyboard

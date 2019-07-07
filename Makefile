@@ -11,7 +11,8 @@ bcd.s65 \
 pong.s65 \
 decomp.s65 \
 pm.s65 \
-sound.s65
+sound.s65 \
+pckybd.s65
 
 # May need to set CC65_LIB to path to compiler libs
 ifdef CC65_LIB
@@ -21,24 +22,34 @@ else
 endif
 
 # Compile with physical keyboard by default as the SIM now supports it
-KEYB ?= 1
+# comodore keyboard now not available
+#KEYB ?= 0
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND)
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF)
 
 ifdef SDIO
 $(info ** Compile with SD card support **)
 	SDIO_DEF = -D SDIO=$(SDIO)
 endif
+
 ifdef KEYB
+ifdef PS2K
+$(error !!! Error cant have both keyboards enabled !!!)
+endif
 $(info ** Compile with VIA Keyboard support **)
 	KEYB_DEF = -D KEYB=$(KEYB)
+endif
+
+ifdef PS2K
+$(info ** Compile with PS2 Keyboard support **)
+	PS2K_DEF = -D PS2K=$(PS2K)
 endif
 ifdef FASTCPU
 $(info ** Compile with FAST CPU support **)
 	FASTCPU_DEF = -D FASTCPU=$(FASTCPU)
 endif
 ifdef SOUND
-$(info ** Compile with SN76489 Sound support **)
+$(info ** Compile with SN76489 Sound support on VIA2 **)
 	SOUND_DEF = -D SOUND=$(SOUND)
 endif
 
