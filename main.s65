@@ -548,6 +548,7 @@ END_CODE
 CHARout:
         JSR ACIAout
         JSR vdp_write_char
+;jsr acia_put_newline
         RTS
 
 ; Output only to serial port
@@ -589,12 +590,24 @@ CHARin:
         plx
         LDA KBD_CHAR
         BEQ aciain_nothing_waiting
+        CMP #$FF
+        BEQ aciain_nothing_waiting
+;pha
+;lda #'+'
+;jsr acia_putc
+;pla
+
         SEC
 .endif
 
 aciain_end:
         RTS
 aciain_nothing_waiting:
+        LDA #0
+;pha
+;lda #'.'
+;jsr acia_putc
+;pla
         CLC
         RTS
 ;------------------------------------

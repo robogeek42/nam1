@@ -271,6 +271,10 @@ KBINPUT        jsr   kbtscrl           ; turn off scroll lock (ready to input)
 kbinput1       jsr   kbget             ; get a code (wait for a key to be pressed)
                jsr   kbcsrch           ; scan for 14 special case codes
 kbcnvt         beq   kbinput1          ; 0=complete, get next scancode
+               
+               cmp   #SC_DONOTHING
+               beq   kb_exit_input
+
                tax                     ; set up scancode as table pointer
                cmp   #$78              ; see if its the F11
                beq   kbcnvt1           ; it is, skip keypad test
@@ -320,8 +324,8 @@ kbdone1        jsr   kbtscrl           ; turn on scroll lock (not ready to recei
                beq   kbdone1           ; ensure scroll lock is on
                pla                     ; get ASCII code
                AND #$7F
-               STA KBD_CHAR
-; debug
+; debug - print decoded ASCII
+;sta KBD_CHAR
 ;lda #'<'
 ;jsr acia_putc
 ;lda KBD_CHAR
@@ -331,6 +335,9 @@ kbdone1        jsr   kbtscrl           ; turn on scroll lock (not ready to recei
 ;jsr acia_put_newline
 ;lda KBD_CHAR
 ; end debug
+
+kb_exit_input
+               STA KBD_CHAR
                sec
                rts                     ; return to calling program
 ;
@@ -366,6 +373,10 @@ kbtcaps        lda   special           ; toggle caps bit in special
 kbnull         lda   #$00              ; set caps, get next code
                rts                     ; 
 ;
+kbnothing      lda   #SC_DONOTHING
+               clc
+               rts
+
 kbExt          jsr   kbget             ; get next code
                cmp   #$F0              ; is it an extended key release?
                beq   kbexrls           ; test for shift, ctrl, caps
@@ -406,7 +417,8 @@ kbrlse         jsr   kbget             ; test for shift & ctrl
 kbrlse1        cmp   #$14              ; 
                beq   kbrctrl           ; 
                cmp   #$11              ; alt key release
-               bne   kbnull            ; return with 0 in A
+               ;bne   kbnull            ; return with 0 in A
+               bne   kbnothing            ; return with 0 in A
 kbralt         lda   #$13              ; new alt release scancode
                rts                     ; 
 kbrctrl        lda   #$F7              ; reset ctrl bit in special
@@ -414,7 +426,8 @@ kbrctrl        lda   #$F7              ; reset ctrl bit in special
 kbrshift       lda   #$EF              ; reset shift bit in special
                and   special           ; 
                sta   special           ; 
-               bra   kbnull            ; return with 0 in A
+               ;bra   kbnull            ; return with 0 in A
+               bra   kbnothing            ; return with 0 in A
 ;
 kbtscrl        lda   special           ; toggle scroll lock bit in special
                eor   #$01              ; 
@@ -474,7 +487,7 @@ kbccmd         .word kbtrap83          ;
                .word kbBrk             ; 
                .word kbExt             ; 
                .word kbrlse            ; 
-               .word kbnull            ; 
+               .word kbnothing            ; 
                .word kbnull            ; 
                .word kbnull            ; 
                .word kbresend          ; 
@@ -531,11 +544,15 @@ kbsend         sta   byte              ; save byte to send
                phx                     ; save registers
                phy                     ; 
                sta   lastbyte          ; keep just in case the send fails
-;debug
+;debug - print send code
 ;ld16 R0,msg_send
 ;jsr acia_puts
+;lda #'['
+;jsr acia_putc
 ;lda byte
 ;jsr print1byte
+;lda #']'
+;jsr acia_putc
 ;jsr acia_put_newline
 ; end debug
                lda   kbportreg         ; 
@@ -647,7 +664,7 @@ kbget4         tya                     ; get parity count
                jsr   kbdis             ; 
                lda   byte              ; 
 ; debug - print scan code
-;pha
+pha
 ;ld16 R0,msg_scan_code
 ;jsr acia_puts
 ;pla
@@ -659,8 +676,8 @@ kbget4         tya                     ; get parity count
 ;pha
 ;jsr print_binary
 ;jsr acia_put_newline
-;pla
-; end debug
+pla
+; enddebug
                rts                     ; 
 ;
 kbdis          lda   kbportreg         ; disable kb from sending more data
@@ -692,6 +709,7 @@ kbsled         lda   #$ED              ; Set the keybrd LED's from kbleds variab
                lda   special           ; 
                and   #$07              ; ensure bits 3-7 are 0
                jsr   kbsend            ; 
+               jsr   kbget             ; get the ack
                rts                     ; 
                                        ; 
 kbhighlow      lda   #clk              ; wait for a low to high to low transition
@@ -702,6 +720,9 @@ kbhl1          bit   kbportreg         ;
                lda   kbportreg         ; 
                and   #data             ; get data line state
                rts                     ; 
+
+SC_DONOTHING = $FF
+
 ;*************************************************************
 ;
 ; Unshifted table for scancodes to ascii conversion
@@ -805,7 +826,7 @@ ASCIITBL       .byte $00               ; 00 no key pressed
                .byte $00               ; 5E
                .byte $00               ; 5F
                .byte $00               ; 60
-               .byte $00               ; 61
+               .byte $5B               ; 61 (new \|)
                .byte $00               ; 62
                .byte $00               ; 63
                .byte $00               ; 64
@@ -936,7 +957,7 @@ ASCIITBL       .byte $00               ; 00 no key pressed
                .byte $00               ; DE
                .byte $00               ; DF
                .byte $00               ; E0
-               .byte $00               ; E1
+               .byte $7C               ; E1 (new \|)
                .byte $00               ; E2
                .byte $00               ; E3
                .byte $00               ; E4
@@ -974,4 +995,4 @@ msg_scan_code:
 msg_error:
     .byte "Error",$0D,$0A,$00
 msg_send:
-    .byte "Send:",$00
+    .byte "-->",$00
