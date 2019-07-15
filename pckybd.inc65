@@ -10,5 +10,7 @@
 .import KBSCAN
 ; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
 .import KBINIT
+.import KBTMON
+.import KBTMOFF
 
 .import test_ps2_keyboard

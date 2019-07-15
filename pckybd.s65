@@ -71,6 +71,9 @@
 .export KBSCAN
 ; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
 .export KBINIT
+
+.export KBTMON
+.export KBTMOFF
 ;
 ;****************************************************************************
 ;
@@ -185,6 +188,26 @@ sbuf: .res 10,0
 ;            Num Lock and Caps Lock LED's are used normally to 
 ;            indicate their respective states.
 ;
+KBCMD_RESET = $FF   ; Rest
+KBCMD_RESEND = $FE  ; Resend
+KBCMD_SETKEYM = $FD ; Set key type to Make 
+KBCMD_SETKEYMB = $FC    ; Set key type to Make/Break
+KBCMD_SETKEYT = $FB     ; Set key type to Typematic
+KBCMD_SETALLTMB = $FA   ; Set all keys to Typematic/Make/Break
+KBCMD_SETALLM = $F9 ; Set all keys to Make
+KBCMD_SETALLMB = $F8 ; Set all keys to Make/Breal
+KBCMD_SETALLT = $F7 ; Set All Keys Typematic
+KBCMD_SETDEF = $F6  ; Load default typematic rate/delay (10.9cps / 500ms), key types (all keystypematic/make/break), and scan code set (2).
+KBCMD_DISABLE = $F5 ; Keyboard stops scanning, loads default values, and waits for further commands
+KBCMD_ENABLE = $F4  ; Re-enables keyboard after disabled using previous command.
+KBCMD_SETDELAY = $F3 ; Set Typematic Rate/Delay
+KBCMD_READID = $F2
+KBCMD_SETSCSET = $F0    ; Set scan code set
+KBCMD_ECHO = $EE    ; Echo
+KBCMD_LEDS = $ED    ; Set/reset LEDs
+KB_ACK   = $FA
+
+
 ;***************************************************************************************
 ;
 ; test program - reads input, prints the ascii code to the terminal and loops until the
@@ -205,6 +228,8 @@ test_ps2_keyboard:
                jsr   KBINIT            ; init the keyboard, LEDs, and flags
 lp0            jsr   acia_put_newline          ; prints 0D 0A (CR LF) to the terminal
 lp1            jsr   KBINPUT           ; wait for a keypress, return decoded ASCII code in A
+               cmp #SC_DONOTHING
+               beq lp1
                cmp   #$0d              ; if CR, then print CR LF to terminal
                beq   lp0               ; 
                cmp   #$1B              ; esc ascii code
@@ -469,7 +494,7 @@ kbclst         .byte $83               ; F7 - move to scancode 02
                .byte $E1               ; Extended pause break 
                .byte $E0               ; Extended key handler
                .byte $F0               ; Release 1 byte key code
-               .byte $FA               ; Ack 
+               .byte KB_ACK            ; Ack 
                .byte $AA               ; POST passed
                .byte $EE               ; Echo
                .byte $FE               ; resend
@@ -620,7 +645,7 @@ kberror
 ld16 R0,msg_error
 jsr acia_puts
 ; enddebug
-               lda   #$FE              ; resend cmd
+               lda   #KBCMD_RESEND     ; resend cmd
                jsr   kbsend            ; 
 kbget
 KBGET          phx                     ; 
@@ -692,19 +717,19 @@ kbdis          lda   kbportreg         ; disable kb from sending more data
 kbinit
 KBINIT         lda   #$02              ; init - num lock on, all other off
                sta   special           ; 
-kbinit1        lda   #$ff              ; keybrd reset
+kbinit1        lda   #KBCMD_RESET      ; keybrd reset
                jsr   kbsend            ; reset keyboard
                jsr   kbget             ; 
-               cmp   #$FA              ; ack?
+               cmp   #KB_ACK           ; ack?
                bne   kbinit1           ; resend reset cmd
                jsr   kbget             ; 
                cmp   #$AA              ; reset ok
                bne   kbinit1           ; resend reset cmd        
                                        ; fall into to set the leds
-kbsled         lda   #$ED              ; Set the keybrd LED's from kbleds variable
+kbsled         lda   #KBCMD_LEDS       ; Set the keybrd LED's from kbleds variable
                jsr   kbsend            ; 
                jsr   kbget             ; 
-               cmp   #$FA              ; ack?
+               cmp   #KB_ACK              ; ack?
                bne   kbsled            ; resend led cmd        
                lda   special           ; 
                and   #$07              ; ensure bits 3-7 are 0
@@ -721,8 +746,24 @@ kbhl1          bit   kbportreg         ;
                and   #data             ; get data line state
                rts                     ; 
 
-SC_DONOTHING = $FF
+; Turn off typematic (repeat)
+KBTMOFF
+        lda #KBCMD_SETALLMB     ; set all keys to make/break
+        jsr kbsend              ;
+        jsr kbget               ; 
+        cmp #KB_ACK             ;
+        bne KBTMOFF             ;
+        rts
+; Turn on typematic (repeat)
+KBTMON
+        lda #KBCMD_SETALLTMB    ; set all keys to make/break
+        jsr kbsend              ;
+        jsr kbget               ; 
+        cmp #KB_ACK             ;
+        bne KBTMON              ;
+        rts
 
+; Scan codes are also in io.s65
 ;*************************************************************
 ;
 ; Unshifted table for scancodes to ascii conversion
