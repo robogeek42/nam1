@@ -220,6 +220,18 @@ pong:
         STA pp_bsy_neg
 
 		JSR draw_score
+;---------------------------------------
+.ifdef PS2K
+; init keyboard
+        jsr KBINIT
+; set ps2 keyboard to have no repeat
+        jsr KBTMOFF
+        lda #0
+        sta KBD_FLAGS ; use KBD_FLAGS zp var to hold key flags
+                      ; 7  6  5  4  3  2  1  0
+                      ;             RD RU LD LU
+                      ;             /  '  z  a
+.endif
 
 ;=======================================
 ; Setup interrupt handler
@@ -285,6 +297,7 @@ check_irq_count:
 .ifdef PS2K
         JSR get_input_ps2k
 .endif
+        JSR check_key_flags
 
 		JSR draw_paddles
 
@@ -497,13 +510,17 @@ gik_done:
 
 .ifdef PS2K
 gip_movelup:
-        jmp gi_movelup
+        jsr gi_movelup
+        rts
 gip_moveldown:
-        jmp gi_moveldown
+        jsr gi_moveldown
+        rts
 gip_moverup:
-        jmp gi_moverup
+        jsr gi_moverup
+        rts
 gip_moverdown:
-        jmp gi_moverdown
+        jsr gi_moverdown
+        rts
 
 gip_do_start:
 		LDA #$01
@@ -515,46 +532,85 @@ gip_do_stop:
         STA pp_game                 ; in game state variable
 		rts
 
+check_key_flags:
+        BBS0 KBD_FLAGS, gip_movelup
+        BBS1 KBD_FLAGS, gip_moveldown
+        BBS2 KBD_FLAGS, gip_moverup
+        BBS3 KBD_FLAGS, gip_moverdown
+        rts
+
+;-----------------------------------------------------
+; This sets the KBD_FLAGS variable as above
+;
 get_input_ps2k:
 		jsr KBSCAN
 		bcc gip_done
-        jsr KBINPUT
-        lda KBD_CHAR
-		cmp #$00
-        beq gip_done
-jsr acia_putc
-lda KBD_CHAR
-		cmp #'s'
-		beq gip_do_start
-		cmp #'S'
-		beq gip_do_start
-		cmp #' '
-		beq gip_do_start
-		cmp #'q'
-		beq gip_do_stop
-		cmp #'Q'
-		beq gip_do_stop
-		cmp #'a'
-        beq gip_movelup
-		cmp #'A'
-        beq gip_movelup
-		cmp #'z'
-        beq gip_moveldown
-		cmp #'Z'
-        beq gip_moveldown
-		cmp #';'
-        beq gip_moverup
-		cmp #':'
-        beq gip_moverup
-		cmp #'.'
-        beq gip_moverdown
-		cmp #'>'
-        beq gip_moverdown
-		
+        jsr KBGET
+        cmp #$E0                ; extended key set
+        beq gip_extended
+        ldx #0                  ; 0 in X means this is a make code
+        cmp #$F0                ; break code
+        bne gip_makecode
+        ldx #1                  ; 1 in X means this is a break code
+        jsr KBGET               ; get the keycode
+gip_makecode:
+        cmp #SC_A
+        beq gip_do_A
+        cmp #SC_Z
+        beq gip_do_Z
+        cmp #SC_TICK
+        beq gip_do_TICK
+        cmp #SC_FWDSLASH
+        beq gip_do_FWDSLASH
+        
 gip_done:
-;    lda #'.'
-;    jsr acia_putc
 		rts
+
+gip_extended:
+        ; currently just ignore
+        jsr KBGET
+        cmp #$F0                ; break code
+        bne gip_ext_makecode
+        jsr KBGET
+gip_ext_makecode:
+        rts
+
+gip_do_A:
+        cpx #0
+        beq @do_make
+        RMB0 KBD_FLAGS
+        rts
+  @do_make:
+        SMB0 KBD_FLAGS
+        rts
+
+gip_do_Z:
+        cpx #0
+        beq @do_make
+        RMB1 KBD_FLAGS
+        rts
+  @do_make:
+        SMB1 KBD_FLAGS
+        rts
+
+gip_do_TICK:
+        cpx #0
+        beq @do_make
+        RMB2 KBD_FLAGS
+        rts
+  @do_make:
+        SMB2 KBD_FLAGS
+        rts
+
+gip_do_FWDSLASH:
+        cpx #0
+        beq @do_make
+        RMB3 KBD_FLAGS
+        rts
+  @do_make:
+        SMB3 KBD_FLAGS
+        rts
+
 .endif
 
 ;---------------------------------------
@@ -838,7 +894,11 @@ pih_restore_irq:
         ; stop any sounds
         JSR snd_all_off
 .endif
+.ifdef PS2K
+        ; reenable typematic repeat
+        jsr KBTMON
 		RTS
+.endif
 
 ;---------------------------------------
 ; Delay
