@@ -8,9 +8,12 @@
 ;           to get the key information.  You can modify the code to automatically 
 ;           jump to either routine if your application needs it.          
 .import KBSCAN
+; special KBSCAN for games that need make/break events
+.import KBSCAN_GAME
 ; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
 .import KBINIT
 .import KBTMON
 .import KBTMOFF
 
 .import test_ps2_keyboard
+.import test_ps2_keyboard_2

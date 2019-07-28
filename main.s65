@@ -230,10 +230,18 @@ loop:           ld16 R0, prompt
 
                 @cmd_t_test_k:
                 cmp #'k'
-                bne @cmd_t_end
+                bne @cmd_t_test_K
                 ; test keyboard
                 JSR test_ps2_keyboard
                 jmp loop
+
+                @cmd_t_test_K:
+                cmp #'K'
+                bne @cmd_t_end
+                ; test keyboard
+                JSR test_ps2_keyboard_2
+                jmp loop
+
                 @cmd_t_end:
 
                 ; h = print help

@@ -72,6 +72,9 @@
 ; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
 .export KBINIT
 
+; special KBSCAN for games that need make/break events
+.export KBSCAN_GAME
+
 .export KBTMON
 .export KBTMOFF
 ;
@@ -181,31 +184,35 @@ sbuf: .res 10,0
 ;            08 - control (either left or right)
 ;            10 - shift  (either left or right)
 ;
+;            80 - last code was a break code
+;
 ;            Scroll Lock LED is used to tell when ready for input 
 ;                Scroll Lock LED on  = Not ready for input
 ;                Scroll Lock LED off = Waiting (ready) for input
 ;
 ;            Num Lock and Caps Lock LED's are used normally to 
 ;            indicate their respective states.
-;
-KBCMD_RESET = $FF   ; Rest
-KBCMD_RESEND = $FE  ; Resend
-KBCMD_SETKEYM = $FD ; Set key type to Make 
-KBCMD_SETKEYMB = $FC    ; Set key type to Make/Break
-KBCMD_SETKEYT = $FB     ; Set key type to Typematic
-KBCMD_SETALLTMB = $FA   ; Set all keys to Typematic/Make/Break
-KBCMD_SETALLM = $F9 ; Set all keys to Make
-KBCMD_SETALLMB = $F8 ; Set all keys to Make/Breal
-KBCMD_SETALLT = $F7 ; Set All Keys Typematic
-KBCMD_SETDEF = $F6  ; Load default typematic rate/delay (10.9cps / 500ms), key types (all keystypematic/make/break), and scan code set (2).
-KBCMD_DISABLE = $F5 ; Keyboard stops scanning, loads default values, and waits for further commands
-KBCMD_ENABLE = $F4  ; Re-enables keyboard after disabled using previous command.
-KBCMD_SETDELAY = $F3 ; Set Typematic Rate/Delay
-KBCMD_READID = $F2
-KBCMD_SETSCSET = $F0    ; Set scan code set
-KBCMD_ECHO = $EE    ; Echo
-KBCMD_LEDS = $ED    ; Set/reset LEDs
-KB_ACK   = $FA
+
+; commands
+KBCMD_RESET     = $FF ; Rest
+KBCMD_RESEND    = $FE ; Resend
+KBCMD_SETKEYM   = $FD ; Set key type to Make 
+KBCMD_SETKEYMB  = $FC ; Set key type to Make/Break
+KBCMD_SETKEYT   = $FB ; Set key type to Typematic
+KBCMD_SETALLTMB = $FA ; Set all keys to Typematic/Make/Break
+KBCMD_SETALLM   = $F9 ; Set all keys to Make
+KBCMD_SETALLMB  = $F8 ; Set all keys to Make/Break
+KBCMD_SETALLT   = $F7 ; Set All Keys Typematic
+KBCMD_SETDEF    = $F6 ; Load default typematic rate/delay (10.9cps / 500ms), key types (all keystypematic/make/break), and scan code set (2).
+KBCMD_DISABLE   = $F5 ; Keyboard stops scanning, loads default values, and waits for further commands
+KBCMD_ENABLE    = $F4 ; Re-enables keyboard after disabled using previous command.
+KBCMD_SETDELAY  = $F3 ; Set Typematic Rate/Delay
+KBCMD_READID    = $F2 ;
+KBCMD_SETSCSET  = $F0 ; Set scan code set
+KBCMD_ECHO      = $EE ; Echo
+KBCMD_LEDS      = $ED ; Set/reset LEDs
+; responses
+KB_ACK          = $FA
 
 
 ;***************************************************************************************
@@ -221,6 +228,7 @@ KB_ACK   = $FA
 ;               *=    $1000             ; locate program beginning at $1000
 
 .export test_ps2_keyboard
+.export test_ps2_keyboard_2
 
 .code
 
@@ -277,6 +285,195 @@ printunkown:
             jsr acia_putc
             rts
 
+;--------------------------------------------------------------
+; tests non-typematic - outputs flags for asdfghjk (8 keys)
+;    KBD_CHAR_LAST ($ED) if this is not 0 print Scan code debug
+; q to quit
+test_ps2_keyboard_2:
+    jsr KBINIT
+    jsr KBTMOFF
+    lda #0
+    sta KBD_FLAGS
+    
+tpk2_loop:
+    jsr KBSCAN_GAME
+    bcc tpk2_loop           ; carry-clear means no key
+
+    ldx #0
+    lda KBD_CHAR
+    cmp #SC_DONOTHING       ; check for a break code
+    bne tpk2_debug_print
+
+    ; if result is SC_DONOTHING then this is a break code and code is in KBD_SPECIAL
+    ; swap it to A and set X=1
+    lda KBD_SPECIAL
+    beq tpk2_loop         ; 0 in KBD_SPECIAL means it was a special key release code - ignore
+    ldx #1
+
+tpk2_debug_print:
+    ; Scan code printing if debug ($ED) is turned on
+    pha
+    lda KBD_CHAR_LAST
+    beq @over1                      ; flag is 0 so skip debug
+    pla
+    jsr ps2k_debug_print_scan_code  ; print scan code
+    jmp @over2
+@over1:
+    pla
+@over2:
+
+tpk2_check_keys:
+    ; check all our required keys (asdfghjk and q)
+    cmp #SC_Q
+    beq tpk2_done
+    cmp #SC_A
+    beq tpk2_do_A
+    cmp #SC_S
+    beq tpk2_do_S
+    cmp #SC_D
+    beq tpk2_do_D
+    cmp #SC_F
+    beq tpk2_do_F
+    cmp #SC_G
+    beq tpk2_do_G
+    cmp #SC_H
+    beq tpk2_do_H
+    cmp #SC_J
+    beq tpk2_do_J
+    cmp #SC_K
+    beq tpk2_do_K
+    jmp tpk2_loop
+
+tpk2_do_extended_JV:
+    jmp tpk2_do_extended
+
+tpk2_update:
+    ; write the KBD Flags out as binary
+    lda KBD_FLAGS
+    jsr print_binary
+    jsr acia_put_newline
+    jmp tpk2_loop
+
+tpk2_done:
+    jsr KBTMON
+    rts
+
+tpk2_do_A:
+    cpx #1                  ; X=1 means this is a break code
+    beq @overA
+    smb7 KBD_FLAGS          ; make code - set flag
+    jmp tpk2_update
+@overA:
+    rmb7 KBD_FLAGS          ; break code - reset flag
+    jmp tpk2_update
+
+tpk2_do_S:
+    cpx #1
+    beq @overS
+    smb6 KBD_FLAGS
+    jmp tpk2_update
+@overS:
+    rmb6 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_D:
+    cpx #1
+    beq @overD
+    smb5 KBD_FLAGS
+    jmp tpk2_update
+@overD:
+    rmb5 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_F:
+    cpx #1
+    beq @overF
+    smb4 KBD_FLAGS
+    jmp tpk2_update
+@overF:
+    rmb4 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_G:
+    cpx #1
+    beq @overG
+    smb3 KBD_FLAGS
+    jmp tpk2_update
+@overG:
+    rmb3 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_H:
+    cpx #1
+    beq @overH
+    smb2 KBD_FLAGS
+    jmp tpk2_update
+@overH:
+    rmb2 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_J:
+    cpx #1
+    beq @overJ
+    smb1 KBD_FLAGS
+    jmp tpk2_update
+@overJ:
+    rmb1 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_K:
+    cpx #1
+    beq @overK
+    smb0 KBD_FLAGS
+    jmp tpk2_update
+@overK:
+    rmb0 KBD_FLAGS
+    jmp tpk2_update
+
+    ; deal with extended key codes and just consume the remaining codes before
+    ; returning to scan loop
+tpk2_do_extended:
+    jsr KBGET
+    cmp #$F0
+    beq tpk2_ext_break_code
+    jmp tpk2_loop
+
+tpk2_ext_break_code:
+    jsr KBGET
+    jmp tpk2_loop
+    
+;**************************************************************************************
+;
+; special read routine for my games - returns key code pressed in KBD_CHAR and KBD_SPECIAL
+; if C=0 then scan didn't read anything, so nothing is waiting
+; if KBD_CHAR == FF then it is a break code and code is in KBD_SPECIAL
+;
+KBSCAN_GAME:
+ksg_loop:
+    phx
+    jsr KBSCAN            ; scan once
+    bcs ksg_key_ready
+    stz KBD_CHAR
+    plx
+    clc
+    rts
+
+ksg_key_ready:
+ksg_scrl_off:
+    ; Turn off scroll lock
+    jsr kbtscrl           ; turn off scroll lock (ready to input)  
+    bne ksg_scrl_off     ; ensure its off 
+
+ksg_get_code:
+    ; Get a code and check for special cases, looping back if this is not a make/break code
+    jsr KBGET
+    jsr kbcsrch           ; scan for 14 codes  (also sets break-sequence indicator)
+    beq ksg_get_code     ; 0 = get more codes
+
+    sta KBD_CHAR
+    sec
+    plx
+    rts
 
 ;**************************************************************************************
 ;
@@ -396,9 +593,16 @@ kbtcaps        lda   special           ; toggle caps bit in special
                sta   special           ; 
                jsr   kbsled            ; set new status leds
 kbnull         lda   #$00              ; set caps, get next code
+               sta   KBD_SPECIAL       ; clear break key code 
                rts                     ; 
 ;
-kbnothing      lda   #SC_DONOTHING
+kbnothing_rls  sta   KBD_SPECIAL           ; set break key code
+               lda   #SC_DONOTHING
+               clc
+               rts
+kbnothing      lda   #$00
+               sta   KBD_SPECIAL           ; clear break key code
+               lda   #SC_DONOTHING
                clc
                rts
 
@@ -442,8 +646,8 @@ kbrlse         jsr   kbget             ; test for shift & ctrl
 kbrlse1        cmp   #$14              ; 
                beq   kbrctrl           ; 
                cmp   #$11              ; alt key release
-               ;bne   kbnull            ; return with 0 in A
-               bne   kbnothing            ; return with 0 in A
+               ;bne   kbnull           ; return with 0 in A
+               bne   kbnothing_rls     ; return with SC_DONOTHING in A and break key in KBD_SPECIAL
 kbralt         lda   #$13              ; new alt release scancode
                rts                     ; 
 kbrctrl        lda   #$F7              ; reset ctrl bit in special
@@ -688,21 +892,7 @@ kbget4         tya                     ; get parity count
                beq   kbget             ; no data, do again
                jsr   kbdis             ; 
                lda   byte              ; 
-; debug - print scan code
-pha
-;ld16 R0,msg_scan_code
-;jsr acia_puts
-;pla
-;pha
-;jsr print1byte
-;lda #' '
-;jsr acia_putc
-;pla
-;pha
-;jsr print_binary
-;jsr acia_put_newline
-pla
-; enddebug
+;jsr ps2k_debug_print_scan_code
                rts                     ; 
 ;
 kbdis          lda   kbportreg         ; disable kb from sending more data
@@ -726,6 +916,10 @@ kbinit1        lda   #KBCMD_RESET      ; keybrd reset
                cmp   #$AA              ; reset ok
                bne   kbinit1           ; resend reset cmd        
                                        ; fall into to set the leds
+  ; debug
+               ld16  R0,msg_init
+               jsr   acia_puts
+
 kbsled         lda   #KBCMD_LEDS       ; Set the keybrd LED's from kbleds variable
                jsr   kbsend            ; 
                jsr   kbget             ; 
@@ -748,15 +942,20 @@ kbhl1          bit   kbportreg         ;
 
 ; Turn off typematic (repeat)
 KBTMOFF
+        ld16 R0,msg_tm_off
+        jsr acia_puts
         lda #KBCMD_SETALLMB     ; set all keys to make/break
-        jsr kbsend              ;
-        jsr kbget               ; 
+        jsr kbsend              ; send command to keyboard
+        jsr kbget               ; expect an ACK
+        jsr ps2k_debug_print_scan_code
         cmp #KB_ACK             ;
-        bne KBTMOFF             ;
+        bne KBTMOFF             ; just resend command if not ACK
         rts
 ; Turn on typematic (repeat)
 KBTMON
-        lda #KBCMD_SETALLTMB    ; set all keys to make/break
+        ld16 R0,msg_tm_on
+        jsr acia_puts
+        lda #KBCMD_SETALLTMB    ; set all keys to make/break/typematic
         jsr kbsend              ;
         jsr kbget               ; 
         cmp #KB_ACK             ;
@@ -1037,3 +1236,25 @@ msg_error:
     .byte "Error",$0D,$0A,$00
 msg_send:
     .byte "-->",$00
+msg_init:
+    .byte "PS2 Keyboard Initialised",$0D,$0A,$00
+msg_tm_off:
+    .byte "Set TM Off",$0D,$0A,$00
+msg_tm_on:
+    .byte "Set TM On",$0D,$0A,$00
+
+ps2k_debug_print_scan_code:
+    pha
+    ld16 R0,msg_scan_code
+    jsr acia_puts
+    pla
+    pha
+    jsr print1byte
+    ;lda #' '
+    ;jsr acia_putc
+    ;pla
+    ;pha
+    ;jsr print_binary
+    jsr acia_put_newline
+    pla
+    rts

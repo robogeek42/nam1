@@ -30,7 +30,7 @@ pp_ballxv = pong_vars+4; ball velocity in X
 pp_ballyv = pong_vars+5; ball velocity in Y
 pp_scorel = pong_vars+6
 pp_scorer = pong_vars+7
-pp_game   = pong_vars+8; Game state. 0=not started, 1=playing, FF=quit
+pp_game   = pong_vars+8; Game state. 0=not started, 1=playing, FF=quit, FE=win message
 ;pp_kbdrow = pong_vars+9;
 ;pp_kbdcol = pong_vars+10;
 IRQ_COUNT = pong_vars+9
@@ -44,7 +44,8 @@ pp_bsy_neg = pong_vars+18      ; negative value of current ball speed in y
 
 pp_c0_vol    = pong_vars + 20;
 pp_collision = pong_vars + 21
-strbuf       = pong_vars + 22;
+pp_coll_cnt  = pong_vars + 22
+strbuf       = pong_vars + 23;
 
 BALLSPEEDX = $02            ; starting ball speeds
 BALLSPEEDXNEG = $FE
@@ -99,11 +100,11 @@ pong:
 ; set mode
 		LDA #1					; Graphics I mode
 		JSR vdp_set_mode
-        ;LDA #$FC				; white on dark green
+        ; Set main play area colors
         LDA #FG_WHITE
-        ORA #BG_DRK_GREEN
+        ORA #BG_DRK_BLUE
 		JSR vdp_load_flat_colors
-        ;LDA #$F3				; white on light green (border)
+        ; set corder color
         LDA #FG_WHITE
         ORA #BG_LIT_GREEN
 		LDY #$87
@@ -225,7 +226,7 @@ pong:
 ; init keyboard
         jsr KBINIT
 ; set ps2 keyboard to have no repeat
-        jsr KBTMOFF
+        ;jsr KBTMOFF
         lda #0
         sta KBD_FLAGS ; use KBD_FLAGS zp var to hold key flags
                       ; 7  6  5  4  3  2  1  0
@@ -281,6 +282,10 @@ game_loop:
 
         JSR get_input_serial
 
+.ifdef PS2K
+        JSR get_input_ps2k
+.endif
+
 check_irq_count:
         LDA IRQ_COUNT
         BNE gl_skip_update
@@ -293,9 +298,6 @@ check_irq_count:
 
 .ifdef KEYB
         JSR get_input_keyboard
-.endif
-.ifdef PS2K
-        JSR get_input_ps2k
 .endif
         JSR check_key_flags
 
@@ -314,7 +316,6 @@ gl_dogame:
 		JSR draw_ball
 		JSR check_game
 		JSR draw_score
-		;JSR delay
 
 gl_skip_update:
 		JMP game_loop
@@ -335,11 +336,12 @@ gi_got_key:
 ;		CMP #';'
 ;		BEQ gi_moverup
 ;		CMP #'.'
-		BEQ gi_moverdown
+;		BEQ gi_moverdown
 		CMP #'q'
 		BNE gi_check_s
 		LDA #$FF
 		STA pp_game
+        JMP gi_done
 gi_check_s:
 		CMP #'s'
         BNE gi_check_minus
@@ -509,50 +511,45 @@ gik_done:
 .endif
 
 .ifdef PS2K
-gip_movelup:
-        jsr gi_movelup
-        rts
-gip_moveldown:
-        jsr gi_moveldown
-        rts
-gip_moverup:
-        jsr gi_moverup
-        rts
-gip_moverdown:
-        jsr gi_moverdown
-        rts
-
-gip_do_start:
-		LDA #$01
-		STA pp_game
-        jsr pp_clear_message
-		rts
-gip_do_stop:
-        LDA #$FF                    ; else mark end-of-game
-        STA pp_game                 ; in game state variable
-		rts
-
 check_key_flags:
-        BBS0 KBD_FLAGS, gip_movelup
-        BBS1 KBD_FLAGS, gip_moveldown
-        BBS2 KBD_FLAGS, gip_moverup
-        BBS3 KBD_FLAGS, gip_moverdown
+        lda #1
+        bit KBD_FLAGS
+        beq @next1
+        jsr gi_movelup
+    @next1:
+        lda #2
+        bit KBD_FLAGS
+        beq @next2
+        jsr gi_moveldown
+    @next2:
+        lda #4
+        bit KBD_FLAGS
+        beq @next3
+        jsr gi_moverup
+    @next3:
+        lda #8
+        bit KBD_FLAGS
+        beq @over
+        jsr gi_moverdown
+    @over:
         rts
 
 ;-----------------------------------------------------
 ; This sets the KBD_FLAGS variable as above
 ;
 get_input_ps2k:
-		jsr KBSCAN
+		jsr KBSCAN_GAME
 		bcc gip_done
-        jsr KBGET
-        cmp #$E0                ; extended key set
-        beq gip_extended
-        ldx #0                  ; 0 in X means this is a make code
-        cmp #$F0                ; break code
+        
+        ldx #0
+        lda KBD_CHAR
+        cmp #SC_DONOTHING       ; check for a break code
         bne gip_makecode
+
+        lda KBD_SPECIAL         ; get break code
+        beq gip_done
         ldx #1                  ; 1 in X means this is a break code
-        jsr KBGET               ; get the keycode
+        
 gip_makecode:
         cmp #SC_A
         beq gip_do_A
@@ -562,17 +559,24 @@ gip_makecode:
         beq gip_do_TICK
         cmp #SC_FWDSLASH
         beq gip_do_FWDSLASH
+        cmp #SC_S
+        beq gip_do_S
+        cmp #SC_SPC
+        beq gip_do_S
+        cmp #SC_Q
+        beq gip_do_Q
         
 gip_done:
 		rts
 
-gip_extended:
-        ; currently just ignore
-        jsr KBGET
-        cmp #$F0                ; break code
-        bne gip_ext_makecode
-        jsr KBGET
-gip_ext_makecode:
+gip_do_Q:
+		LDA #$FF
+		STA pp_game
+        rts
+gip_do_S:
+		LDA #$01
+		STA pp_game
+        JSR pp_clear_message
         rts
 
 gip_do_A:
@@ -678,12 +682,21 @@ mb_yspeed_neg:
 ; X direction
 
 mb_check_collision:
+        lda pp_coll_cnt         ; period during which we ignore collisions to stop in-bat bounce
+        beq mcc_do_detect
+        dec pp_coll_cnt
+        STZ pp_collision        ; reset
+        jmp mb_add_speed        ; not considering collision
+
+mcc_do_detect:
         ; sprite collision detection
         LDA pp_collision
         BEQ mb_add_speed        ; no collision
 
         ; sprite collision
         STZ pp_collision        ; reset
+        lda #$10                ; number of cycles we ignore collisions for
+        sta pp_coll_cnt
         LDA pp_ballxv
         BPL mb_xspeed_neg
 
@@ -786,7 +799,7 @@ msg_press_space:
     ;      01234567890123456789012345678901
     .byte "    Press Space to continue     ",$00
 msg_instructions:
-    .byte " Left A Z   Q=Quit   Right  : / ",$00
+    .byte " Left A Z   Q=Quit   Right  ' / ",$00
 msg_press_s:
     .byte "      Press 'S' to start        ",$00
 msg_clear:
@@ -848,10 +861,10 @@ cg_check_right:
 
 cg_check_scores:
 		LDA pp_scorel
-		CMP #21
+		CMP #10
 		BCS cg_left_wins
 		LDA pp_scorer
-		CMP #21
+		CMP #10
 		BCS cg_right_wins
 cg_done:
 		RTS
@@ -864,8 +877,15 @@ cg_right_wins:
 cg_write_win_message:
 		JSR acia_puts
 		JSR acia_put_newline
-		LDA #$FF
+		LDA #$FE
 		STA pp_game
+
+        LDA #LINE_HI
+        STA ZP_VDP_CURS+1
+        LDA #LINE11_LO
+        STA ZP_VDP_CURS
+        JSR vdp_write_text
+       
 		RTS
 ;---------------------------------------
 ;
@@ -897,21 +917,9 @@ pih_restore_irq:
 .ifdef PS2K
         ; reenable typematic repeat
         jsr KBTMON
-		RTS
 .endif
-
-;---------------------------------------
-; Delay
-delay:
-		LDX #6
-d_loop2:
-		LDY #0
-d_loop1:
-		NOP
-		DEY
-		BNE d_loop1
-		DEX
-		BNE d_loop2
+        LDA #0
+        JSR vdp_set_mode
 		RTS
 
 ;---------------------------------------
