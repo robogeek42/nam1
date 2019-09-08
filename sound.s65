@@ -11,6 +11,7 @@
 .export snd_hello
 .export snd_write
 .export snd_play_vgmdata
+.export snd_beep
 
 .bss
 strbuf: .res 4, 0
@@ -80,24 +81,40 @@ snd_all_off:
         pla
         plx
         RTS
-
+; Tone register DDDDDDdddd (10bit)
+; to get X Hz, set DDDDDDdddd to 115200/X
+; e.g. 440Hz : 115200/440 = 262 = $106 = %0100000110)
+;                                         DDDDDDdddd
+; 1st byte 
+;   %1cctdddd
+;     |||````-- Data
+;     ||`------ Type (0=tone 1=volume)
+;     ``------- Channel (0-3)
+;
+; 2nd byte
+;  %0-DDDDDD
+;    |``````-- Data
+;    `-------- Unused
+;
+; 
+        
 snd_hello:
         phx
         phy
         pha
         ; Set frequency to %1000001000 = 528 -> 3.6864MHz/32*528 = 218Hz
-        LDA #%10001000  ; Freq dddd Channel 1 (of 3)
+        LDA #%10001000  ; Freq dddd Channel 0
         JSR snd_write
         LDA #%00100000  ; Freq DDDDDD 
         JSR snd_write
-        LDA #%10010111  ; Attn Channel 1 (of 3) : 0 = no atten (full vol). This is 7:half vol
+        LDA #%10010111  ; Attn Channel 0 : 0 = no atten (full vol). This is 7:half vol
         JSR snd_write
 
         LDY #$FF
         JSR snd_wait
 
         ; Set frequency to %0001111111 = 127 -> 3.6864MHz/32*127 = 907Hz
-        LDA #%10001111  ; Freq Channel 1 (of 3)
+        LDA #%10001111  ; Freq Channel 0
         JSR snd_write
         LDA #%00000111  ; Freq DDDDDD 
         JSR snd_write
@@ -110,6 +127,29 @@ snd_hello:
         plx
         RTS
 
+        ; 3.6864 /32 = 115200
+        ; to get X Hz, set freq to 115200/X
+snd_beep:
+        phx
+        phy
+        pha
+        ; play a note at 440Hz (262=$106=%0100000110)
+        LDA #%10000110  ; Freq dddd Channel 0
+        JSR snd_write
+        LDA #%00010000  ; Freq DDDDDD 
+        JSR snd_write
+        LDA #%10010111  ; Attn Channel 0 : 0 = no atten (full vol). This is 7:half vol
+        JSR snd_write
+
+        LDY #$2F
+        JSR snd_wait
+        LDA #%10011111  ; Attn Channel 0 : 0 = no atten (full vol). This is 15:off
+        JSR snd_write
+        
+        pla
+        ply
+        plx
+        RTS
 ;----------------------------------------------------------------
 ; Waits for 52 cycles - approx 1 sample (55)
 wait_1_samples:

@@ -73,9 +73,9 @@
 
 .macro dec16 reg
             lda reg
-            bne _mlbl_skip
+            bne @_mlbl_skip
             dec reg+1
-_mlbl_skip: dec reg
+@_mlbl_skip: dec reg
 .endmacro
 
 

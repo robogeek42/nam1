@@ -14,3 +14,14 @@
 .import vdp_copy
 .import vdp_cursor_on
 .import vdp_cursor_off
+; copy cursor
+.import vdp_cc_enable
+.import vdp_cc_disable
+.import vdp_cc_read
+.import vdp_cc_write
+.import vdp_cc_on
+.import vdp_cc_off
+.import vdp_cc_move_up
+.import vdp_cc_move_down
+.import vdp_cc_move_left
+.import vdp_cc_move_right

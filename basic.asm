@@ -998,6 +998,63 @@ LAB_1330
 LAB_133E
 	JMP	WAIT_CMD		; else we just wait for Basic command, no "Ready"
 
+LAB_CHECK_CC_UP
+    pha
+    lda ZP_COPY_CURS+1
+    bmi cc_enable
+    jmp cc_move_up
+cc_enable
+    pla
+    jsr vdp_cc_enable
+    jmp LAB_1359
+cc_move_up
+    pla
+    jsr vdp_cc_move_up
+    jmp LAB_1359
+LAB_CHECK_CC_DOWN
+    pha
+    lda ZP_COPY_CURS+1
+    bpl cc_move_down
+    pla
+    jmp LAB_1359
+cc_move_down
+    pla
+    jsr vdp_cc_move_down
+    jmp LAB_1359
+LAB_CHECK_CC_RIGHT
+    pha
+    lda ZP_COPY_CURS+1
+    bpl cc_move_right
+    pla
+    jmp LAB_1359
+cc_move_right
+    pla
+    jsr vdp_cc_move_right
+    jmp LAB_1359
+LAB_CHECK_CC_LEFT
+    pha
+    lda ZP_COPY_CURS+1
+    bpl cc_move_left
+    pla
+    jmp LAB_1359
+cc_move_left
+    pla
+    jsr vdp_cc_move_left
+    jmp LAB_1359
+ 
+LAB_CC_COPY
+    lda ZP_COPY_CURS+1
+    bpl cc_read_current
+    jmp LAB_1359
+cc_read_current
+    jsr vdp_cc_read     ; get current char under cursor
+    and #$7F            ; not the inverse character
+    pha
+    jsr vdp_cc_move_right
+    pla
+    jmp LAB_CC_RETURN   ; and jump back into code with that character
+
+
 ; print "? " and get BASIC input
 
 LAB_INLN
@@ -1018,6 +1075,7 @@ DEC_BUFFER_CNT:
 
 LAB_1357
 	LDX	#$00			; clear BASIC line buffer pointer
+    JSR vdp_cc_disable  ; invalidate COPY CURSOR position
 LAB_1359
 	JSR	V_INPT		; call scan input device
 	BCC	LAB_1359		; loop if no byte
@@ -1029,6 +1087,18 @@ LAB_1359
 
 	CMP	#$0D			; compare with [CR]
 	BEQ	LAB_1384		; do CR/LF exit if [CR]
+
+    CMP #SC_UP_ARROW       ; UP ARROW on PS2 keyboard
+    BEQ LAB_CHECK_CC_UP
+    CMP #SC_DOWN_ARROW     ; DOWN ARROW on PS2 keyboard
+    BEQ LAB_CHECK_CC_DOWN
+    CMP #SC_RIGHT_ARROW    ; RIGHT ARROW on PS2 keyboard
+    BEQ LAB_CHECK_CC_RIGHT
+    CMP #SC_LEFT_ARROW     ; LEFT ARROW on PS2 keyboard
+    BEQ LAB_CHECK_CC_LEFT
+    CMP #SC_NC_DELETE
+    BEQ LAB_CC_COPY
+LAB_CC_RETURN
 
 	CPX	#$00			; compare pointer with $00
 	BNE	LAB_1374		; branch if not empty

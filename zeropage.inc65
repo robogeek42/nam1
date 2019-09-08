@@ -19,6 +19,9 @@ ZP_TMP3     = $31
 R2          = $32        ; 2byte temp
 R3          = $34        ; 2byte temp
 R4          = $36        ; 2byte temp
+; used by basic LOAD/SAVE, PM and decomp
+; share with COPY CURSOR POS
+ZP_COPY_CURS= $36
 
 ;-----------------------------------------------------------
 ; VDP - 16 bytes

@@ -28,6 +28,18 @@
         .export vdp_copy
 		.export vdp_cursor_on
 		.export vdp_cursor_off
+        ; copy cursor
+        .export vdp_cc_enable
+        .export vdp_cc_disable
+        .export vdp_cc_read
+        .export vdp_cc_write
+        .export vdp_cc_on
+        .export vdp_cc_off
+        .export vdp_cc_move_up
+        .export vdp_cc_move_down
+        .export vdp_cc_move_left
+        .export vdp_cc_move_right
+
 
 .bss
 page_buffer:    .res 256, 0
@@ -758,3 +770,111 @@ vdp_copy:
 
                 RTS
 
+;================================================================
+; New: COPY CURSOR functions
+;
+; Enable: Set COPY CURSOR position to be (Current Curs Pos) - (Screen width)
+vdp_cc_enable:
+                pha
+                phy
+                LDA ZP_VDP_CURS
+                STA ZP_COPY_CURS
+                LDA ZP_VDP_CURS+1
+                STA ZP_COPY_CURS+1
+                sub8From16 ZP_VDP_CHAR_WIDTH, ZP_COPY_CURS
+                jsr vdp_cc_on
+                ply
+                pla
+                rts
+vdp_cc_on:
+                ; draw cursor
+                ; 1. read char at pos
+                JSR vdp_cc_read
+                ; 2. make reverse video
+                ORA #$80
+                ; 3. write back
+                JSR vdp_cc_write
+                RTS
+
+vdp_cc_off:
+                ; draw cursor
+                ; 1. read char at pos
+                JSR vdp_cc_read
+                ; 2. make normal video
+                AND #$7F
+                ; 3. write back
+                JSR vdp_cc_write
+                RTS
+
+vdp_cc_read:
+				phay
+                LDA VDP_REGS+2      ;; Load Name tab from Reg2
+                ASL                 ;; NameTab Addr = reg2 * 0x400
+                ASL
+                CLC
+                ADC ZP_COPY_CURS+1   ;; add curs hi byte to screen hi (res in A)
+                LDY ZP_COPY_CURS     ;; add curs lo byte to screen lo (0)
+                JSR vdp_set_addr_r
+				play
+                JSR vdp_read
+                RTS
+vdp_cc_write:
+				phay
+                LDA VDP_REGS+2      ;; Load Name tab from Reg2
+                ASL                 ;; NameTab Addr = reg2 * 0x400
+                ASL
+                CLC
+                ADC ZP_COPY_CURS+1   ;; add curs hi byte to screen hi (res in A)
+                LDY ZP_COPY_CURS     ;; add curs lo byte to screen lo (0)
+                JSR vdp_set_addr_w  
+				play
+                JSR vdp_write
+                RTS
+
+; move the copy cursor
+; move right
+vdp_cc_move_right:
+                pha
+                phy
+                JSR vdp_cc_off
+                inc16 ZP_COPY_CURS
+                JSR vdp_cc_on
+                ply
+                pla
+                RTS
+vdp_cc_move_left:
+                pha
+                phy
+                JSR vdp_cc_off
+                dec16 ZP_COPY_CURS
+                JSR vdp_cc_on
+                ply
+                pla
+                RTS
+vdp_cc_move_up:
+                pha
+                phy
+                JSR vdp_cc_off
+                sub8From16 ZP_VDP_CHAR_WIDTH,ZP_COPY_CURS
+                JSR vdp_cc_on
+                ply
+                pla
+                RTS
+vdp_cc_move_down:
+                pha
+                phy
+                JSR vdp_cc_off
+                add8To16 ZP_VDP_CHAR_WIDTH,ZP_COPY_CURS
+                JSR vdp_cc_on
+                ply
+                pla
+                RTS
+vdp_cc_disable:
+                pha
+                phy
+                JSR vdp_cc_off
+                LDA #$FF
+                STA ZP_COPY_CURS+1
+                ply
+                pla
+                RTS
