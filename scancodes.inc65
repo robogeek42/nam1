@@ -101,17 +101,18 @@ SC_LEFT_ARROW = $B0 ; relocated left arrow
 SC_DOWN_ARROW = $B1
 SC_RIGHT_ARROW = $B2
 SC_UP_ARROW = $B3
+SC_DELETE = $B4
 
 ; arrows - extended keys, converted scan code
 SC_RAW_LEFT_ARROW = $62
 SC_RAW_DOWN_ARROW = $63
 SC_RAW_RIGHT_ARROW = $64
 SC_RAW_UP_ARROW = $65
+SC_RAW_DELETE = $67
 
 ; arrows - extended keys, unconverted scan code
 SC_NC_LEFT_ARROW = $6B
 SC_NC_DOWN_ARROW = $72
 SC_NC_RIGHT_ARROW = $74
 SC_NC_UP_ARROW = $75
-
 SC_NC_DELETE = $71

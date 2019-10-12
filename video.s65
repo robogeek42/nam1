@@ -457,6 +457,10 @@ vdp_move_line_down:
                 ADC ZP_VDP_CURS+1
                 STA ZP_VDP_CURS+1
                 INC ZP_VDP_YPOS         ;; increment Y pos
+
+                ;; copy cursor
+                add8To16 ZP_VDP_CHAR_WIDTH,ZP_COPY_CURS
+
 				PLA
 				RTS
 				
