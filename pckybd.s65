@@ -620,7 +620,7 @@ kbExt          jsr   kbget             ; get next code
                ;jsr   ps2k_debug_print_extcode
                cmp   #$14              ; right control?
                beq   kbsctrl           ; set control and get next scancode
-               ldx   #$07              ; test for 8 scancode to be relocated
+               ldx   #$09              ; test for 8 scancode to be relocated
 kbext1         cmp   kbextlst,x        ; scan list
                beq   kbext3            ; get data if match found
                dex                     ; get next item
@@ -640,15 +640,17 @@ kbextlst       .byte $7E               ; E07E ctrl-break scancode
                .byte $72               ; E072 Down arrow
                .byte $74               ; E074 Right arrow
                .byte $75               ; E075 Up arrow
+               .byte $71               ; E071 Delete
 ;
 kbextdat       .byte $20               ; new ctrl-brk scancode   
                .byte $6A               ; new kp/ scancode     
                .byte $00               ; do nothing (return and get next scancode)
                .byte $0F               ; new prt scrn scancode
-               .byte $62               ; new Left arrow scancode
-               .byte $63               ; new Down arrow scancode
-               .byte $64               ; new Right arrow scancode
-               .byte $65               ; new Up arrow scancode
+               .byte $62               ; new Left arrow scancode    - map to ASCII $B0
+               .byte $63               ; new Down arrow scancode    - map to ASCII $B1
+               .byte $64               ; new Right arrow scancode   - map to ASCII $B2
+               .byte $65               ; new Up arrow scancode  - map to ASCII $B3
+               .byte $67               ; E071 Delete - then map to ASCII $B4
 ;
 kbexrls
                jsr   kbget             ; 
@@ -1101,7 +1103,7 @@ ASCIITBL       .byte $00               ; 00 no key pressed
                .byte $B2               ; 64 (new Right Arrow)
                .byte $B3               ; 65 (new Up Arrow)
                .byte $08               ; 66 bkspace
-               .byte $00               ; 67
+               .byte $B4               ; 67 Delete (relocated)
                .byte $00               ; 68
                .byte $31               ; 69 kp 1
                .byte $2f               ; 6A kp / converted from E04A in code
@@ -1232,7 +1234,7 @@ ASCIITBL       .byte $00               ; 00 no key pressed
                .byte $B2               ; E4 (new Right Arrow)
                .byte $B3               ; E5 (new Up Arrow)
                .byte $08               ; E6 bkspace
-               .byte $00               ; E7
+               .byte $B4               ; E7 Delete (relocated)
                .byte $00               ; E8
                .byte $91               ; E9 kp 1
                .byte $2f               ; EA kp / converted from E04A in code
