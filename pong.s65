@@ -300,7 +300,9 @@ check_irq_count:
 .ifdef KEYB
         JSR get_input_keyboard
 .endif
+.ifdef PS2K
         JSR check_key_flags
+.endif
 
 		JSR draw_paddles
 
@@ -539,7 +541,11 @@ check_key_flags:
 ; This sets the KBD_FLAGS variable as above
 ;
 get_input_ps2k:
+    lda #'{'
+    jsr acia_putc
 		jsr KBSCAN_GAME
+    lda #'}'
+    jsr acia_putc
 		bcc gip_done
         
         ; debug
@@ -557,16 +563,16 @@ get_input_ps2k:
         lda #']'
         jsr acia_putc
         ; enddebug
-        ldx #0
+        ldx #0                  ; 0 in X means this is a make code
         lda KBD_CHAR
         cmp #SC_DONOTHING       ; check for a break code
-        bne gip_makecode
+        bne gip_skip_set_breakcode
 
         lda KBD_SPECIAL         ; get break code
         beq gip_done
         ldx #1                  ; 1 in X means this is a break code
         
-gip_makecode:
+gip_skip_set_breakcode:
         cmp #SC_A
         beq gip_do_LP_UP
         cmp #SC_Z
@@ -583,7 +589,7 @@ gip_makecode:
         beq gip_do_RP_DOWN
         cmp #SC_RAW_DOWN_ARROW  ; raw scan code (converted)
         beq gip_do_RP_DOWN
-        cmp #SC_NC_DOWN_ARROW   ; raw can code (not converted)
+        cmp #SC_NC_DOWN_ARROW   ; raw scan code (not converted) (needed for break codes of arrow keys)
         beq gip_do_RP_DOWN
 
         cmp #SC_S
@@ -609,10 +615,10 @@ gip_do_START:
 gip_do_LP_UP:
         cpx #0
         beq @do_make
-        RMB0 KBD_FLAGS
+        RMB0 KBD_FLAGS      ; key unpressed - unset bit 0
         rts
   @do_make:
-        SMB0 KBD_FLAGS
+        SMB0 KBD_FLAGS      ; key was pressed - set bit 0
         rts
 
 gip_do_LP_DOWN:

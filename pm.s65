@@ -13,6 +13,8 @@
 .include "sprite.inc65"
 .include "bcd.inc65"
 .include "kbdvia.inc65"
+.include "scancodes.inc65"
+.include "pckybd.inc65"
 
 .export pacman
 
@@ -275,6 +277,15 @@ pmdm_loop7: LDA (TMP0),Y
             STZ PM_SCORE+1
             JSR pm_draw_score
 
+.ifdef PS2K
+; init keyboard
+            jsr KBINIT
+            lda #0
+            sta KBD_FLAGS ; use KBD_FLAGS zp var to hold key flags
+                          ; 7  6  5  4  3  2  1  0
+                          ;             a  s  d  w
+.endif
+
 ;------------------------------------------------------------------
 ; Setup interrupt handler
 pmih_save_old:
@@ -323,6 +334,9 @@ gl_get_input:
             JSR pm_get_input_serial
 .ifdef KEYB
             JSR pm_get_input_keyboard
+.endif
+.ifdef PS2K
+            JSR pm_get_input_ps2k
 .endif
             JSR pm_readmap
             STA pm_allowed
@@ -387,8 +401,7 @@ gl_update_pm:
 
 gl_move_pacman:
             LDA PM_IRQCOUNT                 ; update every N ticks
-            AND #$03                        
-            CMP #$02
+            AND #$01                        ; N=2 
             BNE gl_skip_update
             LDA PM_DIR
             CMP #PM_DIR_R
@@ -691,6 +704,83 @@ gik_done:
             RTS
 .endif
 
+.ifdef PS2K
+pm_get_input_ps2k:
+            jsr KBSCAN_GAME
+            bcc gip_done
+            ldx #0                  ; 0 in X means this is a make code
+            lda KBD_CHAR
+            cmp #SC_DONOTHING       ; check for a break code
+            bne gip_skip_set_breakcode
+
+            ; dont care about release
+            rts
+            ;lda KBD_SPECIAL         ; get break code
+            ;beq gip_done
+            ;ldx #1                  ; 1 in X means this is a break code
+        
+gip_skip_set_breakcode:
+            cmp #SC_A
+            beq gip_do_LEFT
+            cmp #SC_RAW_LEFT_ARROW
+            beq gip_do_LEFT
+            ;cmp #SC_NC_LEFT_ARROW
+            ;beq gip_do_LEFT
+
+            cmp #SC_D
+            beq gip_do_RIGHT
+            cmp #SC_RAW_RIGHT_ARROW
+            beq gip_do_RIGHT
+            ;cmp #SC_NC_RIGHT_ARROW
+            ;beq gip_do_RIGHT
+
+            cmp #SC_W
+            beq gip_do_UP
+            cmp #SC_RAW_UP_ARROW
+            beq gip_do_UP
+            ;cmp #SC_NC_UP_ARROW
+            ;beq gip_do_UP
+
+            cmp #SC_S
+            beq gip_do_DOWN
+            cmp #SC_RAW_DOWN_ARROW
+            beq gip_do_DOWN
+            ;cmp #SC_NC_DOWN_ARROW
+            ;beq gip_do_DOWN
+
+            cmp #SC_SPC
+            beq gip_do_START
+            cmp #SC_Q
+            beq gip_do_QUIT
+
+gip_done:
+            rts
+
+gip_do_QUIT:
+            lda #$FF
+            sta pm_game
+            rts
+gip_do_START:
+            lda #$01
+            sta pm_game
+            rts
+gip_do_LEFT:
+            lda #PM_DIR_L
+            sta pm_input_dir
+            rts
+gip_do_RIGHT:
+            lda #PM_DIR_R
+            sta pm_input_dir
+            rts
+gip_do_UP:
+            lda #PM_DIR_U
+            sta pm_input_dir
+            rts
+gip_do_DOWN:
+            lda #PM_DIR_D
+            sta pm_input_dir
+            rts
+.endif
 
 ;---------------------------------------
 ; Process input in terms of 0=L,1=R,2=U,3=D
