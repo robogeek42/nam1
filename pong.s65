@@ -541,11 +541,7 @@ check_key_flags:
 ; This sets the KBD_FLAGS variable as above
 ;
 get_input_ps2k:
-    lda #'{'
-    jsr acia_putc
 		jsr KBSCAN_GAME
-    lda #'}'
-    jsr acia_putc
 		bcc gip_done
         
         ; debug
@@ -565,11 +561,11 @@ get_input_ps2k:
         ; enddebug
         ldx #0                  ; 0 in X means this is a make code
         lda KBD_CHAR
-        cmp #SC_DONOTHING       ; check for a break code
+        cmp #SC_SPECIAL         ; check for a break code
         bne gip_skip_set_breakcode
 
         lda KBD_SPECIAL         ; get break code
-        beq gip_done
+        ;beq gip_done
         ldx #1                  ; 1 in X means this is a break code
         
 gip_skip_set_breakcode:

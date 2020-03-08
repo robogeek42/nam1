@@ -237,8 +237,8 @@ test_ps2_keyboard:
                jsr   KBINIT            ; init the keyboard, LEDs, and flags
 lp0            jsr   acia_put_newline          ; prints 0D 0A (CR LF) to the terminal
 lp1            jsr   KBINPUT           ; wait for a keypress, return decoded ASCII code in A
-               cmp #SC_DONOTHING
-               beq lp1
+               cmp   #SC_SPECIAL
+               beq   lp1
                cmp   #$0d              ; if CR, then print CR LF to terminal
                beq   lp0               ; 
                cmp   #$1B              ; esc ascii code
@@ -302,10 +302,10 @@ tpk2_loop:
 
     ldx #0
     lda KBD_CHAR
-    cmp #SC_DONOTHING       ; check for a break code
+    cmp #SC_SPECIAL       ; check for a break code
     bne tpk2_debug_print
 
-    ; if result is SC_DONOTHING then this is a break code and code is in KBD_SPECIAL
+    ; if result is SC_SPECIAL then this is a break code and code is in KBD_SPECIAL
     ; swap it to A and set X=1
     lda KBD_SPECIAL
     beq tpk2_loop         ; 0 in KBD_SPECIAL means it was a special key release code - ignore
@@ -473,8 +473,8 @@ ksg_get_code:
 
     sta KBD_CHAR
 
-    sec
     plx
+    sec
     rts
 
 ;**************************************************************************************
@@ -501,7 +501,7 @@ kbinput1       jsr   kbget             ; get a code (wait for a key to be presse
                jsr   kbcsrch           ; scan for 14 special case codes
 kbcnvt         beq   kbinput1          ; 0=complete, get next scancode
                
-               cmp   #SC_DONOTHING
+               cmp   #SC_SPECIAL
                beq   kb_exit_input
 
                tax                     ; set up scancode as table pointer
@@ -600,16 +600,10 @@ kbtcaps        lda   special           ; toggle caps bit in special
                sta   special           ; 
                jsr   kbsled            ; set new status leds
 kbnull         lda   #$00              ; set caps, get next code
-               sta   KBD_SPECIAL       ; clear break key code 
                rts                     ; 
-;
-kbnothing_rls  sta   KBD_SPECIAL           ; set break key code
-               lda   #SC_DONOTHING
-               rts
 
-kbnothing      lda   #$00
-               sta   KBD_SPECIAL           ; clear break key code
-               lda   #SC_DONOTHING
+kbrls_return   sta   KBD_SPECIAL       ; set break key code
+               lda   #SC_SPECIAL
                rts
 
 ; Extended key encountered : so far had E0
@@ -673,7 +667,7 @@ kbrlse1
                beq   kbrctrl           ; 
                cmp   #$11              ; alt key release
                ;bne   kbnull           ; return with 0 in A
-               bne   kbnothing_rls     ; return with SC_DONOTHING in A and break key in KBD_SPECIAL
+               bne   kbrls_return      ; return with SC_SPECIAL in A and break key in KBD_SPECIAL
 kbralt         lda   #$13              ; new alt release scancode
                rts                     ; 
 
@@ -682,9 +676,8 @@ kbrctrl        lda   #$F7              ; reset ctrl bit in special
 kbrshift       lda   #$EF              ; reset shift bit in special
                and   special           ; 
                sta   special           ; 
-               ;bra   kbnull            ; return with 0 in A
-               bra   kbnothing            ; return with 0 in A
-;
+               bra   kbnull            ; return with 0 in A
+
 kbtscrl        lda   special           ; toggle scroll lock bit in special
                eor   #$01              ; 
                sta   special           ; 
@@ -743,7 +736,7 @@ kbccmd         .word kbtrap83          ;
                .word kbBrk             ; 
                .word kbExt             ; 
                .word kbrlse            ; 
-               .word kbnothing            ; 
+               .word kbnull            ; 
                .word kbnull            ; 
                .word kbnull            ; 
                .word kbresend          ; 

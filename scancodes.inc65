@@ -1,6 +1,6 @@
 ;-----------------------------------------------------------
 ; PS2 Keyboard Scan codes
-SC_DONOTHING = $FF
+SC_SPECIAL = $FF
 SC_A = $1C
 SC_B = $32
 SC_C = $21
