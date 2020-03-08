@@ -455,6 +455,7 @@ ksg_loop:
     jsr KBSCAN            ; scan once
     bcs ksg_key_ready
     stz KBD_CHAR
+    stz KBD_SPECIAL
     plx
     clc
     rts
@@ -467,14 +468,26 @@ ksg_scrl_off:
 
 ksg_get_code:
     ; Get a code and check for special cases, looping back if this is not a make/break code
+; debug
+lda #'<'
+jsr acia_putc
+; enddebug
     jsr KBGET
+pha
+lda #'|'
+jsr acia_putc
+pla
     jsr kbcsrch           ; scan for 14 codes  (also sets break-sequence indicator)
     beq ksg_get_code     ; 0 = get more codes
+pha
+lda #'>'
+jsr acia_putc
+pla
 
     sta KBD_CHAR
 
-    sec
     plx
+    sec
     rts
 
 ;**************************************************************************************
