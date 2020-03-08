@@ -469,7 +469,7 @@ ksg_get_code:
     ; Get a code and check for special cases, looping back if this is not a make/break code
     jsr KBGET
     jsr kbcsrch           ; scan for 14 codes  (also sets break-sequence indicator)
-    beq ksg_get_code     ; 0 = get more codes
+    ;beq ksg_get_code     ; 0 = get more codes
 
     sta KBD_CHAR
 
@@ -667,7 +667,7 @@ kbrlse1
                beq   kbrctrl           ; 
                cmp   #$11              ; alt key release
                ;bne   kbnull           ; return with 0 in A
-               bne   kbrls_return      ; return with SC_SPECIAL in A and break key in KBD_SPECIAL
+               bne   kbrls_return      ; return with SC_SPECIAL($FF) in A and key code in KBD_SPECIAL
 kbralt         lda   #$13              ; new alt release scancode
                rts                     ; 
 

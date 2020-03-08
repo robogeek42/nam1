@@ -545,19 +545,19 @@ get_input_ps2k:
 		bcc gip_done
         
         ; debug
-        lda #'['
-        jsr acia_putc
-        ld16 R0,score_buffer
-        lda KBD_CHAR
-        jsr fmt_hex_string
-        jsr acia_puts
-        lda #':'
-        jsr acia_putc
-        lda KBD_SPECIAL
-        jsr fmt_hex_string
-        jsr acia_puts
-        lda #']'
-        jsr acia_putc
+        ;lda #'['
+        ;jsr acia_putc
+        ;ld16 R0,score_buffer
+        ;lda KBD_CHAR
+        ;jsr fmt_hex_string
+        ;jsr acia_puts
+        ;lda #':'
+        ;jsr acia_putc
+        ;lda KBD_SPECIAL
+        ;jsr fmt_hex_string
+        ;jsr acia_puts
+        ;lda #']'
+        ;jsr acia_putc
         ; enddebug
         ldx #0                  ; 0 in X means this is a make code
         lda KBD_CHAR
