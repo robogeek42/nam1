@@ -1,4 +1,4 @@
-SOURCES = \
+SOURCES := \
 acia.s65 \
 string.s65 \
 video_common.s65 \
@@ -12,7 +12,13 @@ pong.s65 \
 decomp.s65 \
 pm.s65 \
 sound.s65 \
-pckybd.s65
+pckybd.s65 
+
+ifdef UCHESS2
+$(info ** Compile with Micro-Chess II **)
+	SOURCES += uchess2.s65
+	UC_DEF = -D UCHESS2=1
+endif
 
 # May need to set CC65_LIB to path to compiler libs
 ifdef CC65_LIB
@@ -25,7 +31,7 @@ endif
 # comodore keyboard now not available
 #KEYB ?= 0
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF)
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(UC_DEF)
 
 ifdef SDIO
 $(info ** Compile with SD card support **)
