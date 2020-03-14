@@ -626,7 +626,7 @@ sd_getrespR17
 ;    ld16 R0,sd_msg_getresp17
 ;	JSR acia_puts
 
-	sta ZP_TMP1						; Page to read in to
+	sta ZP_TMP0+1					; Page to read in to
 	stz ZP_TMP0						; Always a page boundary
 sd_getrespR17token
 	jsr sd_getbyte					; Get a byte
@@ -662,7 +662,7 @@ sd_getrespR17block1
 	iny								; Keep going
 	bne sd_getrespR17block1			; Until all bytes read
 
-	inc ZP_TMP1						; Next page
+	inc ZP_TMP0+1					; Next page
 sd_getrespR17block2
 	jsr sd_getbyte					; get a byet
 	sta (ZP_TMP0),y					; Save the byte
@@ -710,7 +710,7 @@ sd_getrespR17block2
 
 ; Debug print of 1st page of SD buffer
 ;            LDA #SD_BUF
-;            STA ZP_TMP1
+;            STA ZP_TMP0+1
 ;            STZ ZP_TMP0
 ;            JSR print_memory256
 	ply
@@ -772,7 +772,7 @@ sd_sendcmd24
 	jsr sd_sendbyte
 
 	pla							; Retrieve the address high byte
-	sta ZP_TMP1
+	sta ZP_TMP0+1
 	stz ZP_TMP0					; Address is always page boundary
 
 	ldy #00
@@ -781,7 +781,7 @@ sd_writeblock_1					; Send first 256 bytes
 	jsr sd_sendbyte
 	iny
 	bne sd_writeblock_1
-	inc ZP_TMP1					; Next page for second 256 bytes
+	inc ZP_TMP0+1				; Next page for second 256 bytes
 sd_writeblock_2					; Send second 256 bytes
 	lda (ZP_TMP0), y
 	jsr sd_sendbyte

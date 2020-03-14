@@ -7926,7 +7926,7 @@ LAB_SPR_EARLY_OFF
 	;jsr acia_puts
 	LDA #$00		; off
 spr_eo_l
-	STA ZP_TMP1	
+	STA ZP_TMP0+1	
 	JSR	LAB_GTBY	; get byte parameter
 	STX ZP_TMP0		; Store Sprite index S
 	JSR vdp_set_sprite_early
@@ -7945,7 +7945,7 @@ LAB_SPR_PATTERN
 	;jsr acia_puts
 	JSR LAB_GADB		; get 2 integers seperated by comma
 						; 1st integer (S) in Itempl/h, 2nd in X
-	STX ZP_TMP1
+	STX ZP_TMP0+1
 	LDA Itempl
 	STA ZP_TMP0
 	JSR vdp_set_sprite_pattern
@@ -7956,7 +7956,7 @@ LAB_SPR_COLOUR
 	;jsr acia_puts
 	JSR LAB_GADB		; get 2 integers seperated by comma
 						; 1st integer (S) in Itempl/h, 2nd in X
-	STX ZP_TMP1
+	STX ZP_TMP0+1
 	LDA Itempl
 	STA ZP_TMP0
 	JSR vdp_set_sprite_col
@@ -7970,7 +7970,7 @@ LAB_SPR_LOADP
 	LDA Itempl
 	STA ZP_TMP0
 	LDA Itemph
-	STA ZP_TMP1
+	STA ZP_TMP0+1
 	JSR vdp_load_sprite_data_from_mem
 	RTS
 ; Set sprite position SPR_POS <S>, <X>, <Y>
@@ -7989,7 +7989,7 @@ LAB_SPR_POS
 						; else do type mismatch
 	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer
 	LDA	Itempl			; Get value (X)
-	STA ZP_TMP1			; Store X
+	STA ZP_TMP0+1		; Store X
 ; scan for "," and get byte, else do Syntax error then warm start
 	JSR	LAB_1C01		; scan for "," , else do syntax error then warm start
 	JSR	LAB_EVNM		; evaluate expression and check is numeric,
@@ -8268,10 +8268,6 @@ SD_GETFILENAME:
     DEY
     BPL @loop           ; stop loop when it gets to $FF (assumes length was < 127)
 
-;    LDA ut1_pl
-;	STA ZP_TMP2
-;    LDA ut1_ph
-;	STA ZP_TMP3
 	JSR sdfs_file_to_fh	; filename in ZP_TMP2 to file-handle
     ply
     RTS

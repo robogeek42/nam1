@@ -1,0 +1,24 @@
+Zero page temps
+
+RES      2 bytes
+	address in monitor and dump memory funcs
+
+R0       2 bytes
+R1       2 bytes
+	function parameters - important
+R2          2 bytes
+		BCD Sound Basic (as func parameter to sound)
+		In sound could reuse RES or R0
+		
+
+TMP0     2 bytes
+TMP1     2 bytes
+TMP2     2 bytes
+MACROTMP 2 bytes
+
+; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
+ZP_TMP0     2 bytes
+ZP_TMP2     2 bytes
+
+R3          2 bytes
+R4          2 bytes

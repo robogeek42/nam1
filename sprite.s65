@@ -133,7 +133,7 @@ ves_loop:		LDA ZP_VDP_SAB+1	; hi
 
 ;----------------------------------------------------------------
 ; Set position of Sprite S
-; Sprite number in ZP_TMP0, Pos X in ZP_TMP1, Pos Y in ZP_TMP2
+; Sprite number in ZP_TMP0, Pos X in ZP_TMP0+1, Pos Y in ZP_TMP2
 vdp_set_sprite_pos:
 				phay
 				CLC
@@ -147,14 +147,14 @@ vdp_set_sprite_pos:
 				NOP
 				LDA ZP_TMP2			; Y first
                 JSR vdp_write
-				LDA ZP_TMP1			; then X
+				LDA ZP_TMP0+1		; then X
                 JSR vdp_write
 				play
 				RTS
 
 ;----------------------------------------------------------------
 ; Set color of Sprite S
-; Sprite number in ZP_TMP0, Color in ZP_TMP1
+; Sprite number in ZP_TMP0, Color in ZP_TMP0+1
 vdp_set_sprite_col:
 				phay
 				CLC
@@ -168,18 +168,18 @@ vdp_set_sprite_col:
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
                 JSR vdp_read
 				AND #$F0			; preserve the clock bit
-				ORA ZP_TMP1			; and write new color
-				STA ZP_TMP1			; save
+				ORA ZP_TMP0+1		; and write new color
+				STA ZP_TMP0+1		; save
                 LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_w	; set address again - write this time
-				LDA ZP_TMP1			; write modified color to VRAM
+				LDA ZP_TMP0+1		; write modified color to VRAM
                 JSR vdp_write
 				play
 				RTS
 
 ;----------------------------------------------------------------
 ; Set Early Clock bit of Sprite S
-; Sprite number in ZP_TMP0, Clock bit in ZP_TMP1 (either $80=on or $00=off)
+; Sprite number in ZP_TMP0, Clock bit in ZP_TMP0+1 (either $80=on or $00=off)
 vdp_set_sprite_early:
 				phay
 				CLC
@@ -193,11 +193,11 @@ vdp_set_sprite_early:
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
                 JSR vdp_read
 				AND #$0F			; preserve the colour nibble
-				ORA ZP_TMP1
-				STA ZP_TMP1			; save
+				ORA ZP_TMP0+1
+				STA ZP_TMP0+1		; save
                 LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_w	; set address again - write this time
-				LDA ZP_TMP1			; write modified color to VRAM
+				LDA ZP_TMP0+1		; write modified color to VRAM
                 JSR vdp_write
 				play
 				RTS
@@ -205,7 +205,7 @@ vdp_set_sprite_early:
 
 ;----------------------------------------------------------------
 ; Set pattern of Sprite S
-; Sprite number in ZP_TMP0, Pattern name P in ZP_TMP1
+; Sprite number in ZP_TMP0, Pattern name P in ZP_TMP0+1
 vdp_set_sprite_pattern:
 				phay
 				CLC
@@ -217,7 +217,7 @@ vdp_set_sprite_pattern:
                 TAY
                 LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_w	; set write address
-				LDA ZP_TMP1
+				LDA ZP_TMP0+1
                 JSR vdp_write
 				play
 				RTS

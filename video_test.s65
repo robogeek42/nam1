@@ -106,7 +106,7 @@ vt_page_write:
                 ;; position 8&9 are page address
                 ld16reg_offset R0, TMP2, 8
                 JSR scan_hex        ; scan 2 byte hex value into acc
-                STA ZP_TMP1
+                STA ZP_TMP0+1
 
                 JSR vdp_set_page
                 RTS
@@ -159,12 +159,12 @@ vt1_loop2:      JSR print_memory16  ;; print 16 bytes from (RES) and inc RES by 
 
 ;----------------------------------------------
 ; Set all 256 bytes in a page to a given value
-; Expect High byte of address in ZP_TMP0 and Byte to write in ZP_TMP1
+; Expect High byte of address in ZP_TMP0 and Byte to write in ZP_TMP0+1
 vdp_set_page:   LDY #0                  ;; set VRAM write address
                 LDA ZP_TMP0
                 JSR vdp_set_addr_w
                 LDX #0                  ;; write to 256 consecutive locations
-                LDA ZP_TMP1
+                LDA ZP_TMP0+1
 vt2_loop:       STA VDP_WR_VRAM
                 INX
                 BNE vt2_loop

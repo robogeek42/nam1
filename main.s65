@@ -18,6 +18,9 @@
 .include "sound.inc65"
 .include "bcd.inc65"
 .include "pckybd.inc65"
+.ifdef UCHESS2
+.include "uchess2.inc65"
+.endif
 
 .import pong
 .import pacman
@@ -174,6 +177,14 @@ loop:           ld16 R0, prompt
                 jmp loop
                 @cmd_b_end:
 
+.ifdef UCHESS2
+@cmd_c:         cmp #'c'
+                bne @cmd_c_end
+                jsr cmd_uchess2
+                jmp loop
+                @cmd_c_end:
+.endif
+
 @cmd_vd:        cmp #'v'
                 bne @cmd_vd_end
                 lda buffer+1
@@ -213,21 +224,21 @@ loop:           ld16 R0, prompt
 
                 @cmd_t_test_w:
                 cmp #'w'
-                bne @cmd_t_test_s
+                bne @cmd_t_test_k
                 ; test converting a 16 bit number to BCD
                 jsr cmd_test_bcd16
                 jmp loop
 
-                @cmd_t_test_s:
-                cmp #'s'
-                bne @cmd_t_test_k
-                ;test playing a sound file
-                LDA #<TEST_VGM_DATA
-                STA R2
-                LDA #>TEST_VGM_DATA
-                STA R2+1
-                JSR snd_play_vgmdata
-                jmp loop
+;                @cmd_t_test_s:
+;                cmp #'s'
+;                bne @cmd_t_test_k
+;                ;test playing a sound file
+;                LDA #<TEST_VGM_DATA
+;                STA R2
+;                LDA #>TEST_VGM_DATA
+;                STA R2+1
+;                JSR snd_play_vgmdata
+;                jmp loop
 
                 @cmd_t_test_k:
                 cmp #'k'
@@ -327,7 +338,7 @@ cmd_dump_page:  LDA buffer+1
                 BNE check_pong
                 ld16 R0, buffer+2
                 JSR scan_hex        ; scan 2 byte hex value into acc
-                STA ZP_TMP1
+                STA ZP_TMP0+1
                 STZ ZP_TMP0
                 JSR print_memory256
                 RTS
@@ -513,6 +524,14 @@ cmd_basic:
                 STA TMP0+1
 @boot_basic:    JMP (TMP0)
 
+.ifdef UCHESS2
+;-----------------------------------------------------
+; run Micro-Chess II by Peter Jennings/Daryl Richter
+cmd_uchess2:
+                JSR uchess2
+                RTS
+.endif
+
 ;-----------------------------------------------------
 ; BASIC linkage
 ;  - ROM code from LAB_vec to END_CODE will be copied to RAM $0300
@@ -585,12 +604,12 @@ CHARin:
 @nobyw:
         CLC                 ; flag no byte received
 
-;.ifdef KEYB
-;        JSR kbd_scan
-;        BCC aciain_end
-;        LDA KBD_CHAR
-;        JMP aciain_end
-;.endif
+.ifdef KEYB
+        JSR kbd_scan
+        BCC aciain_end
+        LDA KBD_CHAR
+        JMP aciain_end
+.endif
 .ifdef PS2K
         jsr KBSCAN
         bcc aciain_nothing_waiting  ; C=0 means nothing waiting
@@ -655,6 +674,6 @@ ANSI_BKSP:
         RTS
 
 TEST_VGM_DATA:
- .include "BankPanic_GameStart.inc65"
+; .include "BankPanic_GameStart.inc65"
 ;.include "KingsOfTheBeach_MatchSummary.inc65"
 ;.include "PingPong_Game_Entry.inc65"

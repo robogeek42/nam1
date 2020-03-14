@@ -416,12 +416,12 @@ pp_draw_central_line:
         LDA VDP_REGS+2      ; Name table
 		ASL
 		ASL
-		STA ZP_TMP1
+		STA ZP_TMP0+1
 		LDA #$0F			; start at position 15
 		STA ZP_TMP0
 @loop1:
 		LDY ZP_TMP0			; set vram write addr
-		LDA ZP_TMP1
+		LDA ZP_TMP0+1
 		JSR vdp_set_addr_w
 		LDA #0				; write 2 chars to split centre
         JSR vdp_write
@@ -653,14 +653,14 @@ draw_paddles:
 		LDA #0
 		STA ZP_TMP0		; S
 		LDA #BATL_POS
-		STA ZP_TMP1		; X
+		STA ZP_TMP0+1	; X
 		LDA pp_batly
 		STA ZP_TMP2		; Y
 		JSR vdp_set_sprite_pos
 		LDA #1
 		STA ZP_TMP0		; S
 		LDA #BATL_POS
-		STA ZP_TMP1		; X
+		STA ZP_TMP0+1	; X
 		LDA pp_batly
 		CLC
 		ADC #8
@@ -670,14 +670,14 @@ draw_paddles:
 		LDA #2
 		STA ZP_TMP0		; S
 		LDA #BATR_POS
-		STA ZP_TMP1		; X
+		STA ZP_TMP0+1	; X
 		LDA pp_batry
 		STA ZP_TMP2		; Y
 		JSR vdp_set_sprite_pos
 		LDA #3
 		STA ZP_TMP0		; S
 		LDA #BATR_POS
-		STA ZP_TMP1		; X
+		STA ZP_TMP0+1	; X
 		LDA pp_batry
 		CLC
 		ADC #8
@@ -761,7 +761,7 @@ draw_ball:
 		LDA #4			; S=4 ball sprite
 		STA ZP_TMP0
 		LDA pp_ballx
-		STA ZP_TMP1		; X 
+		STA ZP_TMP0+1	; X 
 		LDA pp_bally
 		STA ZP_TMP2		; Y
 		JSR vdp_set_sprite_pos

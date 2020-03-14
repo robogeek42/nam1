@@ -60,8 +60,8 @@ vdp_set_mode:   STA ZP_VDP_MODE
                 ADC ZP_TMP0              ; add 8*mode to mode base to point to this modes settings
                 STA ZP_TMP0
                 LDA #0
-                ADC ZP_TMP1
-                STA ZP_TMP1
+                ADC ZP_TMP0+1
+                STA ZP_TMP0+1
 
                 LDX #$80
                 LDY #0
@@ -200,14 +200,14 @@ vdp_load_g1_col:
                 LDA VDP_REGS+3   ;; Set VRAM address to VDP_REG3 * 0x40
                 STA ZP_TMP0
                 LDX #0
-                STX ZP_TMP1
+                STX ZP_TMP0+1
 lgc_loop1:      ASL ZP_TMP0
-                ROL ZP_TMP1
+                ROL ZP_TMP0+1
                 INX
                 CPX #6
                 BNE lgc_loop1
                 LDY ZP_TMP0
-                LDA ZP_TMP1
+                LDA ZP_TMP0+1
                 JSR vdp_set_addr_w
 
                 PLA                 ;; color
@@ -593,11 +593,11 @@ vdp_scroll_up_line:
                 LDA VDP_REGS+2   ;; hi address of name table (VDP_REG2 * 0x400)
                 ASL
                 ASL
-				STA ZP_TMP3			;; store in DestAddr (hi)
+				STA ZP_TMP2+1		;; store in DestAddr (hi)
 				LDY #00          
 				STY ZP_TMP2			;; (lo)
 
-				STA ZP_TMP1			;; SourceAddr is Base + screen width
+				STA ZP_TMP0+1		;; SourceAddr is Base + screen width
 				LDY ZP_VDP_CHAR_WIDTH
 				STY ZP_TMP0
 				
@@ -605,13 +605,13 @@ vdp_scroll_up_line:
 				STY TMP2
 				JSR vdp_copy
 				
-				INC ZP_TMP1			;; next source page
-				INC ZP_TMP3			;; next dest page
+				INC ZP_TMP0+1		;; next source page
+				INC ZP_TMP2+1		;; next dest page
 
 				JSR vdp_copy		;; 512 chars         
 
-				INC ZP_TMP1			;; next source page
-				INC ZP_TMP3			;; next dest page
+				INC ZP_TMP0+1		;; next source page
+				INC ZP_TMP2+1		;; next dest page
 
 				LDA ZP_VDP_MODE		;; mode 0?
 				CMP #0
@@ -627,8 +627,8 @@ vdp_scroll_up_line:
 
 @domode0:		JSR vdp_copy
 
-				INC ZP_TMP1			;; next source page
-				INC ZP_TMP3			;; next dest page
+				INC ZP_TMP0+1		;; next source page
+				INC ZP_TMP2+1		;; next dest page
 
 				LDY #152			;; extra 152 chars for mode 0
 				STY TMP2

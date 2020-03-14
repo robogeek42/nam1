@@ -91,7 +91,7 @@ print_memory256:
 @pmloop:		LDA ZP_TMP0 
 				STA RES
 				STA R1
-				LDA ZP_TMP1
+				LDA ZP_TMP0+1
 				STA RES+1
 				STA R1+1
 				JSR print_memory16
@@ -99,9 +99,9 @@ print_memory256:
 				LDA ZP_TMP0
 				ADC #16
 				STA ZP_TMP0
-				LDA ZP_TMP1
+				LDA ZP_TMP0+1
 				ADC #0
-				STA ZP_TMP1
+				STA ZP_TMP0+1
 				DEX
 				BNE @pmloop
 				plaxy
