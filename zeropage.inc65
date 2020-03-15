@@ -12,9 +12,7 @@ ZP_CURSOR   = $2D    ; Cursor char to print 0=cursor off
 
 ; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
 ZP_TMP0     = $2E
-ZP_TMP1     = $2F
 ZP_TMP2     = $30
-ZP_TMP3     = $31
 
 R2          = $32        ; 2byte temp
 R3          = $34        ; 2byte temp
