@@ -363,10 +363,11 @@ TK_PACMAN	        = TK_PONG+1             ; PACMAN token
 TK_LOADBIN          = TK_PACMAN+1           ; Binary load
 TK_PLAY             = TK_LOADBIN+1          ; Play sound file
 TK_SETHIMEM         = TK_PLAY+1             ; Set top of memory
+TK_DELAYMS          = TK_SETHIMEM+1         ; Delay N ms
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB		= TK_SETHIMEM+1		; TAB token
+TK_TAB		= TK_DELAYMS+1		; TAB token
 TK_ELSE		= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -8002,6 +8003,21 @@ LAB_SPR_POS
 	JSR vdp_set_sprite_pos
 	RTS
 
+; Sleep N milliseconds (max .255 seconds)
+LAB_DELAYMS
+	JSR	LAB_GTBY	; get byte parameter
+    STX ZP_TMP0		; Number of ms
+@l2: LDY #0
+   ; need 9.5 cycles in inner loop for 1ms @2.45 MHz
+@l1: DEY            ; 2 cycles
+;    NOP             ; 2 cycles
+    NOP             ; 2 cycles
+    NOP             ; 2 cycles
+    BNE @l1         ; 2 cycles
+    DEX
+    BNE @l2
+	RTS
+
 
 .export SEND_CMD
 ;----------------------------------------------------------
@@ -8886,6 +8902,7 @@ LAB_CTBL
     .word	LAB_LOADBIN-1		; LOADBIN   SD file command
     .word	LAB_PLAY-1		; PLAY   sound command
     .word	LAB_SETHIMEM-1		; SETHIMEM   sound command
+    .word	LAB_DELAYMS-1		; DELAYMS command
 
 ; function pre process routine table
 
@@ -9155,6 +9172,8 @@ LBB_DEF
 	.byte	"EF",TK_DEF		; DEF
 LBB_DEL
 	.byte	"EL",TK_DEL		; DEL (delte file) (SD Card)
+LBB_DELAYMS
+    .byte   "ELAYMS",TK_DELAYMS
 LBB_DIM
 	.byte	"IM",TK_DIM		; DIM
 LBB_DIR
@@ -9529,6 +9548,8 @@ LAB_KEYT
 	.word	LBB_PLAY	; PLAY
 	.byte	8,'S'
 	.word	LBB_SETHIMEM	; SETHIMEM
+	.byte	7,'D'
+	.word	LBB_DELAYMS	; DELAYMS
 
 ; secondary commands (can't start a statement)
 
