@@ -17,13 +17,14 @@
 240 SPR_COLOUR 0,3+S
 250 FOR I=0 TO 96 STEP 4
 260 SPR_POS S,20+S*20,I
+265 DELAY 20
 270 NEXT I
 280 NEXT S
 
 899 END
 900 DATA $3c, $7e, $5a, $7e, $24, $3c, $66, $c3
-901 DATA $03, $06, $0C, $18, $30, $60, $C0, $10
-902 DATA $07, $0e, $38, $e0, $e0, $38, $0e, $07
+901 DATA $03, $06, $0C, $18, $30, $60, $C0, $80
+902 DATA $07, $1c, $38, $e0, $e0, $38, $1c, $07
 903 DATA $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 904 DATA $18, $3c, $66, $c3, $c3, $66, $3c, $18
 1000 REM Load sprite
