@@ -1,4 +1,4 @@
-; vim: tabstop=6
+; vim: ts=6 sw=4 noexpandtab
 
 ; Enhanced BASIC to assemble under 6502 simulator, $ver 2.22
 
