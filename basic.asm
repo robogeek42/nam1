@@ -437,6 +437,7 @@ TK_GETKEY 	= TK_ISKEY+1			; GETKEY
 TK_HIMEM    = TK_GETKEY+1
 TK_LOMEM    = TK_HIMEM+1
 TK_TOP    	= TK_LOMEM+1
+TK_SPR_STATUS = TK_TOP+1
 
 ; offsets from a base of X or Y
 
@@ -8592,7 +8593,12 @@ LAB_TOP
 	LDY Earryl
 	LDA Earryh
 	JMP LAB_AYFC
-    
+   
+LAB_SPR_STATUS
+    LDY #42
+    LDA #0
+    JMP LAB_AYFC
+
 ;-----------------------------------------------------------------
 
 ; system dependant i/o vectors
@@ -8965,6 +8971,7 @@ LAB_FTBM	= LAB_FTBL+$01
 	.word	LAB_HIMEM-1	; 
 	.word	LAB_LOMEM-1	; 
 	.word	LAB_TOP-1	; 
+	.word	LAB_SPR_STATUS-1	; 
 
 ; hierarchy and action addresses for operator
 
@@ -9327,6 +9334,8 @@ LBB_SPR_POS
 	.byte	"PR_POS",TK_SPR_POS	; SPR_POS
 LBB_SPR_SET_TYPE
 	.byte	"PR_SET_TYPE",TK_SPR_SET_TYPE	; SPR_SET_TYPE
+LBB_SPR_STATUS
+	.byte	"PR_STATUS",TK_SPR_STATUS	; SPR_STATUS
 LBB_SQR
 	.byte	"QR(",TK_SQR	; SQR(
 LBB_STEP
@@ -9655,6 +9664,8 @@ LAB_KEYT
 	.word	LBB_HIMEM	; HIMEM
 	.byte	3,'T'
 	.word	LBB_TOP	; TOP
+	.byte	10,'S'
+	.word	LBB_SPR_STATUS	; 
 
 ; BASIC messages, mostly error messages
 
