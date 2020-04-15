@@ -8671,9 +8671,11 @@ LAB_TOP
 	JMP LAB_AYFC
    
 LAB_SSTATUS
-    LDY #42
-    LDA #0
-    JMP LAB_AYFC
+    JSR  LAB_IGBY
+    JSR  vdp_getstatus
+    TAY
+    LDA  #0
+    JMP  LAB_AYFC
 
 ;-----------------------------------------------------------------
 
