@@ -350,20 +350,13 @@ TK_COL		= TK_CLS+1		; VDP COL token
 TK_DEL		= TK_COL+1		; SD DEL
 TK_DIR		= TK_DEL+1		; SD DIR
 TK_CAT		= TK_DIR+1		; SD CAT
-TK_SPR_COLOUR	= TK_CAT+1			; SPR_COLOUR
-;TK_SPR_EARLY_OFF	= TK_SPR_COLOUR+1		; SPR_EARLY_OFF
-TK_SPR_EARLY_ON	= TK_SPR_COLOUR+1		; SPR_EARLY_ON
-TK_SPR_ENABLE	= TK_SPR_EARLY_ON+1	; SPR_ENABLE 
-TK_SPR_LOADP	= TK_SPR_ENABLE+1		; SPR_LOADP
-TK_SPR_PATTERN	= TK_SPR_LOADP+1		; SPR_PATTERN
-TK_SPR_POS		= TK_SPR_PATTERN+1	; SPR_POS
-TK_SPR_SET_TYPE	= TK_SPR_POS+1		; SPR_SET_TYPE
-TK_LOADIMG		= TK_SPR_SET_TYPE+1     ; LOADIMG
-TK_PONG		= TK_LOADIMG+1          ; PONG token
-TK_PACMAN		= TK_PONG+1             ; PACMAN token
-TK_LOADBIN		= TK_PACMAN+1           ; Binary load
-TK_PLAY		= TK_LOADBIN+1          ; Play sound file
-TK_DELAY		= TK_PLAY+1         	; Delay N ms
+TK_SPR		= TK_CAT+1		; Sprite commands
+TK_LOADIMG		= TK_SPR+1     	; LOADIMG
+TK_PONG		= TK_LOADIMG+1	; PONG token
+TK_PACMAN		= TK_PONG+1		; PACMAN token
+TK_LOADBIN		= TK_PACMAN+1	; Binary load
+TK_PLAY		= TK_LOADBIN+1	; Play sound file
+TK_DELAY		= TK_PLAY+1		; Delay N ms
 
 ; secondary command tokens, can't start a statement
 
@@ -437,7 +430,7 @@ TK_GETKEY 	= TK_ISKEY+1			; GETKEY
 TK_HIMEM    = TK_GETKEY+1
 TK_LOMEM    = TK_HIMEM+1
 TK_TOP    	= TK_LOMEM+1
-TK_SPR_STATUS = TK_TOP+1
+TK_SSTATUS  = TK_TOP+1
 
 ; offsets from a base of X or Y
 
@@ -7883,12 +7876,90 @@ LAB_PACMAN
 	JSR snd_all_off
 	RTS
 
-; Sprite Set type SPR_SET_TYPE <T>
-;  	T=0  8x8   unmagnified
-;	T=1  16x16 unmagnified
-;  	T=2  8x8   double sized
-;  	T=3  16x16 double sized
-LAB_SPR_SET_TYPE
+;------------------------------------------------------
+; Sprite commands:
+;------------------------------------------------------
+; SPR H			; print sprite help
+; SPR C <S>,<C>		; set colour 
+; SPR E <S>    		; set early clock bit ON
+; SPR O <S>    		; set early clock bit OFF
+; SPR T <T>			; Set sprite type to T 
+				;  	T=0  8x8   unmagnified
+				;	T=1  16x16 unmagnified
+				;  	T=2  8x8   double sized
+				;  	T=3  16x16 double sized
+; SPR N <N>			; Enable N sprites
+; SPR L <Addr>,<P>	; Load pattern P from address
+; SPR P <S>,<P>		; Set pattern P for sprite S
+; SPR X <S>,<X>,<Y>	; Set sprite S to position X,Y
+;------------------------------------------------------
+MSG_SHELP	.byte "sprite help:",$0D,$0A
+.byte " SPR C <S>,<C> colour",$0D,$0A
+.byte " SPR E <S>     eclock ON",$0D,$0A
+.byte " SPR O <S>     eclock OFF",$0D,$0A
+.byte " SPR T <T>     type",$0D,$0A ; (0=8x8 1=16x16 2=8x8 mag, 3=16x16 mag)",$0D,$0A
+.byte " SPR N <N>     enable N spr",$0D,$0A
+.byte " SPR L <Addr>,<P>  load pat",$0D,$0A
+.byte " SPR P <S>,<P>     set pat",$0D,$0A
+.byte " SPR X <S>,<X>,<Y> pos X,Y",$0D,$0A,$00
+MSG_SPR .byte "SPR ", $00
+SPR_HELP
+	;ld16	R0,MSG_SHELP
+	;JSR	acia_puts
+	LDA #<MSG_SHELP
+	LDY #>MSG_SHELP
+	JSR LAB_18C3
+	LDX   #$2A
+	JMP   LAB_XERR
+	RTS
+
+LAB_SPR
+	CMP  #'H'
+	BEQ  SPR_HELP
+	CMP  #'T'
+	BEQ  SPR_T
+	CMP  #'C'
+	BEQ  SPR_C
+	CMP  #'E'
+	BEQ  SPR_E
+	CMP  #'O'
+	BEQ  SPR_O
+	CMP  #'L'
+	BEQ  SPR_L
+	CMP  #'N'
+	BEQ  SPR_N
+	CMP  #'P'
+	BEQ  SPR_P
+	CMP  #'X'
+	BEQ  SPR_X
+	JMP  LAB_SNER
+SPR_T
+	JSR  LAB_IGBY
+	JMP  SPR_SET_TYPE
+SPR_C
+	JSR  LAB_IGBY
+	JMP  SPR_COLOUR
+SPR_E
+	JSR  LAB_IGBY
+	JMP  SPR_EARLY_ON
+SPR_O
+	JSR  LAB_IGBY
+	JMP  SPR_EARLY_OFF
+SPR_L
+	JSR  LAB_IGBY
+	JMP  SPR_LOADP
+SPR_N
+	JSR  LAB_IGBY
+	JMP  SPR_ENABLE
+SPR_P
+	JSR  LAB_IGBY
+	JMP  SPR_PATTERN
+SPR_X
+	JSR  LAB_IGBY
+	JMP  SPR_POS
+
+; Sprite Set type SPR TYPE <T>
+SPR_SET_TYPE
 	JSR	LAB_GTBY	; get byte parameter T in X
 	TXA
 	CMP	#0
@@ -7918,23 +7989,28 @@ sst_3:
 	RTS
 
 ; Set sprite early clock bit on or off SPR_EARLY_ON <S> or SPR_EARLY_OFF <S>
-LAB_SPR_EARLY_ON
+SPR_EARLY_ON
 	;ld16	R0,MSG_SEON
 	;jsr	acia_puts
-	LDA	#$80		; on
-;	JMP	spr_eo_l
-;LAB_SPR_EARLY_OFF
-;	;ld16	R0,MSG_SEOF
-;	;jsr	acia_puts
-;	LDA	#$00		; off
-;spr_eo_l
+	LDA	#$80			; on
 	STA	ZP_TMP0+1	
 	JSR	LAB_GTBY		; get byte parameter
 	STX	ZP_TMP0		; Store Sprite index S
 	JSR	vdp_set_sprite_early
 	RTS
+
+SPR_EARLY_OFF
+	;ld16	R0,MSG_SEOF
+	;jsr	acia_puts
+	LDA	#$00			; off
+	STA	ZP_TMP0+1	
+	JSR	LAB_GTBY		; get byte parameter
+	STX	ZP_TMP0		; Store Sprite index S
+	JSR	vdp_set_sprite_early
+	RTS
+
 ; Sprite Enable SPR_ENABLE <N>   : Enable N sprites
-LAB_SPR_ENABLE
+SPR_ENABLE
 	;ld16	R0,MSG_SENA
 	;jsr	acia_puts
 	JSR	LAB_GTBY		; get byte parameter
@@ -7942,7 +8018,7 @@ LAB_SPR_ENABLE
 	JSR	vdp_enable_sprites
 	RTS
 ; Set sprite pattern SPR_PATTERN <S>, <P>
-LAB_SPR_PATTERN
+SPR_PATTERN
 	;ld16	R0,MSG_SPAT
 	;jsr	acia_puts
 	JSR	LAB_GADB		; get 2 integers seperated by comma
@@ -7952,8 +8028,8 @@ LAB_SPR_PATTERN
 	STA	ZP_TMP0
 	JSR	vdp_set_sprite_pattern
 	RTS
-; Set sprite colour SPR_COLOUR <S>, <C>
-LAB_SPR_COLOUR
+; Set sprite colour SPR C <S>, <C>
+SPR_COLOUR
 	;ld16	R0,MSG_SCOL
 	;jsr	acia_puts
 	JSR	LAB_GADB		; get 2 integers seperated by comma
@@ -7964,7 +8040,7 @@ LAB_SPR_COLOUR
 	JSR	vdp_set_sprite_col
 	RTS
 ; Load spite pattern data from Address SPR_LOADP <Addr>,<P>
-LAB_SPR_LOADP
+SPR_LOADP
 	;ld16	R0,MSG_SLDP
 	;jsr	acia_puts
 	JSR	LAB_GADB		; get two intergers (1st can be 16bit) 2nd is 8bit
@@ -7976,7 +8052,7 @@ LAB_SPR_LOADP
 	JSR	vdp_load_sprite_data_from_mem
 	RTS
 ; Set sprite position SPR_POS <S>, <X>, <Y>
-LAB_SPR_POS
+SPR_POS
 	;ld16	R0,MSG_SPOS
 	;jsr	acia_puts
 	; read 3 vars
@@ -8594,10 +8670,12 @@ LAB_TOP
 	LDA Earryh
 	JMP LAB_AYFC
    
-LAB_SPR_STATUS
-    LDY #42
-    LDA #0
-    JMP LAB_AYFC
+LAB_SSTATUS
+    JSR  LAB_IGBY
+    JSR  vdp_getstatus
+    TAY
+    LDA  #0
+    JMP  LAB_AYFC
 
 ;-----------------------------------------------------------------
 
@@ -8867,20 +8945,13 @@ LAB_CTBL
 	.word	LAB_DEL-1		; DEL			SD command
 	.word	LAB_DIR-1		; DIR			SD command
 	.word	LAB_CAT-1		; CAT			SD command
-	.word	LAB_SPR_COLOUR-1		; SPR_COLOUR		VDP command
-;	.word	LAB_SPR_EARLY_OFF-1	; SPR_EARLY_OFF		VDP command
-	.word	LAB_SPR_EARLY_ON-1	; SPR_EARLY_ON		VDP command
-	.word	LAB_SPR_ENABLE-1		; SPR_ENABLE		VDP command
-	.word	LAB_SPR_LOADP-1		; SPR_LOADP			VDP command
-	.word	LAB_SPR_PATTERN-1		; SPR_PATTERN		VDP command
-	.word	LAB_SPR_POS-1		; SPR_POS			VDP command
-	.word	LAB_SPR_SET_TYPE-1	; SPR_SET_TYPE		VDP command
-	.word	LAB_LOADIMG-1		; LOADIMG			VDP command
-	.word	LAB_PONG-1			; PONG			Built-in Game
-	.word	LAB_PACMAN-1		; PACMAN			Built-in Game
-	.word	LAB_LOADBIN-1		; LOADBIN  			SD file command
-	.word	LAB_PLAY-1			; PLAY 			sound command
-	.word	LAB_DELAY-1			; DELAY
+	.word	LAB_SPR-1		; SPRite		VDP command
+	.word	LAB_LOADIMG-1	; LOADIMG		VDP command
+	.word	LAB_PONG-1		; PONG		Built-in Game
+	.word	LAB_PACMAN-1	; PACMAN		Built-in Game
+	.word	LAB_LOADBIN-1	; LOADBIN  		SD file command
+	.word	LAB_PLAY-1		; PLAY 		sound command
+	.word	LAB_DELAY-1		; DELAY
 
 ; function pre process routine table
 
@@ -8971,7 +9042,7 @@ LAB_FTBM	= LAB_FTBL+$01
 	.word	LAB_HIMEM-1	; 
 	.word	LAB_LOMEM-1	; 
 	.word	LAB_TOP-1	; 
-	.word	LAB_SPR_STATUS-1	; 
+	.word	LAB_SSTATUS-1	; 
 
 ; hierarchy and action addresses for operator
 
@@ -9318,26 +9389,12 @@ LBB_SIN
 	.byte	"IN(",TK_SIN	; SIN(
 LBB_SPC
 	.byte	"PC(",TK_SPC	; SPC(
-LBB_SPR_COLOUR
-	.byte	"PR_COLOUR",TK_SPR_COLOUR	; SPR_COLOUR
-;LBB_SPR_EARLY_OFF
-;	.byte	"PR_EARLY_OFF",TK_SPR_EARLY_OFF	; SPR_EARLY_OFF
-LBB_SPR_EARLY_ON
-	.byte	"PR_EARLY_ON",TK_SPR_EARLY_ON	; SPR_EARLY_ON
-LBB_SPR_ENABLE
-	.byte	"PR_ENABLE",TK_SPR_ENABLE	; SPR_ENABLE
-LBB_SPR_LOADP
-	.byte	"PR_LOADP",TK_SPR_LOADP	; SPR_LOADP
-LBB_SPR_PATTERN
-	.byte	"PR_PATTERN",TK_SPR_PATTERN	; SPR_PATTERN
-LBB_SPR_POS
-	.byte	"PR_POS",TK_SPR_POS	; SPR_POS
-LBB_SPR_SET_TYPE
-	.byte	"PR_SET_TYPE",TK_SPR_SET_TYPE	; SPR_SET_TYPE
-LBB_SPR_STATUS
-	.byte	"PR_STATUS",TK_SPR_STATUS	; SPR_STATUS
+LBB_SPR
+	.byte	"PR",TK_SPR		; SPR
 LBB_SQR
 	.byte	"QR(",TK_SQR	; SQR(
+LBB_SSTATUS
+	.byte	"STATUS",TK_SSTATUS ; SSTATUS
 LBB_STEP
 	.byte	"TEP",TK_STEP	; STEP
 LBB_STOP
@@ -9478,55 +9535,41 @@ LAB_KEYT
 	.byte	6,'B'
 	.word	LBB_BITCLR		; BITCLR
 	.byte	3,'I'
-	.word	LBB_IRQ			; IRQ
+	.word	LBB_IRQ		; IRQ
 	.byte	3,'N'
-	.word	LBB_NMI			; NMI
+	.word	LBB_NMI		; NMI
 	.byte	3,'M'
-	.word	LBB_MON			; MON
+	.word	LBB_MON		; MON
 	.byte	4,'M'
 	.word	LBB_MODE		; VDP MODE
 	.byte	3,'C'
-	.word	LBB_CLS			; VDP CLS
+	.word	LBB_CLS		; VDP CLS
 	.byte	3,'C'
-	.word	LBB_COL			; VDP COL
+	.word	LBB_COL		; VDP COL
 ;	.byte	4,'L'
 ;	.word	LBB_LOAD		; LOAD
 ;	.byte	4,'S'
 ;	.word	LBB_SAVE		; SAVE
 	.byte	3,'S'
-	.word	LBB_DEL			; SD DEL
+	.word	LBB_DEL		; SD DEL
 	.byte	3,'S'
-	.word	LBB_DIR			; SD DIR
+	.word	LBB_DIR		; SD DIR
 	.byte	3,'S'
-	.word	LBB_CAT			; SD CAT
-	.byte	10,'S'
-	.word	LBB_SPR_COLOUR	; SPR_COLOUR
-;	.byte	13,'S'
-;	.word	LBB_SPR_EARLY_OFF	; SPR_EARLY_OFF
-	.byte	12,'S'
-	.word	LBB_SPR_EARLY_ON	; SPR_EARLY_ON
-	.byte	10,'S'
-	.word	LBB_SPR_ENABLE		; SPR_ENABLE
-	.byte	9,'S'
-	.word	LBB_SPR_LOADP		; SPR_LOADP
-	.byte	11,'S'
-	.word	LBB_SPR_PATTERN		; SPR_PATTERN
-	.byte	7,'S'
-	.word	LBB_SPR_POS			; SPR_POS
-	.byte	12,'S'
-	.word	LBB_SPR_SET_TYPE	; SPR_SET_TYPE
+	.word	LBB_CAT		; SD CAT
+	.byte	3,'S'
+	.word	LBB_SPR		; SPR
 	.byte	7,'L'
-	.word	LBB_LOADIMG	; LOADIMG
+	.word	LBB_LOADIMG		; LOADIMG
 	.byte	4,'P'
-	.word	LBB_PONG	; PONG
+	.word	LBB_PONG		; PONG
 	.byte	6,'P'
-	.word	LBB_PACMAN	; PACMAN
+	.word	LBB_PACMAN		; PACMAN
 	.byte	7,'L'
-	.word	LBB_LOADBIN	; LOADBIN
+	.word	LBB_LOADBIN		; LOADBIN
 	.byte	4,'P'
-	.word	LBB_PLAY	; PLAY
+	.word	LBB_PLAY		; PLAY
 	.byte	5,'D'
-	.word	LBB_DELAY	; DELAY
+	.word	LBB_DELAY		; DELAY
 
 ; secondary commands (can't start a statement)
 
@@ -9664,8 +9707,8 @@ LAB_KEYT
 	.word	LBB_HIMEM	; HIMEM
 	.byte	3,'T'
 	.word	LBB_TOP	; TOP
-	.byte	10,'S'
-	.word	LBB_SPR_STATUS	; 
+	.byte	7,'S'
+	.word	LBB_SSTATUS	; 
 
 ; BASIC messages, mostly error messages
 
@@ -9691,6 +9734,7 @@ LAB_BAER
 	.word   ERR_FS      ;$24 Filesystem
     .word   ERR_FU      ;$26 File not found
     .word   ERR_NO      ;$28 No can do
+    .word   ERR_NONE     ;$2A No error msg 
 
 ; I may implement these two errors to force definition of variables and
 ; dimensioning of arrays before use.
@@ -9722,6 +9766,7 @@ ERR_LD	.byte	"LOOP without DO",$00
 ERR_FS  .byte   "Filesystem",$00
 ERR_FU  .byte   "File not found",$00
 ERR_NO  .byte   "No can do",$00
+ERR_NONE  .byte   "no",$00
 
 ;ERR_UV	.byte	"Undefined variable",$00
 
@@ -9743,12 +9788,12 @@ MSG_SDLD	.byte "SD Load",$0D,$0A,$00
 MSG_SDSV	.byte "SD Save",$0D,$0A,$00
 ;MSG_SDDR	.byte "SD Dir",$0D,$0A,$00
 ;MSG_SDDL	.byte "SD Delete",$0D,$0A,$00
-;MSG_SPAT	.byte "SPR_PATTERN",$0D,$0A,$00
-;MSG_SENA	.byte "SPR_ENABLE",$0D,$0A,$00
-MSG_SPOS	.byte "SPR_POS",$0D,$0A,$00
-;MSG_SLDP	.byte "SPR_LOADP",$0D,$0A,$00
-;MSG_SCOL	.byte "SPR_COL",$0D,$0A,$00
-;MSG_SEON	.byte "SPR_EARLY_ON",$0D,$0A,$00
-;MSG_SEOF	.byte "SPR_EARLY_OFF",$0D,$0A,$00
+;MSG_SPAT	.byte "SPR PATTERN",$0D,$0A,$00
+;MSG_SENA	.byte "SPR ENABLE",$0D,$0A,$00
+;MSG_SPOS	.byte "SPR POS",$0D,$0A,$00
+;MSG_SLDP	.byte "SPR LOADP",$0D,$0A,$00
+;MSG_SCOL	.byte "SPR COL",$0D,$0A,$00
+;MSG_SEON	.byte "SPR EARLY_ON",$0D,$0A,$00
+;MSG_SEOF	.byte "SPR EARLY_OFF",$0D,$0A,$00
 
 AA_end_basic

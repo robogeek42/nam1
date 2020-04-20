@@ -16,6 +16,9 @@ COL <FG>,<BG>
 	based screen (modes 0,1,2)
 	FG and BG are integers 0-15
 
+PRINT SSTATUS
+	reads VDP status register (for sprite info: collison, 5th sprite)
+
 SD card FAT16 access
 --------------------
 The FAT16 file structure is flat and does not have subdirectories
@@ -39,35 +42,38 @@ CAT <"filename">
 
 Sprite commands
 ---------------
-SPR_ENABLE <N>
+SPR H
+	Print help
+
+SPR N <N>
 	Enable N Sprites (0 -> N-1). Max N is 32
 	N=0 disable all sprites
 
-SPR_SET_TYPE <T>
+SPR T <T>
 	Set type for all sprites to T
 	T=0  8x8   unmagnified
 	T=1  16x16 unmagnified
 	T=2  8x8   double sized
 	T=3  16x16 double sized
 
-SPR_PATTERN <S>, <P>
+SPR P <S>, <P>
 	Sprite S set to use pattern P
 	S range 0-31
 	P range 0-64 (Large sprites take 4 patterns)
 
-SPR_POS <S>, <X>, <Y>
+SPR X <S>, <X>, <Y>
 	Set sprite S position to X,Y
 
-SPR_EARLY_ON <S>
+SPR E <S>
 	Set Early CLock bit for Sprite S  (move position 32 pix to left)
-SPR_EARLY_OFF <S>
+SPR O <S>
 	Unset Early CLock bit for Sprite S  (restore correct position for sprite)
 
-SPR_COLOUR <S>, <C>
+SPR C <S>, <C>
 	Set colour of sprite S to C 
 	C range 0-15
 
-SPR_LOADP <ADDR>,<P>
+SPR L <ADDR>,<P>
 	Load either 8 (Type=0,2) or 32 (Type=1,3) bytes into sprite
 	pattern table position P from address ADDR
 
