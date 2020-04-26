@@ -1,13 +1,14 @@
+; vim: ts=4
 		.setcpu "65C02"
-        .include "zeropage.inc65"
-        .include "macros.inc65"
+		.include "zeropage.inc65"
+		.include "macros.inc65"
 		.include "video_common.inc65"
 		.include "video_registers.inc65"
-        .export spr_set_small
-        .export spr_set_large
-        .export spr_set_mag_on
-        .export spr_set_mag_off
-        .export vdp_init_sprites
+		.export spr_set_small
+		.export spr_set_large
+		.export spr_set_mag_on
+		.export spr_set_mag_off
+		.export vdp_init_sprites
 		.export vdp_enable_sprites
 		.export vdp_set_sprite_pos
 		.export vdp_set_sprite_col
@@ -19,13 +20,13 @@
 
 ; sprite movement table (not animated)
 ; struct {
-;           byte pattern;
-;           byte xpos;
-;           byte ypos;
-;           byte xspeed; 
-;           byte yspeed;
-;        }
-;spr_tab:    .res 4*32, 0
+;		   byte pattern;
+;		   byte xpos;
+;		   byte ypos;
+;		   byte xspeed; 
+;		   byte yspeed;
+;		}
+;spr_tab:	.res 4*32, 0
 
 .code
 
@@ -34,73 +35,73 @@
 
 spr_set_small: ;; set small sprites in registers
 				phay
-                LDA VDP_REGS+1
-                AND #$FD
-                STA VDP_REGS+1
-                LDY #$81            ;; register 1
-                JSR vdp_regwrite
+				LDA VDP_REGS+1
+				AND #$FD
+				STA VDP_REGS+1
+				LDY #$81			;; register 1
+				JSR vdp_regwrite
 				play
-                RTS
-                
+				RTS
+				
 spr_set_large: ;; set large sprites in registers
 				phay
-                LDA VDP_REGS+1
-                ORA #$02
-                STA VDP_REGS+1
-                LDY #$81            ;; register 1
-                JSR vdp_regwrite
+				LDA VDP_REGS+1
+				ORA #$02
+				STA VDP_REGS+1
+				LDY #$81			;; register 1
+				JSR vdp_regwrite
 				play
-                RTS                
+				RTS				
 
 spr_set_mag_on: 
 				phay
-                LDA VDP_REGS+1
-                ORA #$01
-                STA VDP_REGS+1
-                LDY #$81            ;; register 1
-                JSR vdp_regwrite
+				LDA VDP_REGS+1
+				ORA #$01
+				STA VDP_REGS+1
+				LDY #$81			;; register 1
+				JSR vdp_regwrite
 				play
-                RTS                
+				RTS				
 
 spr_set_mag_off:
 				phay
-                LDA VDP_REGS+1
-                AND #$FE
-                STA VDP_REGS+1
-                LDY #$81            ;; register 1
-                JSR vdp_regwrite
+				LDA VDP_REGS+1
+				AND #$FE
+				STA VDP_REGS+1
+				LDY #$81			;; register 1
+				JSR vdp_regwrite
 				play
-                RTS                
+				RTS				
 
 
 ;----------------------------------------------------------------
 ; Initialise sprites - all off
-; 	VPosY    = $D0
-; 	VPosX    = $00
+; 	VPosY	= $D0
+; 	VPosX	= $00
 ; 	Pattern  = $00
 ; 	EClk/Col = $00
 ;
 vdp_init_sprites:
 				phaxy
-                LDY ZP_VDP_SAB
-                LDA ZP_VDP_SAB+1
-                JSR vdp_set_addr_w
-                ;; 32 sprites 4 bytes each = 128
-                LDY #128
-                LDX #$D0    ;; D0 in vertical pos turns off sprite processing
-                LDA #0      ;; zero in other 3 fields
-vis_loop:       
-                JSR vdp_write
-                DEY             ;; 2 cycles = 2us at 1MHz
-                JSR vdp_write
-                DEY
-                JSR vdp_write
-                DEY
-                JSR vdp_write
-                DEY
-                BNE vis_loop
+				LDY ZP_VDP_SAB
+				LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_w
+				;; 32 sprites 4 bytes each = 128
+				LDY #128
+vis_loop:	   
+				LDA #$D0	;; D0 in vertical pos turns off sprite processing
+				JSR vdp_write
+				DEY			 ;; 2 cycles = 2us at 1MHz
+				LDA #0 		;; zero in other 3 fields
+				JSR vdp_write
+				DEY
+				JSR vdp_write
+				DEY
+				JSR vdp_write
+				DEY
+				BNE vis_loop
 				plaxy
-                RTS
+				RTS
 
 ;----------------------------------------------------------------
 ; Enable first N sprites (N in Acc)
@@ -113,14 +114,14 @@ vdp_enable_sprites:
 				LDX #0				; counter (all 32)
 				LDY ZP_VDP_SAB		; SAB lo
 ves_loop:		LDA ZP_VDP_SAB+1	; hi
-                JSR vdp_set_addr_w
+				JSR vdp_set_addr_w
 				CPX ZP_TMP0			; ZP_TMP0 has N
 				BCC @enable			; Branch if X < N
 				LDA #$D0
 				JMP @dowrite
 @enable:		LDA #0 
 @dowrite:		
-                JSR vdp_write
+				JSR vdp_write
 				INY					; move to next sprite
 				INY
 				INY
@@ -141,14 +142,14 @@ vdp_set_sprite_pos:
 				ASL
 				ASL
 				ADC ZP_VDP_SAB		; add LSB of base
-                TAY
-                LDA ZP_VDP_SAB+1
-                JSR vdp_set_addr_w
+				TAY
+				LDA ZP_VDP_SAB+1
+				JSR vdp_set_addr_w
 				NOP
 				LDA ZP_TMP2			; Y first
-                JSR vdp_write
+				JSR vdp_write
 				LDA ZP_TMP0+1		; then X
-                JSR vdp_write
+				JSR vdp_write
 				play
 				RTS
 
@@ -163,17 +164,17 @@ vdp_set_sprite_col:
 				ASL
 				ADC ZP_VDP_SAB		; add LSB of base
 				ADC #3				; 4th member
-                TAY
-                LDA ZP_VDP_SAB+1
+				TAY
+				LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
-                JSR vdp_read
+				JSR vdp_read
 				AND #$F0			; preserve the clock bit
 				ORA ZP_TMP0+1		; and write new color
 				STA ZP_TMP0+1		; save
-                LDA ZP_VDP_SAB+1
+				LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_w	; set address again - write this time
 				LDA ZP_TMP0+1		; write modified color to VRAM
-                JSR vdp_write
+				JSR vdp_write
 				play
 				RTS
 
@@ -188,17 +189,17 @@ vdp_set_sprite_early:
 				ASL
 				ADC ZP_VDP_SAB		; add LSB of base
 				ADC #3				; 4th member
-                TAY
-                LDA ZP_VDP_SAB+1
+				TAY
+				LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
-                JSR vdp_read
+				JSR vdp_read
 				AND #$0F			; preserve the colour nibble
 				ORA ZP_TMP0+1
 				STA ZP_TMP0+1		; save
-                LDA ZP_VDP_SAB+1
+				LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_w	; set address again - write this time
 				LDA ZP_TMP0+1		; write modified color to VRAM
-                JSR vdp_write
+				JSR vdp_write
 				play
 				RTS
 
@@ -214,11 +215,11 @@ vdp_set_sprite_pattern:
 				ASL
 				ADC ZP_VDP_SAB		; add LSB of base
 				ADC #2				; 3rd member
-                TAY
-                LDA ZP_VDP_SAB+1
+				TAY
+				LDA ZP_VDP_SAB+1
 				JSR vdp_set_addr_w	; set write address
 				LDA ZP_TMP0+1
-                JSR vdp_write
+				JSR vdp_write
 				play
 				RTS
 
@@ -232,7 +233,7 @@ vdp_load_sprite_data_from_mem:
 				LDA VDP_REGS+6   ;; Reg 6 has Pattern table addr
 				ASL					;; 2k boundaries (*0x800)
 				ASL					;; mult by 8 to give MSB
-                ASL
+				ASL
 				STA TMP2+1			;; put patt table addr in TMP2/TMP2+1
 				STZ TMP2			;;
 
@@ -245,11 +246,11 @@ vdp_load_sprite_data_from_mem:
 
 vssp_setvram:	LDY TMP2			;; set vram write address
 				LDA TMP2+1
-                JSR vdp_set_addr_w
+				JSR vdp_set_addr_w
 
 				LDY #0				;; copy data into vram
 @vssp_loop:		LDA (ZP_TMP0),Y
-                JSR vdp_write
+				JSR vdp_write
 				INY
 				CPY #8
 				BNE @vssp_loop
