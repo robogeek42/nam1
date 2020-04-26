@@ -50,15 +50,15 @@ page_buffer:	.res 256, 0
 
 ;================================================================
 ; VDP Set Mode - mode passed in Acc
-vdp_set_mode:   STA ZP_VDP_MODE
+vdp_set_mode:	STA ZP_VDP_MODE
 				ASL ; Multiply Acc by 8 to give offset into mode reg table
 				ASL 
 				ASL
 				STA TMP0
 				CLC 
-				ld16 ZP_TMP0, VDP_MODES  ; store address of mode table in ZP_TMP0/1
-				LDA TMP0				 ; 8 * mode #
-				ADC ZP_TMP0			  ; add 8*mode to mode base to point to this modes settings
+				ld16 ZP_TMP0, VDP_MODES ; store address of mode table in ZP_TMP0/1
+				LDA TMP0				; 8 * mode #
+				ADC ZP_TMP0				; add 8*mode to mode base to point to this modes settings
 				STA ZP_TMP0
 				LDA #0
 				ADC ZP_TMP0+1
@@ -67,8 +67,8 @@ vdp_set_mode:   STA ZP_VDP_MODE
 				LDX #$80
 				LDY #0
 vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
-				STA VDP_REGS,Y	   ; Save it in zero page
-				STA VDP_WR_REG		  ; set registers directly as subroutine uses X for reg num
+				STA VDP_REGS,Y			; Save it in zero page
+				STA VDP_WR_REG			; set registers directly as subroutine uses X for reg num
 .ifdef FASTCPU
 				NOP
 				NOP
@@ -104,12 +104,12 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				;; store the sprite table address
 				;; it will be frequently used and is slow to derive
 				;; SAB = REG5 * 0x80 (makes upper 7 bits of 14 bit address)
-				LDA VDP_REGS+5   
+				LDA VDP_REGS+5	
 				CLC				 
-				ROR A			   
+				ROR A				
 				STA ZP_VDP_SAB+1	;; put shifted right bits into hi word
 				LDA #0
-				ROR A			   ;; and lsbit into top bit of low word of address
+				ROR A				;; and lsbit into top bit of low word of address
 				STA ZP_VDP_SAB
 
 				JSR vdp_init_sprites
@@ -152,12 +152,12 @@ vdp_load_chars:
 				JSR vdp_setaddr_pattern_table_offset
 				JSR vlc_load
 
-vlc_done:	   RTS
+vlc_done:		RTS
 
-vlc_load:	   ld16 TMP0,CHAR_TAB  ;; character defs
-				LDX #04			 ;; write 4 blocks of 256
+vlc_load:		ld16 TMP0,CHAR_TAB  ;; character defs
+				LDX #04				;; write 4 blocks of 256
 				LDY #00
-lc_loop1:	   LDA (TMP0),Y
+lc_loop1:		LDA (TMP0),Y
 				JSR vdp_write
 				INY
 				BNE lc_loop1
@@ -167,9 +167,9 @@ lc_loop1:	   LDA (TMP0),Y
 
 				; Write inverse in second 128 chars
 				ld16 TMP0,CHAR_TAB  ;; character defs
-				LDX #04			 ;; write 4 blocks of 256
+				LDX #04				;; write 4 blocks of 256
 				LDY #00
-lc_loop2:	   LDA (TMP0),Y
+lc_loop2:		LDA (TMP0),Y
 				EOR #$FF
 				JSR vdp_write
 				INY
@@ -183,7 +183,7 @@ lc_loop2:	   LDA (TMP0),Y
 
 ;================================================================
 ; Load color table - only for modes 1 & 2
-;   - colour is in Accumulator
+;	- colour is in Accumulator
 vdp_load_flat_colors:
 				LDX ZP_VDP_MODE
 				CPX #1
@@ -197,12 +197,12 @@ vdp_load_flat_colors:
 ; Col encoded in a byte MSNib foreground LSNib background
 ;
 vdp_load_g1_col: 
-				PHA				 ;; color in Acc
-				LDA VDP_REGS+3   ;; Set VRAM address to VDP_REG3 * 0x40
+				PHA				;; color in Acc
+				LDA VDP_REGS+3	;; Set VRAM address to VDP_REG3 * 0x40
 				STA ZP_TMP0
 				LDX #0
 				STX ZP_TMP0+1
-lgc_loop1:	  ASL ZP_TMP0
+lgc_loop1:		ASL ZP_TMP0
 				ROL ZP_TMP0+1
 				INX
 				CPX #6
@@ -211,11 +211,11 @@ lgc_loop1:	  ASL ZP_TMP0
 				LDA ZP_TMP0+1
 				JSR vdp_set_addr_w
 
-				PLA				 ;; color
-				LDY #$00		   
-lgc_loop:	   JSR vdp_write
+				PLA					;; color
+				LDY #$00			
+lgc_loop:		JSR vdp_write
 				INY
-				CPY #$20			 ;; 32 entries
+				CPY #$20			;; 32 entries
 				BNE lgc_loop
 				RTS
 ;----------------------------------------------------------------
@@ -225,8 +225,8 @@ lgc_loop:	   JSR vdp_write
 ; 8 colors per 8 bytes (i.e per character) - sections like pattern table
 ;
 vdp_load_g2_col:
-				PHA				 ;; color in Acc
-				LDA VDP_REGS+3	  ;; Color table
+				PHA					;; color in Acc
+				LDA VDP_REGS+3		;; Color table
 				AND #$80			;; just want upper bit
 				CLC
 				ROR
@@ -286,7 +286,7 @@ vdp_clear_screen:
 cs_write_spaces:
 				LDA #$20				
 				LDY #24				 ; Screens are 24 chars high
-cs_loop_row:	LDX ZP_VDP_CHAR_WIDTH   ; and either 32 or 40 wide
+cs_loop_row:	LDX ZP_VDP_CHAR_WIDTH	; and either 32 or 40 wide
 cs_loop_col:	JSR vdp_write
 				DEX
 				BNE cs_loop_col
@@ -310,7 +310,7 @@ cs_clear_multicolor:
 				LDX #8
 				LDY #0
 				LDA #0
-cs_loop1:	   JSR vdp_write
+cs_loop1:		JSR vdp_write
 				INY
 				BNE cs_loop1
 				DEX
@@ -322,22 +322,22 @@ cs_loop1:	   JSR vdp_write
 ; Dump VRAM page 
 vdp_dump_page:
 				; read back to CPU memory
-				ld16 RES, page_buffer   ;; set read-back address
-				LDY #0				  ;; set VDP VRAM read address (and test 256 bytes)
+				ld16 RES, page_buffer	;; set read-back address
+				LDY #0					;; set VDP VRAM read address (and test 256 bytes)
 				LDA ZP_TMP0				;; page
 				JSR vdp_set_addr_r
-vt1_loop1:	  JSR vdp_read			;; read back
+vt1_loop1:	  JSR vdp_read				;; read back
 				STA (RES),Y
 				INY
 				BNE vt1_loop1
 
 				; print out the page
-				LDX #$10			;; 16*16 bytes
+				LDX #$10				;; 16*16 bytes
 				LDA ZP_TMP0 
 				STA R1+1
 				LDA #0
 				STA R1
-vt1_loop2:	  JSR print_memory16  ;; print 16 bytes from (RES) and inc RES by 16
+vt1_loop2:	  JSR print_memory16		;; print 16 bytes from (RES) and inc RES by 16
 				CLC
 				LDA #16
 				ADC R1
@@ -352,12 +352,12 @@ vt1_loop2:	  JSR print_memory16  ;; print 16 bytes from (RES) and inc RES by 16
 ; Setup a VDP write to ZP_VDP_CURS (2byte) position
 vdp_start_str_w:
 				phay
-				LDA VDP_REGS+2   ;; Load Name tab from Reg2
-				ASL				 ;; NameTab Addr = reg2 * 0x400
+				LDA VDP_REGS+2		;; Load Name tab from Reg2
+				ASL					;; NameTab Addr = reg2 * 0x400
 				ASL
 				CLC
-				ADC ZP_VDP_CURS+1   ;; add curs hi byte to screen hi (res in A)
-				LDY ZP_VDP_CURS	 ;; add curs lo byte to screen lo (0)
+				ADC ZP_VDP_CURS+1	;; add curs hi byte to screen hi (res in A)
+				LDY ZP_VDP_CURS		;; add curs lo byte to screen lo (0)
 				JSR vdp_set_addr_w  
 				play
 				RTS
@@ -366,13 +366,13 @@ vdp_start_str_w:
 ; Set screen position.
 ; Start VDP write at given location and set cursor vars.
 ; A - xpos, Y - ypos, dont touch X
-vdp_set_pos:	STA ZP_VDP_XPOS	 ; X
-				STA ZP_VDP_CURS	 ; start abs curs position with X
-				STY ZP_VDP_YPOS	 ; Y
+vdp_set_pos:	STA ZP_VDP_XPOS		; X
+				STA ZP_VDP_CURS		; start abs curs position with X
+				STY ZP_VDP_YPOS		; Y
 				STZ ZP_VDP_CURS+1
-				CPY #0			  ; if Y was 0 then we already have position
+				CPY #0				; if Y was 0 then we already have position
 				BEQ vsp_done
-vsp_loop:		CLC				 ; otherwise add screen width * Y
+vsp_loop:		CLC					; otherwise add screen width * Y
 				LDA ZP_VDP_CURS
 				ADC ZP_VDP_CHAR_WIDTH
 				STA ZP_VDP_CURS
@@ -392,7 +392,7 @@ vsp_done:
 ; The screen position is handled internaly - not suitable for BASIC inteface
 vdp_write_text: 
 				JSR vdp_start_str_w
-				LDY #0			  ;; max 255 chars, in case not zero term
+				LDY #0				;; max 255 chars, in case not zero term
 vps_next_char:  
 				LDA (R0),Y
 				BEQ vps_done		;; found zero in string
@@ -402,9 +402,9 @@ vps_next_char:
 				BEQ vps_cr
 				STA VDP_WR_VRAM		;; otherwise write the char
 				JSR vdp_inc_pos
-vps_get_next:   INY
+vps_get_next:	INY
 				BNE vps_next_char
-vps_done:	   RTS
+vps_done:		RTS
 
 vps_lf:		 ;; move down a line
 				JSR vdp_move_line_down
@@ -418,14 +418,14 @@ vps_cr:		 ;; return to start of current line
 
 ;---------------------------------------------
 ; Screen movement - handle vars for cursor pos
-;   ZP_VDP_CURS - incremental char position 
-;   ZP_VDP_XPOS - XPosition
-;   ZP_VDP_YPOS - YPosition
+;	ZP_VDP_CURS - incremental char position 
+;	ZP_VDP_XPOS - XPosition
+;	ZP_VDP_YPOS - YPosition
 ; depends on
-;   ZP_VDP_CHAR_WIDTH - 32 or 40
+;	ZP_VDP_CHAR_WIDTH - 32 or 40
 ;
 ; increment screen position (preserve A)
-;   wraps line
+;	wraps line
 vdp_inc_pos:	PHA
 				;; screen pos (name 0-32*24 or 0-40*24 for mode 0)
 				INC ZP_VDP_CURS
@@ -521,25 +521,25 @@ vdp_move_back_char:
 ; printing of graphics characters?
 ;
 vdp_write_char:
-				CMP #$0A			;; Line feed
+				CMP #$0A				;; Line feed
 				BNE @check_cr
 				JSR vdp_clear_cursor
 				JSR vdp_move_line_down
 				JSR vdp_cursor_off
 				RTS
-@check_cr:	  CMP #$0D			;; Carriage return
+@check_cr:		CMP #$0D				;; Carriage return
 				BNE @check_bksp
 				JSR vdp_clear_cursor
 				JSR vdp_move_to_start_line
 				JSR vdp_cursor_off
 				RTS
-@check_bksp:	CMP #$08			;; Backspace
+@check_bksp:	CMP #$08				;; Backspace
 				BNE vwc_write_char
 vdp_backspace:  
 				JSR vdp_clear_cursor
 				JSR vdp_move_back_char ;; move back
 				JSR vdp_start_str_w
-				LDA #$20			;; and write a space
+				LDA #$20				;; and write a space
 				STA VDP_WR_VRAM
 				JSR vdp_draw_cursor
 				RTS
@@ -591,7 +591,7 @@ vdp_cursor_off:
 ;  		256+256+256+192-40
 vdp_scroll_up_line:
 				phay
-				LDA VDP_REGS+2   ;; hi address of name table (VDP_REG2 * 0x400)
+				LDA VDP_REGS+2		;; hi address of name table (VDP_REG2 * 0x400)
 				ASL
 				ASL
 				STA ZP_TMP2+1		;; store in DestAddr (hi)
@@ -649,7 +649,7 @@ vdp_load_number_name_table:
 				STA TMP0			
 				LDY #3
 				LDX #00
-gt1_loop:	   JSR vdp_write
+gt1_loop:		JSR vdp_write
 				INC TMP0
 				LDA TMP0
 				INX
@@ -671,8 +671,8 @@ gt1_loop2:	  JSR vdp_write
 				LDA TMP0
 				DEX
 				BNE gt1_loop2
-			   
-gt1_done:	   RTS
+				
+gt1_done:		RTS
 
 ; Multicolor mode setup (clear)
 ; Fill name table with a standard pattern 
@@ -691,14 +691,14 @@ gt1_done:	   RTS
 ; This allows pixels to be set to any color by
 ; loading pixels according to this pattern 
 ;
-;	  Columns	0,1  2,3  4,5   6,7   8,9 .... 62,63
-; Row 0 is bytes   0,   8,   10,   18,   20 ....  F8
-; Row 1 is bytes   1,   9,   11,   19,   21 ....  F9
-; Row 2 is bytes   2,   A,   12,   1A,   22 ....  FA
+;	  Columns	0,1  2,3  4,5	6,7	8,9 .... 62,63
+; Row 0 is bytes	0,	8,	10,	18,	20 ....  F8
+; Row 1 is bytes	1,	9,	11,	19,	21 ....  F9
+; Row 2 is bytes	2,	A,	12,	1A,	22 ....  FA
 ; Row ......
-; Row 7 is bytes   7,   F,   17,   1F,   27 ....  FF
+; Row 7 is bytes	7,	F,	17,	1F,	27 ....  FF
 ; Row 8 (add 255) 100, 108 ....
-; Row 9		   101, 109 ....
+; Row 9			101, 109 ....
 ; ...
 ; Row 47 ...	  507, 50F				  .... 5FF
 ;
@@ -706,9 +706,9 @@ gt1_done:	   RTS
 ;
 ; X,Y = (Y/8)*$100+(Y%8)+((X/2)*8)  
 ;
-;	   Hi Byte = Y>>3
-;	   Lo Byte = (Y & 7) + ((X>>1)<<3)
-;	   (X is odd - lower nibble, X is even - upper nibble)
+;		Hi Byte = Y>>3
+;		Lo Byte = (Y & 7) + ((X>>1)<<3)
+;		(X is odd - lower nibble, X is even - upper nibble)
 ;
 vdp_load_mc_standard_name_table:
 				; get name table
@@ -746,29 +746,29 @@ vlsnt_loop1:	JSR vdp_write
 
 ;================================================================
 ; Copy/Blit NN bytes from address SSSS to address DDDD
-;   SSSS in ZP_TMP0/1 DDDD in ZP_TMP2/3 NN in TMP2
+;	SSSS in ZP_TMP0/1 DDDD in ZP_TMP2/3 NN in TMP2
 ;
 vdp_copy:		
 				; read to CPU memory
-				ld16 RES, page_buffer   ;; set CPU address
-				LDY ZP_TMP0			 ;; set VDP VRAM read address
-				LDA ZP_TMP0+1		   ;; in ZP_TMP0/1
+				ld16 RES, page_buffer	;; set CPU address
+				LDY ZP_TMP0				;; set VDP VRAM read address
+				LDA ZP_TMP0+1			;; in ZP_TMP0/1
 				JSR vdp_set_addr_r
 				LDY #0
-@loop1:		 JSR vdp_read			;; read from VDP
-				STA (RES),Y			 ;; save in CPU
+@loop1:			JSR vdp_read			;; read from VDP
+				STA (RES),Y				;; save in CPU
 				INY
 				CPY TMP2				;; number of bytes (0=256)
 				BNE @loop1
 
 				; write back 
-				ld16 RES, page_buffer   ;; set CPU read address
-				LDY ZP_TMP2			 ;; set VDP VRAM write address
-				LDA ZP_TMP2+1		   ;; in ZP_TMP2/3
+				ld16 RES, page_buffer	;; set CPU read address
+				LDY ZP_TMP2				;; set VDP VRAM write address
+				LDA ZP_TMP2+1			;; in ZP_TMP2/3
 				JSR vdp_set_addr_w
 				LDY #0
-@loop2:		 LDA (RES),Y			 ;; read from CPU
-				JSR vdp_write		   ;; write to VDP
+@loop2:		 LDA (RES),Y				;; read from CPU
+				JSR vdp_write			;; write to VDP
 				INY
 				CPY TMP2				;; number of bytes (0=256)
 				BNE @loop2
@@ -813,24 +813,24 @@ vdp_cc_off:
 
 vdp_cc_read:
 				phay
-				LDA VDP_REGS+2	  ;; Load Name tab from Reg2
-				ASL				 ;; NameTab Addr = reg2 * 0x400
+				LDA VDP_REGS+2		;; Load Name tab from Reg2
+				ASL					;; NameTab Addr = reg2 * 0x400
 				ASL
 				CLC
-				ADC ZP_COPY_CURS+1   ;; add curs hi byte to screen hi (res in A)
-				LDY ZP_COPY_CURS	 ;; add curs lo byte to screen lo (0)
+				ADC ZP_COPY_CURS+1	;; add curs hi byte to screen hi (res in A)
+				LDY ZP_COPY_CURS	;; add curs lo byte to screen lo (0)
 				JSR vdp_set_addr_r
 				play
 				JSR vdp_read
 				RTS
 vdp_cc_write:
 				phay
-				LDA VDP_REGS+2	  ;; Load Name tab from Reg2
-				ASL				 ;; NameTab Addr = reg2 * 0x400
+				LDA VDP_REGS+2		;; Load Name tab from Reg2
+				ASL					;; NameTab Addr = reg2 * 0x400
 				ASL
 				CLC
-				ADC ZP_COPY_CURS+1   ;; add curs hi byte to screen hi (res in A)
-				LDY ZP_COPY_CURS	 ;; add curs lo byte to screen lo (0)
+				ADC ZP_COPY_CURS+1	;; add curs hi byte to screen hi (res in A)
+				LDY ZP_COPY_CURS	;; add curs lo byte to screen lo (0)
 				JSR vdp_set_addr_w  
 				play
 				JSR vdp_write
