@@ -357,10 +357,11 @@ TK_PACMAN		= TK_PONG+1		; PACMAN token
 TK_LOADBIN		= TK_PACMAN+1	; Binary load
 TK_PLAY		= TK_LOADBIN+1	; Play sound file
 TK_DELAY		= TK_PLAY+1		; Delay N ms
+TK_CURS		= TK_DELAY+1	; Move Text Cursor
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB		= TK_DELAY+1	; TAB token
+TK_TAB		= TK_CURS+1		; TAB token
 TK_ELSE		= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -8080,23 +8081,72 @@ SPR_POS
 	JSR	vdp_set_sprite_pos
 	RTS
 
-; Sleep N milliseconds (max .255 seconds)
+; Sleep N milliseconds
 LAB_DELAY
-	JSR	LAB_GTBY		; get byte parameter
-	STX	ZP_TMP0		; Number of ms
-dlyl2:
-	LDY	#0
-	; need 9.5 cycles in inner loop for 1ms @2.45 MHz
+	JSR	LAB_EVNM		; evaluate expression and check is numeric, else do type mismatch
+	JSR	LAB_F2FX		; save integer part of FAC1 in temporary integer Itempl/h
+	LDA	Itempl
+	STA	ZP_TMP0
+	LDA	Itemph
+	STA	ZP_TMP0+1
+;debug
+;ld16 R0,buffer
+;lda ZP_TMP0+1
+;jsr fmt_hex_string
+;lda #' '
+;sta buffer+2
+;ld16 R0,buffer+3
+;lda ZP_TMP0
+;jsr fmt_hex_string
+;ld16 R0,buffer
+;jsr acia_puts
+;RTS
+;enddebug
+
+	; low byte number of ms first
+	LDX	ZP_TMP0
 dlyl1:
-	DEY		; 2 cycles
-;	NOP		; 2 cycles
-	NOP		; 2 cycles
-	NOP		; 2 cycles
-	BNE	dlyl1	; 2 cycles
+	LDY	#0
+	JSR	dly_inner
+	DEX
+	BNE	dlyl1
+
+	; now high byte
+	LDA	ZP_TMP0+1
+	BEQ   dly_done
+dlyl4:
+	LDX	#0
+dlyl2:
+	LDY	#230		; tuning for longer delays
+	JSR	dly_inner
 	DEX
 	BNE	dlyl2
+
+	DEC	ZP_TMP0+1
+	BNE	dlyl4
+dly_done:
 	RTS
 
+; 1ms loop
+; need 9.5 cycles in inner loop for 1ms @2.45 MHz
+dly_inner:
+	NOP			; 2 cycles
+	NOP			; 2 cycles
+	DEY			; 2 cycles
+	BNE	dly_inner	; 2 cycles
+	RTS
+
+; CURS X,Y
+; Move cursor position to X,Y 
+; - use vdp_set_pos A=xpos Y=ypos
+LAB_CURS
+	JSR  LAB_GADB		; get 2 integers seperated by comma
+					; 1st integer (S) in Itempl/h, 2nd in X
+	TXA
+	TAY
+	LDA  Itempl
+	JSR  vdp_set_pos
+	RTS
 
 .export SEND_CMD
 ;----------------------------------------------------------
@@ -8951,7 +9001,8 @@ LAB_CTBL
 	.word	LAB_PACMAN-1	; PACMAN		Built-in Game
 	.word	LAB_LOADBIN-1	; LOADBIN  		SD file command
 	.word	LAB_PLAY-1		; PLAY 		sound command
-	.word	LAB_DELAY-1		; DELAY
+	.word	LAB_DELAY-1		; DELAY ms
+	.word	LAB_CURS-1		; move CURSor position
 
 ; function pre process routine table
 
@@ -9210,6 +9261,8 @@ LBB_CONT
 	.byte	"ONT",TK_CONT	; CONT
 LBB_COS
 	.byte	"OS(",TK_COS	; COS(
+LBB_CURS
+	.byte	"URS",TK_CURS	; CURS
 	.byte	$00
 TAB_ASCD
 LBB_DATA
@@ -9570,6 +9623,8 @@ LAB_KEYT
 	.word	LBB_PLAY		; PLAY
 	.byte	5,'D'
 	.word	LBB_DELAY		; DELAY
+	.byte	4,'C'
+	.word	LBB_CURS		; CURS
 
 ; secondary commands (can't start a statement)
 

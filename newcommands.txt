@@ -19,6 +19,15 @@ COL <FG>,<BG>
 PRINT SSTATUS
 	reads VDP status register (for sprite info: collison, 5th sprite)
 
+CURS <X>,<Y>
+	move the text cursor to screen position X,Y
+
+General Commands
+----------------
+
+DELAY <T>
+	sleep (busy) for T ms
+
 SD card FAT16 access
 --------------------
 The FAT16 file structure is flat and does not have subdirectories
