@@ -394,8 +394,6 @@ gl_update_score:
 gl_update_pm:
 			JSR pm_update_pm_sprite
 
-			;JSR pm_update_debug_square
-
             LDA #1
             STA PM_UPDATE_FLAG   ; tell update routine to update sprites
 
@@ -1000,35 +998,6 @@ pm_update_pm_sprite:
             LDA PM_SPR_INDEX,Y
             ; store in pattern
             STA PM_ST_SPR1_P
-			RTS
-
-;------------------------------------------------------------------
-; update the white Debug square (in sprite 2)
-pm_update_debug_square:
-			; debug square sprite
-			; calculate X/Y from the memory position in PM_NT_HI/LO
-			LDA PM_NT_HI
-			STA R3+2
-			LDA PM_NT_LO
-			STA R3
-			AND #$1F        ; remainder after divide by 32
-			ASL
-			ASL
-			ASL             ; * 8 to give X
-			STA PM_ST_SPR2_X
-			
-			CLC
-			LDA R3
-			AND #$E0
-			STA R3
-
-			ROR R3+2    ; /2
-			ROR R3
-			CLC
-			ROR R3+2    ; /4
-			ROR R3
-			LDA R3
-			STA PM_ST_SPR2_Y
 			RTS
 
 quit_message:
