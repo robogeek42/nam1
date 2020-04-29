@@ -1,5 +1,7 @@
 .setcpu "65C02"
 
+.export main
+
 .include "macros.inc65"
 .include "zeropage.inc65"
 .include "acia.inc65"

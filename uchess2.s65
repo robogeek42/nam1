@@ -23,6 +23,8 @@
 
 .export uchess2
 
+.import main
+
 ; 6551 I/O Port Addresses
 ;
 ACIADat	= 	$7F00
@@ -137,7 +139,7 @@ NOGO		CMP	#$0D	    ; [Enter]
 NOMV		CMP     #$41		; [Q] ***Added to allow game exit***
 		BEQ     DONE		; quit the game, exit back to system.  
 		JMP	INPUT		; process move
-DONE		JMP     $FF00		; *** MUST set this to YOUR OS starting address
+DONE		JMP     main		; *** MUST set this to YOUR OS starting address
 ;		
 ;       THE ROUTINE JANUS DIRECTS THE
 ;       ANALYSIS BY DETERMINING WHAT
