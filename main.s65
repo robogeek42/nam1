@@ -38,7 +38,8 @@
 ;-----------------------------------------------------
                 BUFFER_LENGTH = 60
 buffer:         .res BUFFER_LENGTH+1, 0
-
+basicvars:      .res 1,0
+                PAGECNT = basicvars+0
 .code
 
 RES_vec:
