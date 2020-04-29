@@ -83,7 +83,7 @@ temp    =       $FC
 uchess2:
 		LDA     #$00		; REVERSE TOGGLE
 		STA     REV
-		JSR     Init_6551
+		;JSR     Init_6551
 CHESS   CLD             ; INITIALIZE
 		LDX	#$FF		; TWO STACKS
 		TXS	
