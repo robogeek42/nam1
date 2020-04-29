@@ -8148,26 +8148,25 @@ LAB_CURS
 	JSR  vdp_set_pos
 	RTS
 
-.export SEND_CMD
 ;----------------------------------------------------------
 ; Send a command as though it was typed
-; R4 (word) contains address of 0 term string
-; R3,R3+1 are used
+; ZP_TMP2 (word) contains address of 0 term string
+; ZP_TMP0,ZP_TMP0+1 are used
 
 send_cmd_list: .byte $0d,$0a,"LIST",$0d,$0a,$0d,$0a, $00
 
 SEND_CMD:
 	phx
 	phy
-	LDY R3				; saved index into string
-	LDA (R4),Y
-	STA R3+1			; Save char so we can set flags correctly later
+	LDY ZP_TMP0			; saved index into string
+	LDA (ZP_TMP2),Y
+	STA ZP_TMP0+1		; Save char so we can set flags correctly later
 	BEQ sdcmd_end
-	INC R3				; inc index for next time
+	INC ZP_TMP0			; inc index for next time
 	BEQ sdcmd_end		; max line length 256
 	ply
 	plx
-	LDA R3+1			; set flags correctly
+	LDA ZP_TMP0+1			; set flags correctly
 	SEC                 ; flag we have char
 	RTS
 sdcmd_end:
@@ -8175,11 +8174,11 @@ sdcmd_end:
 	STA VEC_IN
 	LDA #>CHARin
 	STA VEC_IN+1
-	STZ ccflag			; reenable ctrl-c
+	STZ ccflag		; reenable ctrl-c
 	ply
 	plx
-	LDA R3+1			; set flags correctly
-	CLC                 ; flag - no char
+	LDA ZP_TMP0+1	; set flags correctly
+	CLC			; flag - no char
 	RTS
 
 ;-----------------------------------------------------------------
@@ -8236,8 +8235,8 @@ LAB_SAVE
 	STA OUT_LIST_SD		; flag LIST to output to SD card
 
 	; Send a LIST command
-	STZ R3				; string index
-	ld16 R4, send_cmd_list
+	STZ ZP_TMP0				; string index
+	ld16 ZP_TMP2, send_cmd_list
 	; Set input vector to SEND_CMD
 	LDA #<SEND_CMD
 	STA VEC_IN
@@ -8295,11 +8294,11 @@ SDREAD:
 	phx
 	phy
 	JSR fs_get_next_byte
-	STA R3+1			; save so we load with correct flags later
+	STA ZP_TMP0+1			; save so we load with correct flags later
 	BCS load_eof		; C=1 means EOF reached
 	ply
 	plx
-	LDA R3+1			; set flags correctly
+	LDA ZP_TMP0+1			; set flags correctly
 	SEC                 ; flag we have char
 	RTS
 
@@ -8535,8 +8534,8 @@ LAB_SAVE
 	STA OUT_LIST_SD		; flag LIST to output to SD card
 
 	; Send a LIST command
-	STZ R3				; string index
-	ld16 R4, send_cmd_list
+	STZ ZP_TMP0				; string index
+	ld16 ZP_TMP2, send_cmd_list
 	; Set input vector to SEND_CMD
 	LDA #<SEND_CMD
 	STA VEC_IN
@@ -8555,11 +8554,11 @@ LAB_LOAD
 	ld16 R0,MSG_SDLD
 	jsr acia_puts
 
-	STZ R3				; string index
+	STZ ZP_TMP0				; string index
 	LDA #1
 	STA ccflag			; disable Ctrl-C
 	;---- purely for debug pretend to LOAD from SD
-	ld16 R4, load_cmd_example1
+	ld16 ZP_TMP2, load_cmd_example1
 	; Set input vector to SEND_CMD
 	LDA #<SEND_CMD
 	STA VEC_IN

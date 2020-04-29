@@ -1,3 +1,4 @@
+; vim: ts=4
 .setcpu "65C02"
 
 .include "zeropage.inc65"
@@ -44,17 +45,17 @@ CNVBIT:
 ;-----------------------------------------------------------------------
 ; Assif - a 16 bit version of above
 ; Input in R1,R1+1 
-; Output to R2,R2+1,R2+2 (R2&R3)
+; Output to TMP0,TMP0+1,TMP0+2 (TMP1+0)
 ; 2^16-1 = 65535 in BCD this needs 3 bytes (5 nibbles)
 BINBCD16:
 		PHX
         PHY
 		SED			; Switch to decimal mode
 		LDA #0		; Ensure the result is clear
-		STA R2+0
-		STA R2+1
-		STA R2+2
-		STA R2+3
+		STA TMP0+0
+		STA TMP0+1
+		STA TMP0+2
+		STA TMP0+3
         LDY #1      ; number of bytes in word
 BB16_BYTELOOP:
         LDX #8		; The number of source bits in byte
@@ -62,18 +63,18 @@ BB16_BYTELOOP:
         STA BCD_IN
 BB16_BITLOOP:
 		ASL BCD_IN	; Shift out one bit
-		LDA R2+0	; And add into result
-		ADC R2+0
-		STA R2+0
-		LDA R2+1	; propagating any carry
-		ADC R2+1
-		STA R2+1
-        LDA R2+2	; propagating any carry to third byte
-		ADC R2+2
-		STA R2+2
-        ;LDA R2+3	; and to fourth byte
-		;ADC R2+3
-		;STA R2+3
+		LDA TMP0+0	; And add into result
+		ADC TMP0+0
+		STA TMP0+0
+		LDA TMP0+1	; propagating any carry
+		ADC TMP0+1
+		STA TMP0+1
+        LDA TMP0+2	; propagating any carry to third byte
+		ADC TMP0+2
+		STA TMP0+2
+        ;LDA TMP0+3	; and to fourth byte
+		;ADC TMP0+3
+		;STA TMP0+3
 		DEX		    ; And repeat for next bit
 		BNE BB16_BITLOOP
         DEY
@@ -149,7 +150,7 @@ b2s_do_write_digit:
 
 ;-----------------------------------------------------------------------
 ; Assif:
-; Convert the BCD value in R2,R2+1,R2+3 to string pointed to by R0
+; Convert the BCD value in TMP0,TMP0+1,TMP0+3 to string pointed to by R0
 ; ASCII 0 = $30 , no leading zeros
 BCD4BYTE2STR:
         pha
@@ -157,15 +158,15 @@ BCD4BYTE2STR:
         phy
 		LDY #0 					; point to pos in string
 
-		LDX R2+2				; MMSB
+		LDX TMP0+2				; MMSB
 		CPX #0
         BNE b4s_do_mmsb			; not zero, so convert all 3 bytes
 
-		LDX R2+1				; MSB
+		LDX TMP0+1				; MSB
 		CPX #0
         BNE b4s_do_msb			; not zero, so convert MSB down
 
-		LDX R2					; LSB
+		LDX TMP0					; LSB
 		CPX #0
 		BNE b4s_do_lsb			; MSB is zero, only need to convert LSB
 
@@ -177,10 +178,10 @@ BCD4BYTE2STR:
 b4s_do_mmsb:
 		JSR b2s_read_byte		; MSB
 b4s_do_msb:
-        LDX R2+1
+        LDX TMP0+1
 		JSR b2s_read_byte		; MSB
 b4s_do_lsb:
-		LDX R2
+		LDX TMP0
 		JSR b2s_read_byte		; LSB
 
         JMP b2s_write_term_null

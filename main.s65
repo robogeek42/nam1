@@ -484,7 +484,7 @@ cmd_test_bcd16:
                 ld16 R0, buffer + 5
                 JSR scan_hex               ; scan 2 character hex value into Acc
                 STA R1
-                JSR BINBCD16               ; convert to BCD and write in RES,RES+1
+		JSR BINBCD16               ; convert to BCD and write in TMP0,TMP0+1,TMP1 (3bytes)
                 ld16 R0, buffer            ; output buffer
                 JSR BCD4BYTE2STR            ; convert BCD to string
                 JSR acia_puts              ; print it

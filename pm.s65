@@ -964,20 +964,6 @@ pm_draw_score:
             JSR vdp_write_text  
             RTS
             
-pm_print_debug:
-            ld16 R0,PM_STR_BUFFER
-            LDA R4+1
-            JSR fmt_hex_string
-            add8To16 #2, R0
-            LDA R4
-            JSR fmt_hex_string
-            ld16 R0,PM_STR_BUFFER
-            LDA #27             ; X
-            LDY #13             ; Y
-            JSR vdp_set_pos
-            JSR vdp_write_text  
-            RTS
-
 ;------------------------------------------------------------------
 ; update the PM sprite animation
 pm_update_pm_sprite:

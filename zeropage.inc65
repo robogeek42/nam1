@@ -1,26 +1,31 @@
 ; Zeropage variables
-RES      = $20
-R0       = $22
-R1       = $24
-TMP0     = $26
-TMP1     = $28
-TMP2     = $2A
-MACROTMP = $2C
-BCD_IN   = $2C ; overloaded for BCD conv
+RES      = $20	; 2 bytes
+R0       = $22	; 2 bytes
+R1       = $24	; 2 bytes
+R2       = $26 	; 2 bytes
 
-ZP_CURSOR   = $2D    ; Cursor char to print 0=cursor off
+TMP0     = $28	; 2 bytes
+TMP1     = $2A	; 2 bytes
+TMP2     = $2C	; 2 bytes
+BCD_IN   = $2E 	; 1 byte
+ZP_COPY_CURS = $2E ; overloaded for Copy Cursor
+
+ZP_CURSOR   = $2F    ; Cursor char to print 0=cursor off
 
 ; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
-ZP_TMP0     = $2E
-ZP_TMP2     = $30
+ZP_TMP0     = $30	; 2 bytes
+ZP_TMP2     = $32	; 2 bytes
 
-R2          = $32        ; 2byte temp
-R3          = $34        ; 2byte temp
-R4          = $36        ; 2byte temp
-; used by basic LOAD/SAVE, PM and decomp
-; share with COPY CURSOR POS
-ZP_COPY_CURS= $36
-
+;-----------------------------------------------------------
+; For keyboard scan routine
+; 4 bytes
+; ASCII char of character pressed
+KBD_CHAR       = $34
+KBD_CHAR_LAST  = $35
+; Flags of Shift/Ctrl etc. as a bit-mask
+KBD_FLAGS      = $36
+; Other keys (Function, Return, Del, Cursor) as a bit-mask
+KBD_SPECIAL    = $37
 ;-----------------------------------------------------------
 ; VDP - 16 bytes
 ZP_VDP_MODE = $38
@@ -58,17 +63,6 @@ sd_sect        = $E2        ; 4 SD Card sector address
 sd_addr        = $E6        ; 4 SD Card byte address
 ;-----------------------------------------------------------
 
-;-----------------------------------------------------------
-; For keyboard scan routine
-; 8 bytes
-; ASCII char of character pressed
-KBD_CHAR       = $EA
-KBD_CHAR_LAST  = $ED
-; Flags of Shift/Ctrl etc. as a bit-mask
-KBD_FLAGS      = $EB
-; Other keys (Function, Return, Del, Cursor) as a bit-mask
-KBD_SPECIAL    = $EC
-;-----------------------------------------------------------
 
 
 
