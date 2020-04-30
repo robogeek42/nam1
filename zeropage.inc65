@@ -8,32 +8,32 @@ TMP0     = $28	; 2 bytes
 TMP1     = $2A	; 2 bytes
 TMP2     = $2C	; 2 bytes
 BCD_IN   = $2E 	; 1 byte
-ZP_COPY_CURS = $2E ; overloaded for Copy Cursor
+ZP_COPY_CURS = $2F ; 2 bytes
 
-ZP_CURSOR   = $2F    ; Cursor char to print 0=cursor off
+ZP_CURSOR   = $31    ; Cursor char to print 0=cursor off
 
 ; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
-ZP_TMP0     = $30	; 2 bytes
-ZP_TMP2     = $32	; 2 bytes
+ZP_TMP0     = $32	; 2 bytes
+ZP_TMP2     = $34	; 2 bytes
 
 ;-----------------------------------------------------------
 ; For keyboard scan routine
 ; 4 bytes
 ; ASCII char of character pressed
-KBD_CHAR       = $34
-KBD_CHAR_LAST  = $35
+KBD_CHAR       = $36
+KBD_CHAR_LAST  = $37
 ; Flags of Shift/Ctrl etc. as a bit-mask
-KBD_FLAGS      = $36
+KBD_FLAGS      = $38
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
-KBD_SPECIAL    = $37
+KBD_SPECIAL    = $39
 
-KBD_ROW     = $38
-KBD_COL     = $39
+KBD_ROW     = $3A
+KBD_COL     = $3B
 
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0
 ;
-OUT_LIST_SD = $3A
+OUT_LIST_SD = $3C
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver
