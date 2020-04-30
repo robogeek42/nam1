@@ -133,8 +133,8 @@ pong:
 
 ; set sprite pattern, position, colour and early bit
 		LDX #0					; X is sprite number (S)
-		LDY ZP_VDP_SAB			; set address of Sprite Attribute table
-		LDA ZP_VDP_SAB+1
+		LDY VDP_SAB			; set address of Sprite Attribute table
+		LDA VDP_SAB+1
 		JSR vdp_set_addr_w
 		LDY #0					; most fields are initially 0
 		LDA #$0F				; Colour white / no early bit set
@@ -267,13 +267,13 @@ pih_enable_vdp_irq:
         CLI
 
         LDA #LINE_HI
-        STA ZP_VDP_CURS+1
+        STA VDP_CURS+1
         LDA #LINE9_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         ld16 R0, msg_instructions
         JSR vdp_write_text
         LDA #LINE13_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         ld16 R0, msg_press_s
         JSR vdp_write_text
 
@@ -437,16 +437,16 @@ pp_draw_central_line:
 pp_clear_message:
         ; clear approx middle of screen 11*32+16-7=361=$0169
         LDA #LINE_HI
-        STA ZP_VDP_CURS+1
+        STA VDP_CURS+1
         LDA #LINE9_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         ld16 R0, msg_clear
         JSR vdp_write_text
         LDA #LINE11_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         JSR vdp_write_text
         LDA #LINE13_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         JSR vdp_write_text
         JSR pp_draw_central_line
         RTS
@@ -770,11 +770,11 @@ draw_ball:
 ;---------------------------------------
 ; Disable ball sprite
 disable_ball:
-		LDA ZP_VDP_SAB			; set address of Sprite Attribute table
+		LDA VDP_SAB			; set address of Sprite Attribute table
 		CLC
 		ADC #16
 		TAY
-		LDA ZP_VDP_SAB+1
+		LDA VDP_SAB+1
 		JSR vdp_set_addr_w
 		LDA #$D0
         JSR vdp_write
@@ -788,10 +788,10 @@ draw_score:
 		LDA pp_scorel
 		CMP #100				; check if triple digit
 		BCS ds_over				; X >= 100
-		INC ZP_VDP_CURS			; move right
+		INC VDP_CURS			; move right
 		CMP #10					; check if double digits
 		BCS ds_over				; X >= 10, X < 100
-		INC ZP_VDP_CURS			; move right
+		INC VDP_CURS			; move right
 ds_over:
 		LDA pp_scorel			; Left score
 		JSR ds_conv_decimal		; convert to decimal string in R0
@@ -814,14 +814,14 @@ ds_conv_decimal:
 		
 ds_set_cursor_position:
 		; A has x position, y pos is 2
-		; Set cursor position in ZP_VDP_CURS
+		; Set cursor position in VDP_CURS
 		CLC
 		ADC #64					; set Y=2 on a graphics screen
-		STA ZP_VDP_CURS
-		STZ ZP_VDP_CURS+1
-		STA ZP_VDP_XPOS
+		STA VDP_CURS
+		STZ VDP_CURS+1
+		STA VDP_XPOS
 		LDA #2
-		STA ZP_VDP_YPOS
+		STA VDP_YPOS
 		RTS
 
 msg_press_space:
@@ -835,9 +835,9 @@ msg_clear:
     .byte "                                ",$00
 pp_pause_game:
         LDA #LINE_HI
-        STA ZP_VDP_CURS+1
+        STA VDP_CURS+1
         LDA #LINE11_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         ld16 R0, msg_press_space
         JSR vdp_write_text
         LDA #$02                ; put game into pause state
@@ -910,9 +910,9 @@ cg_write_win_message:
 		STA pp_game
 
         LDA #LINE_HI
-        STA ZP_VDP_CURS+1
+        STA VDP_CURS+1
         LDA #LINE11_LO
-        STA ZP_VDP_CURS
+        STA VDP_CURS
         JSR vdp_write_text
        
 		RTS

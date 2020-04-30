@@ -1,13 +1,13 @@
 ;-----------------------------------------------------------
 ; VDP - 9 bytes
-ZP_VDP_MODE = VDP_VARS+0
-ZP_VDP_CHAR_WIDTH = VDP_VARS+1
-ZP_VDP_SAB  = VDP_VARS+2 ;; Sprite Attribute table Base addr (2 bytes)
+VDP_MODE = VDP_VARS+0
+VDP_CHAR_WIDTH = VDP_VARS+1
+VDP_SAB  = VDP_VARS+2 ;; Sprite Attribute table Base addr (2 bytes)
 
 ; 2 bytes for cursor position (in terms of name table)
-ZP_VDP_CURS = VDP_VARS+4  ; 2 bytes
-ZP_VDP_XPOS = VDP_VARS+6
-ZP_VDP_YPOS = VDP_VARS+7
+VDP_CURS = VDP_VARS+4  ; 2 bytes
+VDP_XPOS = VDP_VARS+6
+VDP_YPOS = VDP_VARS+7
 
 VDP_STATUS  = VDP_VARS+8
 

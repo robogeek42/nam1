@@ -928,8 +928,8 @@ pm_do_draw:
             ASL
             TAX                         ; X has size of table
 
-            LDY ZP_VDP_SAB              ; set vdp up to write to Sprite Attrib Base
-            LDA ZP_VDP_SAB+1
+            LDY VDP_SAB              ; set vdp up to write to Sprite Attrib Base
+            LDA VDP_SAB+1
             JSR vdp_set_addr_w
             LDY #0                      ; index into table
 pds_loop1:

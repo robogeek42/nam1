@@ -83,8 +83,8 @@ spr_set_mag_off:
 ;
 vdp_init_sprites:
 				phaxy
-				LDY ZP_VDP_SAB
-				LDA ZP_VDP_SAB+1
+				LDY VDP_SAB
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_w
 				;; 32 sprites 4 bytes each = 128
 				LDY #128
@@ -112,8 +112,8 @@ vis_loop:
 vdp_enable_sprites:
 				phaxy
 				LDX #0				; counter (all 32)
-				LDY ZP_VDP_SAB		; SAB lo
-ves_loop:		LDA ZP_VDP_SAB+1	; hi
+				LDY VDP_SAB		; SAB lo
+ves_loop:		LDA VDP_SAB+1	; hi
 				JSR vdp_set_addr_w
 				CPX ZP_TMP0			; ZP_TMP0 has N
 				BCC @enable			; Branch if X < N
@@ -141,9 +141,9 @@ vdp_set_sprite_pos:
 				LDA ZP_TMP0			; S*4
 				ASL
 				ASL
-				ADC ZP_VDP_SAB		; add LSB of base
+				ADC VDP_SAB		; add LSB of base
 				TAY
-				LDA ZP_VDP_SAB+1
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_w
 				NOP
 				LDA ZP_TMP2			; Y first
@@ -162,16 +162,16 @@ vdp_set_sprite_col:
 				LDA ZP_TMP0			; S*4
 				ASL
 				ASL
-				ADC ZP_VDP_SAB		; add LSB of base
+				ADC VDP_SAB		; add LSB of base
 				ADC #3				; 4th member
 				TAY
-				LDA ZP_VDP_SAB+1
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
 				JSR vdp_read
 				AND #$F0			; preserve the clock bit
 				ORA ZP_TMP0+1		; and write new color
 				STA ZP_TMP0+1		; save
-				LDA ZP_VDP_SAB+1
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_w	; set address again - write this time
 				LDA ZP_TMP0+1		; write modified color to VRAM
 				JSR vdp_write
@@ -187,16 +187,16 @@ vdp_set_sprite_early:
 				LDA ZP_TMP0			; S*4
 				ASL
 				ASL
-				ADC ZP_VDP_SAB		; add LSB of base
+				ADC VDP_SAB		; add LSB of base
 				ADC #3				; 4th member
 				TAY
-				LDA ZP_VDP_SAB+1
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_r	; read current value of colour/earlyclock
 				JSR vdp_read
 				AND #$0F			; preserve the colour nibble
 				ORA ZP_TMP0+1
 				STA ZP_TMP0+1		; save
-				LDA ZP_VDP_SAB+1
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_w	; set address again - write this time
 				LDA ZP_TMP0+1		; write modified color to VRAM
 				JSR vdp_write
@@ -213,10 +213,10 @@ vdp_set_sprite_pattern:
 				LDA ZP_TMP0			; S*4
 				ASL
 				ASL
-				ADC ZP_VDP_SAB		; add LSB of base
+				ADC VDP_SAB		; add LSB of base
 				ADC #2				; 3rd member
 				TAY
-				LDA ZP_VDP_SAB+1
+				LDA VDP_SAB+1
 				JSR vdp_set_addr_w	; set write address
 				LDA ZP_TMP0+1
 				JSR vdp_write

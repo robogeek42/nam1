@@ -195,8 +195,8 @@ gt2_loop:       LDA (R0),Y
 
                 ;; Sprite 0 - red
                 ;; set vertical and horiz position of sprite (centre of screen)
-                LDY ZP_VDP_SAB      ;; Sprite attribute base address
-                LDA ZP_VDP_SAB+1
+                LDY VDP_SAB      ;; Sprite attribute base address
+                LDA VDP_SAB+1
                 JSR vdp_set_addr_w
                 LDA #96             ;; vertical
                 STA VDP_WR_VRAM
@@ -229,18 +229,18 @@ gt2_loop:       LDA (R0),Y
                 ;; move sprites across sceen
                 LDX #0              ;; move from pos 0 to pos 255
                 ;; sprite 0
-gt2_loop2:      LDY ZP_VDP_SAB      ;; Sprite attribute base address
+gt2_loop2:      LDY VDP_SAB      ;; Sprite attribute base address
                 INY                 ;; horiz field, sprite 0
-                LDA ZP_VDP_SAB+1
+                LDA VDP_SAB+1
                 JSR vdp_set_addr_w
                 STX VDP_WR_VRAM 
                
                 ;; sprite 1
                 CLC
-                LDA ZP_VDP_SAB
+                LDA VDP_SAB
                 ADC #5              ;; horiz field of sprite 1
                 TAY
-                LDA ZP_VDP_SAB+1
+                LDA VDP_SAB+1
                 JSR vdp_set_addr_w
                 STX VDP_WR_VRAM 
 
@@ -297,8 +297,8 @@ vst2_loop1:     LDA (R0),Y
 
                 ;; use sprite attributes 0,1 and 2
                 ;; show sprites patterns 0,1 and 2 (Anim position 0)
-                LDY ZP_VDP_SAB      ;; Sprite attribute base address
-                LDA ZP_VDP_SAB+1
+                LDY VDP_SAB      ;; Sprite attribute base address
+                LDA VDP_SAB+1
                 JSR vdp_set_addr_w
                 ;; sprite 0 red
                 LDA #96             ;; vertical

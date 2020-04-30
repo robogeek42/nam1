@@ -50,7 +50,7 @@ page_buffer:	.res 256, 0
 
 ;================================================================
 ; VDP Set Mode - mode passed in Acc
-vdp_set_mode:	STA ZP_VDP_MODE
+vdp_set_mode:	STA VDP_MODE
 				ASL ; Multiply Acc by 8 to give offset into mode reg table
 				ASL 
 				ASL
@@ -89,11 +89,11 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				STA ZP_CURSOR
 
 				;; set some mode specific vars
-				LDA ZP_VDP_MODE
+				LDA VDP_MODE
 				CMP #0
 				BEQ vdp_sm_text_mode
 				LDA #32
-				STA ZP_VDP_CHAR_WIDTH
+				STA VDP_CHAR_WIDTH
 
 				;; Load char-set, colours and clear screen
 				JSR vdp_load_chars  
@@ -107,10 +107,10 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				LDA VDP_REGS+5	
 				CLC				 
 				ROR A				
-				STA ZP_VDP_SAB+1	;; put shifted right bits into hi word
+				STA VDP_SAB+1	;; put shifted right bits into hi word
 				LDA #0
 				ROR A				;; and lsbit into top bit of low word of address
-				STA ZP_VDP_SAB
+				STA VDP_SAB
 
 				JSR vdp_init_sprites
 
@@ -118,7 +118,7 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 
 vdp_sm_text_mode: 
 				LDA #40
-				STA ZP_VDP_CHAR_WIDTH
+				STA VDP_CHAR_WIDTH
 				JSR vdp_load_chars  
 				JSR vdp_clear_screen
 				RTS
@@ -130,14 +130,14 @@ vdp_sm_text_mode:
 ; so Space ($20) loads into address BASE+$20*8 
 ;
 vdp_load_chars: 
-				LDA ZP_VDP_MODE
+				LDA VDP_MODE
 				CMP #3
 				BEQ vlc_done
 
 				;; pattern table
 				JSR vdp_setaddr_pattern_table
 				JSR vlc_load
-				LDA ZP_VDP_MODE
+				LDA VDP_MODE
 				CMP #2
 				BNE vlc_done
 
@@ -185,7 +185,7 @@ lc_loop2:		LDA (TMP0),Y
 ; Load color table - only for modes 1 & 2
 ;	- colour is in Accumulator
 vdp_load_flat_colors:
-				LDX ZP_VDP_MODE
+				LDX VDP_MODE
 				CPX #1
 				BEQ vdp_load_g1_col
 				CPX #2
@@ -257,7 +257,7 @@ vdp_set_base_colors:
 				; set BG/FG Col
 				LDY #$87
 				JSR vdp_regwrite	;; write value of Acc to Reg 7 (Col)
-				LDA ZP_VDP_MODE
+				LDA VDP_MODE
 				BEQ @done_set_base_cols	; Mode 0 we are done
 				LDA TMP0
 				JSR vdp_load_flat_colors
@@ -272,7 +272,7 @@ vdp_set_base_colors:
 ; Clear screen
 ; clear by writing a space char ($20) to all name space entries
 vdp_clear_screen: 
-				LDA ZP_VDP_MODE
+				LDA VDP_MODE
 				CMP #3
 				BEQ cs_clear_multicolor
 
@@ -286,7 +286,7 @@ vdp_clear_screen:
 cs_write_spaces:
 				LDA #$20				
 				LDY #24				 ; Screens are 24 chars high
-cs_loop_row:	LDX ZP_VDP_CHAR_WIDTH	; and either 32 or 40 wide
+cs_loop_row:	LDX VDP_CHAR_WIDTH	; and either 32 or 40 wide
 cs_loop_col:	JSR vdp_write
 				DEX
 				BNE cs_loop_col
@@ -295,10 +295,10 @@ cs_loop_col:	JSR vdp_write
 
 cs_reset_cursor:
 				LDA #0				  ; reset cursor pos
-				STA ZP_VDP_CURS
-				STA ZP_VDP_CURS+1
-				STA ZP_VDP_XPOS
-				STA ZP_VDP_YPOS
+				STA VDP_CURS
+				STA VDP_CURS+1
+				STA VDP_XPOS
+				STA VDP_YPOS
 				RTS
 
 cs_clear_multicolor:
@@ -349,15 +349,15 @@ vt1_loop2:	  JSR print_memory16		;; print 16 bytes from (RES) and inc RES by 16
 ;================================================================
 ; Write char and string
 
-; Setup a VDP write to ZP_VDP_CURS (2byte) position
+; Setup a VDP write to VDP_CURS (2byte) position
 vdp_start_str_w:
 				phay
 				LDA VDP_REGS+2		;; Load Name tab from Reg2
 				ASL					;; NameTab Addr = reg2 * 0x400
 				ASL
 				CLC
-				ADC ZP_VDP_CURS+1	;; add curs hi byte to screen hi (res in A)
-				LDY ZP_VDP_CURS		;; add curs lo byte to screen lo (0)
+				ADC VDP_CURS+1	;; add curs hi byte to screen hi (res in A)
+				LDY VDP_CURS		;; add curs lo byte to screen lo (0)
 				JSR vdp_set_addr_w  
 				play
 				RTS
@@ -366,19 +366,19 @@ vdp_start_str_w:
 ; Set screen position.
 ; Start VDP write at given location and set cursor vars.
 ; A - xpos, Y - ypos, dont touch X
-vdp_set_pos:	STA ZP_VDP_XPOS		; X
-				STA ZP_VDP_CURS		; start abs curs position with X
-				STY ZP_VDP_YPOS		; Y
-				STZ ZP_VDP_CURS+1
+vdp_set_pos:	STA VDP_XPOS		; X
+				STA VDP_CURS		; start abs curs position with X
+				STY VDP_YPOS		; Y
+				STZ VDP_CURS+1
 				CPY #0				; if Y was 0 then we already have position
 				BEQ vsp_done
 vsp_loop:		CLC					; otherwise add screen width * Y
-				LDA ZP_VDP_CURS
-				ADC ZP_VDP_CHAR_WIDTH
-				STA ZP_VDP_CURS
-				LDA ZP_VDP_CURS+1
+				LDA VDP_CURS
+				ADC VDP_CHAR_WIDTH
+				STA VDP_CURS
+				LDA VDP_CURS+1
 				ADC #0
-				STA ZP_VDP_CURS+1
+				STA VDP_CURS+1
 				DEY
 				BNE vsp_loop
 vsp_done:
@@ -418,22 +418,22 @@ vps_cr:		 ;; return to start of current line
 
 ;---------------------------------------------
 ; Screen movement - handle vars for cursor pos
-;	ZP_VDP_CURS - incremental char position 
-;	ZP_VDP_XPOS - XPosition
-;	ZP_VDP_YPOS - YPosition
+;	VDP_CURS - incremental char position 
+;	VDP_XPOS - XPosition
+;	VDP_YPOS - YPosition
 ; depends on
-;	ZP_VDP_CHAR_WIDTH - 32 or 40
+;	VDP_CHAR_WIDTH - 32 or 40
 ;
 ; increment screen position (preserve A)
 ;	wraps line
 vdp_inc_pos:	PHA
 				;; screen pos (name 0-32*24 or 0-40*24 for mode 0)
-				INC ZP_VDP_CURS
+				INC VDP_CURS
 				BNE @nowrap
-				INC ZP_VDP_CURS+1
-@nowrap:		INC ZP_VDP_XPOS
-				LDA ZP_VDP_XPOS
-				CMP ZP_VDP_CHAR_WIDTH	;; check end of line
+				INC VDP_CURS+1
+@nowrap:		INC VDP_XPOS
+				LDA VDP_XPOS
+				CMP VDP_CHAR_WIDTH	;; check end of line
 				BEQ inc_pos_eol 
 				PLA
 				RTS
@@ -445,22 +445,22 @@ inc_pos_eol:	JSR vdp_move_to_start_line	;; CR
 ; increment line (preserve A)
 vdp_move_line_down:
 				PHA
-				LDA ZP_VDP_YPOS			;; first check if we are on bottom row
+				LDA VDP_YPOS			;; first check if we are on bottom row
 				CMP #23
 				BEQ @bottom_row
 
 				;; normal move down
-				LDA ZP_VDP_CHAR_WIDTH ;; add line width to cusror position
+				LDA VDP_CHAR_WIDTH ;; add line width to cusror position
 				CLC
-				ADC ZP_VDP_CURS		
-				STA ZP_VDP_CURS
+				ADC VDP_CURS		
+				STA VDP_CURS
 				LDA #0
-				ADC ZP_VDP_CURS+1
-				STA ZP_VDP_CURS+1
-				INC ZP_VDP_YPOS		 ;; increment Y pos
+				ADC VDP_CURS+1
+				STA VDP_CURS+1
+				INC VDP_YPOS		 ;; increment Y pos
 
 				;; copy cursor
-				add8To16 ZP_VDP_CHAR_WIDTH,ZP_COPY_CURS
+				add8To16 VDP_CHAR_WIDTH,ZP_COPY_CURS
 
 				PLA
 				RTS
@@ -473,7 +473,7 @@ vdp_move_line_down:
 				JSR vdp_start_str_w
 				TYA
 				PHA
-				LDY ZP_VDP_CHAR_WIDTH
+				LDY VDP_CHAR_WIDTH
 				LDA #$20			;; and write a space
 @loop_clrline:	JSR vdp_write
 				DEY
@@ -488,30 +488,30 @@ vdp_move_line_down:
 vdp_move_to_start_line:
 				PHA
 				SEC
-				LDA ZP_VDP_CURS		 ;; get abs cursor pos
-				SBC ZP_VDP_XPOS		 ;; and subtract X value
-				STA ZP_VDP_CURS
-				LDA ZP_VDP_CURS+1
+				LDA VDP_CURS		 ;; get abs cursor pos
+				SBC VDP_XPOS		 ;; and subtract X value
+				STA VDP_CURS
+				LDA VDP_CURS+1
 				SBC #0
-				STA ZP_VDP_CURS+1
+				STA VDP_CURS+1
 				LDA #0
-				STA ZP_VDP_XPOS		 ;; set x to 0, y unchanged
+				STA VDP_XPOS		 ;; set x to 0, y unchanged
 				PLA
 				RTS
 
 ; decrement X position (preserve A)
 vdp_move_back_char:
 				PHA
-				dec16 ZP_VDP_CURS		;; --VDPCursPos
-				LDA ZP_VDP_XPOS
+				dec16 VDP_CURS		;; --VDPCursPos
+				LDA VDP_XPOS
 				BNE @move_back			;; if Xpos>0 just decrement Xpos
 				;; XPos is 0 :- Move up and to end of line
-				LDA ZP_VDP_YPOS
+				LDA VDP_YPOS
 				BEQ @at_top_stop		;; but cant go up at all
-				DEC ZP_VDP_YPOS			;; --YPos
-				LDA ZP_VDP_CHAR_WIDTH
-				STA ZP_VDP_XPOS			;; XPos to end of line ... (minus 1)
-@move_back:		DEC ZP_VDP_XPOS			;; --Xpos
+				DEC VDP_YPOS			;; --YPos
+				LDA VDP_CHAR_WIDTH
+				STA VDP_XPOS			;; XPos to end of line ... (minus 1)
+@move_back:		DEC VDP_XPOS			;; --Xpos
 @at_top_stop:	PLA
 				RTS
 
@@ -544,7 +544,7 @@ vdp_backspace:
 				JSR vdp_draw_cursor
 				RTS
 vwc_write_char: 
-				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
+				JSR vdp_start_str_w ;; set position to VDP_CURS
 				STA VDP_WR_VRAM		;; write the char
 				JSR vdp_inc_pos
 				JSR vdp_draw_cursor
@@ -554,7 +554,7 @@ vdp_draw_cursor:
 				pha
 				LDA ZP_CURSOR
 				BEQ @nocursor
-				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
+				JSR vdp_start_str_w ;; set position to VDP_CURS
 				;LDA #$1D
 				STA VDP_WR_VRAM
 @nocursor:		pla
@@ -564,7 +564,7 @@ vdp_clear_cursor:
 				pha
 				LDA ZP_CURSOR
 				BEQ @nocursor2
-				JSR vdp_start_str_w ;; set position to ZP_VDP_CURS
+				JSR vdp_start_str_w ;; set position to VDP_CURS
 				LDA #$20
 				STA VDP_WR_VRAM
 @nocursor2:		pla
@@ -599,7 +599,7 @@ vdp_scroll_up_line:
 				STY ZP_TMP2			;; (lo)
 
 				STA ZP_TMP0+1		;; SourceAddr is Base + screen width
-				LDY ZP_VDP_CHAR_WIDTH
+				LDY VDP_CHAR_WIDTH
 				STY ZP_TMP0
 				
 				LDY #00 			;; 256 chars		 
@@ -614,7 +614,7 @@ vdp_scroll_up_line:
 				INC ZP_TMP0+1		;; next source page
 				INC ZP_TMP2+1		;; next dest page
 
-				LDA ZP_VDP_MODE		;; mode 0?
+				LDA VDP_MODE		;; mode 0?
 				CMP #0
 				BEQ @domode0
 
@@ -658,7 +658,7 @@ gt1_loop:		JSR vdp_write
 				BNE gt1_loop
 				
 				; check mode - text mode needs more chars
-				LDA ZP_VDP_MODE
+				LDA VDP_MODE
 				CMP #0
 				BNE gt1_done
 				
@@ -782,11 +782,11 @@ vdp_copy:
 vdp_cc_enable:
 				pha
 				phy
-				LDA ZP_VDP_CURS
+				LDA VDP_CURS
 				STA ZP_COPY_CURS
-				LDA ZP_VDP_CURS+1
+				LDA VDP_CURS+1
 				STA ZP_COPY_CURS+1
-				sub8From16 ZP_VDP_CHAR_WIDTH, ZP_COPY_CURS
+				sub8From16 VDP_CHAR_WIDTH, ZP_COPY_CURS
 				jsr vdp_cc_on
 				ply
 				pla
@@ -860,7 +860,7 @@ vdp_cc_move_up:
 				pha
 				phy
 				JSR vdp_cc_off
-				sub8From16 ZP_VDP_CHAR_WIDTH,ZP_COPY_CURS
+				sub8From16 VDP_CHAR_WIDTH,ZP_COPY_CURS
 				JSR vdp_cc_on
 				ply
 				pla
@@ -869,7 +869,7 @@ vdp_cc_move_down:
 				pha
 				phy
 				JSR vdp_cc_off
-				add8To16 ZP_VDP_CHAR_WIDTH,ZP_COPY_CURS
+				add8To16 VDP_CHAR_WIDTH,ZP_COPY_CURS
 				JSR vdp_cc_on
 				ply
 				pla

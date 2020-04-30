@@ -133,7 +133,7 @@ vdp_setaddr_pattern_table:
                 LDA #0
                 STA TMP0
 vdp_setaddr_pattern_table_offset:   ;; add TMP0*256 to pattern table address
-                LDA ZP_VDP_MODE     ;; check mode - mode 2 is different
+                LDA VDP_MODE     ;; check mode - mode 2 is different
                 CMP #2
                 BEQ vdp_setaddr_pattern_table_g2
 vdp_setaddr_pattern_table_g1:
@@ -159,8 +159,8 @@ vdp_setaddr_pattern_table_g2:
                 RTS
 
 vdp_setaddr_sprite_attribute_table:
-                LDY ZP_VDP_SAB
-                LDA ZP_VDP_SAB+1
+                LDY VDP_SAB
+                LDA VDP_SAB+1
                 JSR vdp_set_addr_w
                 RTS
 vdp_setaddr_sprite_pattern_table:
