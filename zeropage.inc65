@@ -26,26 +26,14 @@ KBD_CHAR_LAST  = $35
 KBD_FLAGS      = $36
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
 KBD_SPECIAL    = $37
-;-----------------------------------------------------------
-; VDP - 16 bytes
-ZP_VDP_MODE = $38
-ZP_VDP_CHAR_WIDTH = $39
-ZP_VDP_SAB  = $3a ;; Sprite Attribute table Base addr (2 bytes)
 
-; 2 bytes for cursor position (in terms of name table)
-ZP_VDP_CURS = $3c  ; 2 bytes
-ZP_VDP_XPOS = $3e
-ZP_VDP_YPOS = $3f
-
-VDP_STATUS  = $40
+KBD_ROW     = $38
+KBD_COL     = $39
 
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0
 ;
-OUT_LIST_SD = $41
-
-KBD_ROW     = $42
-KBD_COL     = $43
+OUT_LIST_SD = $3A
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver
@@ -62,7 +50,4 @@ sd_shi         = $E1        ; 1 Sector pointer high
 sd_sect        = $E2        ; 4 SD Card sector address
 sd_addr        = $E6        ; 4 SD Card byte address
 ;-----------------------------------------------------------
-
-
-
 

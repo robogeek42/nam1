@@ -23,6 +23,7 @@
 ;+--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
 ;
 ;
+.include "video_vars.inc65"
 .include "video_registers.inc65"
 .include "zeropage.inc65"
 .include "macros.inc65"
@@ -47,9 +48,13 @@
 
 .bss
 VDP_REGS:   .res  8,0
+VDP_VARS:   .res  9,0
 buff:       .res 12,0
 
 .export VDP_REGS
+.export VDP_VARS
+
+
 
 .code
 

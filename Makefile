@@ -65,7 +65,7 @@ all: firmware
 main.o: main.s65 basic.asm
 	ca65 --feature labels_without_colons -g -s -o $@ -l $(@:.o=.lst) $(DEFINES) $<
 
-%.o: %.s65 video_chartable_1.inc65
+%.o: %.s65 video_chartable_1.inc65 zeropage.inc65
 	ca65 --feature labels_without_colons -g -s -o $@ -l $(@:.o=.lst) $(DEFINES) $<
 
 firmware: main.o $(SOURCES:.s65=.o)
