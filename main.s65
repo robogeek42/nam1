@@ -1,6 +1,6 @@
 .setcpu "65C02"
 
-.export main
+.export basic_cold_start
 
 .include "macros.inc65"
 .include "zeropage.inc65"
@@ -26,6 +26,7 @@
 
 .import pong
 .import pacman
+.export CHARin
 
 .segment "VECTORS"
 
@@ -128,6 +129,7 @@ skip_sdinit:
                 STA RES+1
 
 ; Go straight to BASIC!
+basic_cold_start:
                 LDA #<LAB_COLD
                 STA TMP0
                 LDA #>LAB_COLD

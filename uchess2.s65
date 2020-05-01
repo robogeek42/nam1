@@ -15,15 +15,24 @@
 ;
 .setcpu "65C02"
 
-;.include "macros.inc65"
-;.include "zeropage.inc65"
-;.include "acia.inc65"
-;.include "io.inc65"
-;.include "string.inc65"
+.include "macros.inc65"
+.include "zeropage.inc65"
+.include "acia.inc65"
+.include "io.inc65"
+.include "string.inc65"
+;.include "print_util.inc65"
+.include "video.inc65"
+;.include "video_common.inc65"
+;.include "video_registers.inc65"
+
 
 .export uchess2
 
-.import main
+.bss
+HEXCBUF .res 4,0
+.code
+.import basic_cold_start
+.import CHARin
 
 ; 6551 I/O Port Addresses
 ;
@@ -69,7 +78,7 @@ PMOB    =	$EF
 PMAXC   =	$F0 
 PCC     =	$F1 
 PCP     =	$F2 
-OLDKY   =	$F3 
+;OLDKY   =	$F3 
 BESTP   =	$FB 
 BESTV   =	$FA 
 BESTM   =	$F9 
@@ -85,8 +94,7 @@ temp    =       $FC
 uchess2:
 		LDA     #$00		; REVERSE TOGGLE
 		STA     REV
-		;JSR     Init_6551
-CHESS   CLD             ; INITIALIZE
+CHESS		CLD 			; INITIALIZE
 		LDX	#$FF		; TWO STACKS
 		TXS	
 		LDX	#$C8
@@ -97,11 +105,8 @@ CHESS   CLD             ; INITIALIZE
 ;       FROM KEYBOARD
 ;		
 OUT		JSR	POUT		; DISPLAY AND
-		JSR	KIN		; GET INPUT   *** my routine waits for a keypress
-;		CMP	OLDKY		; KEY IN ACC  *** no need to debounce
-;		BEQ	OUT		; (DEBOUNCE)
-;		STA	OLDKY
-;		
+		JSR	MYKIN		; GET INPUT   *** my routine waits for a keypress
+		
 		CMP	#$43		; [C]
 		BNE	NOSET		; SET UP
 		LDX	#$1F		; BOARD
@@ -124,7 +129,7 @@ NOSET		CMP	#$45		; [E]
 		LDA	#$EE	    ; IS
 		BNE	CLDSP
 ;		
-NOREV		CMP	#$40			; [P]
+NOREV		CMP	#$40		; [P] ($40 because $50 & $4F = $40)
 		BNE	NOGO	   	; PLAY CHESS
 		JSR	GO
 CLDSP		STA	DIS1	  	; DISPLAY
@@ -139,7 +144,11 @@ NOGO		CMP	#$0D	    ; [Enter]
 NOMV		CMP     #$41		; [Q] ***Added to allow game exit***
 		BEQ     DONE		; quit the game, exit back to system.  
 		JMP	INPUT		; process move
-DONE		JMP     main		; *** MUST set this to YOUR OS starting address
+DONE		
+		CLD           ; Clear decimal bit
+                LDX #$ff    ; Reset stack
+                TXS
+		JMP     basic_cold_start ; *** MUST set this to YOUR OS starting address
 ;		
 ;       THE ROUTINE JANUS DIRECTS THE
 ;       ANALYSIS BY DETERMINING WHAT
@@ -399,7 +408,7 @@ CMOVE		LDA	SQUARE       	; GET SQUARE
 		ADC	MOVEX,X		; MOVE LIST
 		STA	SQUARE       	; NEW POS'N
 		AND	#$88
-		BNE	ILLEGAL       	; OFF BOARD
+		BEQ	ILLEGAL       	; OFF BOARD
 		LDA	SQUARE
 ;			
 		LDX	#$20
@@ -452,7 +461,9 @@ RETL		CLC			; LEGAL
 		LDA	#$00	    ; RETURN
 		RTS	
 ;		
-ILLEGAL	LDA	#$FF
+ILLEGAL		;ld16	R0, MSG_ILLEGAL
+		;JSR	acia_puts
+		LDA	#$FF
 		CLC			; ILLEGAL
 		CLV			; RETURN
 		RTS	
@@ -581,7 +592,7 @@ GO		LDX	OMOVE		; OPENING?
 ;			
 END		LDA     #$FF		; *ADD - STOP CANNED MOVES
 		STA	OMOVE		; FLAG OPENING
-NOOPEN	LDX	#$0C	    	; FINISHED
+NOOPEN		LDX	#$0C	    	; FINISHED
 		STX	STATE		; STATE=C
 		STX	BESTV		; CLEAR BESTV
 		LDX	#$14	   	; GENERATE P
@@ -689,8 +700,9 @@ NOPOSN	JMP	CKMATE       		; CONTINUE
 ; The following routines were added to allow text-based board
 ; display over a standard RS-232 port.
 ;
-POUT		jsr 	POUT9		; print CRLF
-		jsr     POUT13		; print copyright
+POUT		;jsr 	POUT9		; print CRLF
+		;jsr     POUT13		; print copyright
+		JSR	vdp_clear_screen
 		JSR	POUT10		; print column labels
 		LDY   	#$00		; init board location
 		JSR	POUT5		; print board horz edge
@@ -799,20 +811,17 @@ POUT14		lda   	banner,x
 		bne   	POUT14
 POUT15		rts	 
 
-KIN		LDA   	#'?'
+MYKIN		LDA   	#'?'
 		JSR   	syschout	; PRINT ONE ASCII CHR - ?
-		JSR   	syskin		; GET A KEYSTROKE FROM SYSTEM
+MK_LOOP		JSR   	CHARin		; GET A KEYSTROKE FROM SYSTEM
+		BCC	MK_LOOP
 	    	AND   	#$4F	    ; MASK 0-7, AND ALPHA'S
+		JSR	acia_putc	; debug
 	    	RTS
+
 ;
 ; 6551 I/O Support Routines
 ;
-;
-Init_6551      lda   #$1F	       ; 19.2K/8/1
-	       sta   ACIACtl	    ; control reg 
-	       lda   #$0B	       ; N parity/echo off/rx int off/ dtr active low
-	       sta   ACIACmd	    ; command reg 
-	       rts		      ; done
 ;
 ; input chr from ACIA1 (waiting)
 ;
@@ -824,27 +833,17 @@ syskin	 lda   ACIASta	    ; Serial port status
 ;
 ; output to OutPut Port
 ;
-syschout       PHA		      ; save registers
-ACIA_Out1      lda   ACIASta	    ; serial port status
-	       and   #$10	       ; is tx buffer empty
-	       beq   ACIA_Out1	  ; no
-	       PLA		      ; get chr
-	       sta   ACIADat	    ; put character to Port
-	       RTS		      ; done
-
-syshexout      PHA		     ;  prints AA hex digits
-	       LSR		     ;  MOVE UPPER NIBBLE TO LOWER
-	       LSR		     ;
-	       LSR		     ;
-	       LSR		     ;
-	       JSR   PrintDig	  ;
-	       PLA		     ;
-PrintDig       PHY		     ;  prints A hex nibble (low 4 bits)
-	       AND   #$0F	      ;
-	       TAY		     ;
-	       LDA   Hexdigdata,Y      ;
-	       PLY		     ;
-	       jmp   syschout	  ;
+syschout	JSR vdp_write_char
+		RTS
+syshexout	PHA
+		ld16 R0, HEXCBUF
+		PLA
+		JSR fmt_hex_string
+		LDA HEXCBUF
+		JSR vdp_write_char
+		LDA HEXCBUF+1
+		JSR vdp_write_char
+		RTS
 
 Hexdigdata	.byte	"0123456789ABCDEF"
 banner		.byte	"MicroChess (c) 1996-2002 Peter Jennings"
@@ -852,6 +851,7 @@ banner		.byte	"MicroChess (c) 1996-2002 Peter Jennings"
 cpl		.byte	"WWWWWWWWWWWWWWWWBBBBBBBBBBBBBBBBWWWWWWWWWWWWWWWW"
 cph		.byte	"KQCCBBRRPPPPPPPPKQCCBBRRPPPPPPPP"
 		.byte	$00
+MSG_ILLEGAL	.byte "Illegal",$0d,$0a,$00
 ;
 ; end of added code
 ;
@@ -872,7 +872,6 @@ OPNING  	.byte 	$99, $25, $0B, $25, $01, $00, $33, $25
 		.byte	$07, $36, $34, $0D, $34, $34, $0E, $52
 		.byte 	$25, $0D, $45, $35, $04, $55, $22, $06
 		.byte	$43, $33, $0F, $CC
-
 ;
 ;
 ; end of file
