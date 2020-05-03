@@ -31,7 +31,7 @@ endif
 # comodore keyboard now not available
 #KEYB ?= 0
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(UC_DEF)
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(UC_DEF) $(VKEYB_DEF)
 
 ifdef SDIO
 $(info ** Compile with SD card support **)
@@ -49,6 +49,10 @@ endif
 ifdef PS2K
 $(info ** Compile with PS2 Keyboard support **)
 	PS2K_DEF = -D PS2K=$(PS2K)
+endif
+ifdef VKEYB
+$(info ** Compile with Virtual PS2 Keyboard support **)
+	VKEYB_DEF = -D VKEYB=$(VKEYB)
 endif
 ifdef FASTCPU
 $(info ** Compile with FAST CPU support **)

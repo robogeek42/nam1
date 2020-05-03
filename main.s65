@@ -85,7 +85,7 @@ LAB_stlp:
                 JSR snd_all_off
 .endif ; SOUND
 
-.ifdef PS2K
+.if .def(PS2K)
                 ld16 R0,msg_init_ps2k
                 JSR acia_puts
                 JSR KBINIT
@@ -244,6 +244,7 @@ loop:           ld16 R0, prompt
 ;                jmp loop
 
                 @cmd_t_test_k:
+.if .def(PS2K)
                 cmp #'k'
                 bne @cmd_t_test_K
                 ; test keyboard
@@ -256,7 +257,7 @@ loop:           ld16 R0, prompt
                 ; test keyboard
                 JSR test_ps2_keyboard_2
                 jmp loop
-
+.endif
                 @cmd_t_end:
 
                 ; h = print help
@@ -613,7 +614,7 @@ CHARin:
         LDA KBD_CHAR
         JMP aciain_end
 .endif
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
         jsr KBSCAN
         bcc aciain_nothing_waiting  ; C=0 means nothing waiting
         phx

@@ -1,3 +1,4 @@
+; vim: ts=4 et sw=4
 .setcpu "65C02"
 .include "zeropage.inc65"
 .include "io.inc65"
@@ -61,15 +62,18 @@
 ; 
 ; Recommended Routines callable from external programs
 ;
+.if .def(PS2K) || .def(VKEYB)
 ; KBINPUT - wait for a key press and return with its assigned ASCII code in A.
 .export KBINPUT
-; KBGET   - wait for a key press and return with its unprocessed scancode in A.
-.export KBGET
 ; KBSCAN  - Scan the keyboard for 105uS, returns 0 in A if no key pressed.
 ;           Return ambiguous data in A if key is pressed.  Use KBINPUT OR KBGET
 ;           to get the key information.  You can modify the code to automatically 
 ;           jump to either routine if your application needs it.          
 .export KBSCAN
+; KBGET   - wait for a key press and return with its unprocessed scancode in A.
+.endif
+.if .def(PS2K)
+.export KBGET
 ; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
 .export KBINIT
 
@@ -78,6 +82,7 @@
 
 .export KBTMON
 .export KBTMOFF
+.endif
 ;
 ;****************************************************************************
 ;
@@ -228,11 +233,11 @@ KB_ACK          = $FA
 ; 
 ;               *=    $1000             ; locate program beginning at $1000
 
-.export test_ps2_keyboard
-.export test_ps2_keyboard_2
 
 .code
 
+.if .def(PS2K)
+.export test_ps2_keyboard
 test_ps2_keyboard:
                jsr   KBINIT            ; init the keyboard, LEDs, and flags
 lp0            jsr   acia_put_newline          ; prints 0D 0A (CR LF) to the terminal
@@ -260,6 +265,8 @@ lp3            pha                     ;
                lda   #$3E              ; >
                jsr   acia_putc         ; 
                bra   lp1               ; 
+.endif
+
 print1byte:
             pha
             ld16 R0,sbuf
@@ -286,10 +293,12 @@ printunkown:
             jsr acia_putc
             rts
 
+.if .def(PS2K)
 ;--------------------------------------------------------------
 ; tests non-typematic - outputs flags for asdfghjk (8 keys)
 ;    KBD_CHAR_LAST ($ED) if this is not 0 print Scan code debug
 ; q to quit
+.export test_ps2_keyboard_2
 test_ps2_keyboard_2:
     jsr KBINIT
     jsr KBTMOFF
@@ -442,7 +451,9 @@ tpk2_do_extended:
 tpk2_ext_break_code:
     jsr KBGET
     jmp tpk2_loop
-    
+.endif
+
+.if .def(PS2K)
 ;**************************************************************************************
 ;
 ; special read routine for my games - returns key code pressed in KBD_CHAR and KBD_SPECIAL
@@ -458,6 +469,7 @@ ksg_loop:
     plx
     clc
     rts
+.endif
 
 ksg_key_ready:
 ksg_scrl_off:
@@ -477,6 +489,7 @@ ksg_get_code:
     sec
     rts
 
+.if .def(PS2K)
 ;**************************************************************************************
 ;
 ; Decoding routines
@@ -569,6 +582,7 @@ kb_exit_input
                STA KBD_CHAR
                sec
                rts                     ; return to calling program
+.endif
 ;
 ;******************************************************************************
 ;
@@ -755,6 +769,7 @@ kbccmd         .word kbtrap83          ;
 ; is ready is ambiguous.  You must call KBGET or KBINPUT to
 ; get the keyboard data.
 ;
+.if .def(PS2K)
 KBSCAN         
                phx                  ;4
                ldx   #$12           ;2 ; timer: x = (cycles - 40)/13   (105-40)/13=5
@@ -768,8 +783,8 @@ kbscan1        lda   #clk           ;2 ;
                dex                  ;2 ; reduce timer
                bne   kbscan1        ;2 ; wait while clk is high
                jsr   kbdis             ; timed out, no data, disable receiver
-               lda   #$00              ; set data not ready flag
                plx
+               lda   #$00              ; set data not ready flag
                clc                     ; data not ready - C=0
                rts                     ; return 
 
@@ -783,7 +798,7 @@ kbscan2        jsr   kbdis             ; disable the receiver so other routines 
 ;               rts
 ;               jmp   KBGET             ; if key pressed, decode it with KBGET
 ; ---------------------------------------------------------------------
-
+.endif
 
 kbflush        lda   #$f4              ; flush buffer
 ;
@@ -1300,3 +1315,22 @@ ps2k_debug_print_extcode:
     jsr acia_putc
     pla
     rts
+
+.if .def(VKEYB)
+PCVKB_IO = $7FA0
+KBSCAN
+    LDA PCVKB_IO
+    BEQ @None
+    SEC
+    RTS
+@None
+    CLC
+    RTS
+
+KBINPUT    
+    LDA PCVKB_IO
+    STA KBD_CHAR
+    STZ PCVKB_IO
+    RTS
+.endif
+
