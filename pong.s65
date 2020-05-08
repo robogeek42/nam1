@@ -223,7 +223,7 @@ pong:
 
 		JSR draw_score
 ;---------------------------------------
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
 ; init keyboard
         jsr KBINIT
 ; set ps2 keyboard to have no repeat
@@ -283,7 +283,7 @@ game_loop:
 
         JSR get_input_serial
 
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
         JSR get_input_ps2k
 .endif
 
@@ -300,7 +300,7 @@ check_irq_count:
 .ifdef KEYB
         JSR get_input_keyboard
 .endif
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
         JSR check_key_flags
 .endif
 
@@ -513,7 +513,7 @@ gik_done:
 		RTS
 .endif
 
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
 check_key_flags:
         lda #1
         bit KBD_FLAGS
@@ -943,7 +943,7 @@ pih_restore_irq:
         ; stop any sounds
         JSR snd_all_off
 .endif
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
         ; reenable typematic repeat
         jsr KBTMON
 .endif

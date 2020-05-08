@@ -85,7 +85,7 @@ LAB_stlp:
                 JSR snd_all_off
 .endif ; SOUND
 
-.if .def(PS2K)
+.if .def(PS2K) || .def(VKEYB)
                 ld16 R0,msg_init_ps2k
                 JSR acia_puts
                 JSR KBINIT
@@ -299,8 +299,14 @@ msg_help:       .byte "m <addr> - dump mem",$0d,$0a
 msg_error:      .byte "Error", $0d, $0a, $00
 ;msg_vdp_welcome:  .byte "Assif 6502 & EhBasic", $0d, $0a, $00
 
+.if .def(PS2K)
 msg_init_ps2k:
                 .byte "PS2 "
+.elseif .def(VKEYB)
+msg_init_ps2k:
+	.byte "Virtual PS2 "
+.endif
+
 msg_init_keyboard:
                 .byte "Init keyboard",$0d,$0a,$00
 

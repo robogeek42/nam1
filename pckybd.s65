@@ -62,7 +62,6 @@
 ; 
 ; Recommended Routines callable from external programs
 ;
-.if .def(PS2K) || .def(VKEYB)
 ; KBINPUT - wait for a key press and return with its assigned ASCII code in A.
 .export KBINPUT
 ; KBSCAN  - Scan the keyboard for 105uS, returns 0 in A if no key pressed.
@@ -70,19 +69,15 @@
 ;           to get the key information.  You can modify the code to automatically 
 ;           jump to either routine if your application needs it.          
 .export KBSCAN
-; KBGET   - wait for a key press and return with its unprocessed scancode in A.
-.endif
-.if .def(PS2K)
-.export KBGET
 ; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
 .export KBINIT
-
 ; special KBSCAN for games that need make/break events
 .export KBSCAN_GAME
+; KBGET   - wait for a key press and return with its unprocessed scancode in A.
+.export KBGET
 
 .export KBTMON
 .export KBTMOFF
-.endif
 ;
 ;****************************************************************************
 ;
@@ -265,7 +260,6 @@ lp3            pha                     ;
                lda   #$3E              ; >
                jsr   acia_putc         ; 
                bra   lp1               ; 
-.endif
 
 print1byte:
             pha
@@ -293,7 +287,6 @@ printunkown:
             jsr acia_putc
             rts
 
-.if .def(PS2K)
 ;--------------------------------------------------------------
 ; tests non-typematic - outputs flags for asdfghjk (8 keys)
 ;    KBD_CHAR_LAST ($ED) if this is not 0 print Scan code debug
@@ -451,9 +444,7 @@ tpk2_do_extended:
 tpk2_ext_break_code:
     jsr KBGET
     jmp tpk2_loop
-.endif
 
-.if .def(PS2K)
 ;**************************************************************************************
 ;
 ; special read routine for my games - returns key code pressed in KBD_CHAR and KBD_SPECIAL
@@ -469,7 +460,6 @@ ksg_loop:
     plx
     clc
     rts
-.endif
 
 ksg_key_ready:
 ksg_scrl_off:
@@ -489,7 +479,6 @@ ksg_get_code:
     sec
     rts
 
-.if .def(PS2K)
 ;**************************************************************************************
 ;
 ; Decoding routines
@@ -582,7 +571,6 @@ kb_exit_input
                STA KBD_CHAR
                sec
                rts                     ; return to calling program
-.endif
 ;
 ;******************************************************************************
 ;
@@ -769,7 +757,6 @@ kbccmd         .word kbtrap83          ;
 ; is ready is ambiguous.  You must call KBGET or KBINPUT to
 ; get the keyboard data.
 ;
-.if .def(PS2K)
 KBSCAN         
                phx                  ;4
                ldx   #$12           ;2 ; timer: x = (cycles - 40)/13   (105-40)/13=5
@@ -798,7 +785,7 @@ kbscan2        jsr   kbdis             ; disable the receiver so other routines 
 ;               rts
 ;               jmp   KBGET             ; if key pressed, decode it with KBGET
 ; ---------------------------------------------------------------------
-.endif
+KBINIT          JMP kbinit
 
 kbflush        lda   #$f4              ; flush buffer
 ;
@@ -933,6 +920,7 @@ kbget4         tya                     ; get parity count
 ;lda byte
 ;noprint:
                rts                     ; 
+
 ;
 kbdis          lda   kbportreg         ; disable kb from sending more data
                and   #$EF              ; clk = 0 (change if port bits change)
@@ -942,9 +930,8 @@ kbdis          lda   kbportreg         ; disable kb from sending more data
                ora   #clk              ; 
                sta   kbportddr         ; 
                rts                     ; 
-;
 kbinit
-KBINIT         lda   #$02              ; init - num lock on, all other off
+               lda   #$02              ; init - num lock on, all other off
                sta   special           ; 
 kbinit1        lda   #KBCMD_RESET      ; keybrd reset
                jsr   kbsend            ; reset keyboard
@@ -1315,6 +1302,7 @@ ps2k_debug_print_extcode:
     jsr acia_putc
     pla
     rts
+.endif
 
 .if .def(VKEYB)
 PCVKB_IO = $7FA0
@@ -1328,9 +1316,57 @@ KBSCAN
     RTS
 
 KBINPUT    
-    LDA PCVKB_IO
+    LDA PCVKB_IO+1  ; check if it is Released
+    BNE kbg_done    ; if so ignore
+    LDA PCVKB_IO    ; get ASCII
     STA KBD_CHAR
+    STZ PCVKB_IO    ; Ready for next key
+    RTS
+KBINIT
+KBTMOFF
+KBTMON
+    RTS
+KBGET
+    STZ KBD_SPECIAL
+    LDA PCVKB_IO+1          ; Check KeyRelease flag
+    BNE kbg_releasekey      ; 1 in reg1 = release key
+                            ; 0 in reg1 = press key
+    LDA PCVKB_IO+2          ; Scan code
+    STA KBD_CHAR
+    BRA kbg_done
+
+kbg_releasekey
+    LDA #$FF
+    STA KBD_CHAR
+    LDA PCVKB_IO+2          ; Scan code
+    STA KBD_SPECIAL
+
+kbg_done
     STZ PCVKB_IO
     RTS
+;**************************************************************************************
+;
+; special read routine for my games - returns key code pressed in KBD_CHAR and KBD_SPECIAL
+; if C=0 then scan didn't read anything, so nothing is waiting. Set KBD_CHAR=0 and return immediately.
+; if KBD_CHAR == FF then it is a break code and code is in KBD_SPECIAL
+;
+KBSCAN_GAME:
+ksg_loop:
+    phx
+    jsr KBSCAN            ; scan once
+    bcs ksg_key_ready
+    stz KBD_CHAR
+    plx
+    clc
+    rts
+
+ksg_key_ready:
+
+ksg_get_code:
+    ; Get a code
+    jsr KBGET
+    plx
+    sec
+    rts
 .endif
 

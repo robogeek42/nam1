@@ -277,7 +277,7 @@ pmdm_loop7: LDA (TMP0),Y
             STZ PM_SCORE+1
             JSR pm_draw_score
 
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
 ; init keyboard
             jsr KBINIT
             lda #0
@@ -335,7 +335,7 @@ gl_get_input:
 .ifdef KEYB
             JSR pm_get_input_keyboard
 .endif
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
             JSR pm_get_input_ps2k
 .endif
             JSR pm_readmap
@@ -702,7 +702,7 @@ gik_done:
             RTS
 .endif
 
-.ifdef PS2K
+.if .def(PS2K) || .def(VKEYB)
 pm_get_input_ps2k:
             jsr KBSCAN_GAME
             bcc gip_done
