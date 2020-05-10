@@ -244,7 +244,7 @@ loop:           ld16 R0, prompt
 ;                jmp loop
 
                 @cmd_t_test_k:
-.if .def(PS2K)
+.if .def(PS2K) || .def(VKEYB)
                 cmp #'k'
                 bne @cmd_t_test_K
                 ; test keyboard

@@ -231,7 +231,6 @@ KB_ACK          = $FA
 
 .code
 
-.if .def(PS2K)
 .export test_ps2_keyboard
 test_ps2_keyboard:
                jsr   KBINIT            ; init the keyboard, LEDs, and flags
@@ -445,6 +444,7 @@ tpk2_ext_break_code:
     jsr KBGET
     jmp tpk2_loop
 
+.if .def(PS2K)
 ;**************************************************************************************
 ;
 ; special read routine for my games - returns key code pressed in KBD_CHAR and KBD_SPECIAL
@@ -1255,6 +1255,7 @@ ASCIITBL       .byte $00               ; 00 no key pressed
                .byte $CD               ; FE scroll lock
 ; NOT USED     .byte $00               ; FF 
 ; end
+.endif
 
 msg_scan_code:
     .byte "Scan:",$00
@@ -1302,10 +1303,13 @@ ps2k_debug_print_extcode:
     jsr acia_putc
     pla
     rts
-.endif
 
 .if .def(VKEYB)
 PCVKB_IO = $7FA0
+; KBSCAN  - Scan the keyboard for 105uS, returns 0 in A if no key pressed.
+;           Return ambiguous data in A if key is pressed.  Use KBINPUT OR KBGET
+;           to get the key information.  You can modify the code to automatically 
+;           jump to either routine if your application needs it.          
 KBSCAN
     LDA PCVKB_IO
     BEQ @None
@@ -1315,34 +1319,42 @@ KBSCAN
     CLC
     RTS
 
+; KBINPUT - wait for a key press and return with its assigned ASCII code in A.
 KBINPUT    
-    LDA PCVKB_IO+1  ; check if it is Released
-    BNE kbg_done    ; if so ignore
+    LDA PCVKB_IO
+    BEQ KBINPUT     ; one function is for KBINPUT to WAIT for a key
+    CMP #$FF        ; got a key, check if it is Released
+    BEQ kbi_done    ; if so ignore
     LDA PCVKB_IO    ; get ASCII
+kbi_done
     STA KBD_CHAR
     STZ PCVKB_IO    ; Ready for next key
     RTS
-KBINIT
+; KBINIT  - Initialize the keyboard and associated variables and set the LEDs
+KBINIT  ; nothing in virtual keyboard
 KBTMOFF
 KBTMON
     RTS
+; KBGET   - wait for a key press and return with its unprocessed scancode in A.
 KBGET
-    STZ KBD_SPECIAL
-    LDA PCVKB_IO+1          ; Check KeyRelease flag
-    BNE kbg_releasekey      ; 1 in reg1 = release key
-                            ; 0 in reg1 = press key
-    LDA PCVKB_IO+2          ; Scan code
+    LDA PCVKB_IO
+    BEQ KBGET           ; one function is for KBGET to WAIT for a key
+    CMP #$FF            ; Check if it is Released
+    BEQ kbg_releasekey
+    LDA PCVKB_IO+2      ; Scan code
     STA KBD_CHAR
+    STZ KBD_SPECIAL
     BRA kbg_done
 
 kbg_releasekey
-    LDA #$FF
     STA KBD_CHAR
-    LDA PCVKB_IO+2          ; Scan code
+    LDA PCVKB_IO+2      ; Scan code
     STA KBD_SPECIAL
 
 kbg_done
     STZ PCVKB_IO
+    STZ PCVKB_IO+1
+    STZ PCVKB_IO+2
     RTS
 ;**************************************************************************************
 ;
@@ -1369,4 +1381,3 @@ ksg_get_code:
     sec
     rts
 .endif
-
