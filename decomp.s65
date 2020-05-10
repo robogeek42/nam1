@@ -73,6 +73,9 @@ read_from_sd:
 .ifdef SDIO
 		JSR fs_get_next_byte
 		BCS read_eof		; C=1 means EOF reached
+
+        PHA
+        PLA
 		RTS
 read_eof:
 		ld16 R0, msg_EOF
@@ -129,6 +132,7 @@ dr1_write_block:
 		; 	"unique": write next count chars directly (Size-=count)
 		; until Size==0
 		phx
+        LDA #16
 		LDY #0						; Y is never incremented
 dr1_loop_main:
 		;LDA (TMP1),Y				; zero-page indirect (Y==0)

@@ -1122,6 +1122,7 @@ LAB_137F
 	BNE  LAB_1359		; always loop for next character
 
 LAB_1384
+    JSR  vdp_cc_disable  ; invalidate COPY CURSOR position
 	JMP  LAB_1866		; do CR/LF exit to BASIC
 
 ; announce buffer full
@@ -7868,13 +7869,17 @@ LAB_TWOPI
 	JMP  LAB_UFAC		; unpack memory (AY) into FAC1 and return
 
 LAB_PONG
+.ifdef PONG
 	JSR pong
 	JSR snd_all_off
+.endif
 	RTS
 
 LAB_PACMAN
+.ifdef PACMAN
 	JSR pacman
 	JSR snd_all_off
+.endif
 	RTS
 
 ;------------------------------------------------------
