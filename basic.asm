@@ -1122,6 +1122,7 @@ LAB_137F
 	BNE  LAB_1359		; always loop for next character
 
 LAB_1384
+    JSR  vdp_cc_disable  ; invalidate COPY CURSOR position
 	JMP  LAB_1866		; do CR/LF exit to BASIC
 
 ; announce buffer full
