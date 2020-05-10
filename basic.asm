@@ -7868,13 +7868,17 @@ LAB_TWOPI
 	JMP  LAB_UFAC		; unpack memory (AY) into FAC1 and return
 
 LAB_PONG
+.ifdef PONG
 	JSR pong
 	JSR snd_all_off
+.endif
 	RTS
 
 LAB_PACMAN
+.ifdef PACMAN
 	JSR pacman
 	JSR snd_all_off
+.endif
 	RTS
 
 ;------------------------------------------------------

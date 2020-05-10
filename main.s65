@@ -24,8 +24,12 @@
 .include "uchess2.inc65"
 .endif
 
+.ifdef PONG
 .import pong
+.endif
+.ifdef PACMAN
 .import pacman
+.endif
 
 .segment "VECTORS"
 
@@ -292,8 +296,12 @@ msg_help:       .byte "m <addr> - dump mem",$0d,$0a
                 .byte "w <addr> <byte> - write byte",$0d,$0a
                 .byte "b - basic bw=warm start",$0d,$0a
                 .byte "vd <page> - dump VRAM page",$0d,$0a
+.ifdef PONG
                 .byte "pp - play pong",$0d,$0a
+.endif
+.ifdef PACMAN
                 .byte "pm - play pacman",$0d,$0a
+.endif
                 .byte $00
 msg_error:      .byte "Error", $0d, $0a, $00
 ;msg_vdp_welcome:  .byte "Assif 6502 & EhBasic", $0d, $0a, $00
@@ -349,11 +357,15 @@ cmd_dump_page:  LDA buffer+1
 check_pong:        
                 CMP #'p'
                 BNE check_pacman
+.ifdef PONG
                 JSR pong
+.endif
                 RTS
 check_pacman:   CMP #'m'
                 BNE cmd_m_error
+.ifdef PACMAN
                 JSR pacman
+.endif
                 RTS
                 
 
@@ -494,19 +506,23 @@ cmd_test_bcd16:
 ;-----------------------------------------------------
 ; Load a compressed image (test)
 cmd_loadimage:
-;                ; switch to mode 2 (Screen2)
-;                LDA #2
-;                JSR vdp_set_mode
-;                ; put address into TMP1
-;                LDA #<image_smashmario_COMP
-;                STA TMP1
-;                LDA #>image_smashmario_COMP
-;                STA TMP1+1
-;                ; load image
-;                JSR decompRLE1_SC2
+.ifdef IMAGETEST
+                ; switch to mode 2 (Screen2)
+                LDA #2
+                JSR vdp_set_mode
+                ; put address into TMP1
+                LDA #<image_smashmario_COMP
+                STA TMP1
+                LDA #>image_smashmario_COMP
+                STA TMP1+1
+                ; load image
+                JSR decompRLE1_SC2
                 RTS
-;image_smashmario_COMP:
-;    .include "smashmario_COMP.inc65"
+image_smashmario_COMP:
+    .include "smashmario_COMP.inc65"
+.else
+                RTS
+.endif
 
 ;-----------------------------------------------------
 ; run Basic - b[cw]
