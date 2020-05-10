@@ -45,7 +45,7 @@ endif
 # comodore keyboard now not available
 #KEYB ?= 0
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(UC_DEF) $(PM_DEF) $(PONG_DEF) $(IT_DEF)
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(VKEYB_DEF) $(UC_DEF) $(PM_DEF) $(PONG_DEF) $(IT_DEF)
 
 ifdef SDIO
 $(info ** Compile with SD card support **)
