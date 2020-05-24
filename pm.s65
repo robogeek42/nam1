@@ -15,6 +15,7 @@
 .include "kbdvia.inc65"
 .include "scancodes.inc65"
 .include "pckybd.inc65"
+.include "colors.inc65"
 
 .export pacman
 
@@ -38,7 +39,7 @@ PM_DIR = pm_positions+2   ; Direction
 ; Ghost 1
 G1_X = pm_positions+3
 G1_Y = pm_positions+4
-G1_D = pm_positions+5
+G1_D = pm_positions+5   ; Direction
 G1_M = pm_positions+6   ; Mode (0=norm 1=scared)
 ; Ghost 2
 G2_X = pm_positions+7
@@ -92,9 +93,10 @@ pm_sprite_table_end = pm_sprite_table+20
 
 pm_local =  pm_sprite_table_end+1
 
-IRQ_OLD      = pm_local+0  ; 2 bytes
+IRQ_OLD        = pm_local+0  ; 2 bytes
 PM_IRQCOUNT    = pm_local+2
-PM_INTERRUPT = pm_local+3
+PM_INTERRUPT   = pm_local+3
+GHOST_IRQCOUNT = pm_local+4
 
 PM_SCORE = pm_local+8       ; 2 bytes
 PM_STR_BUFFER = pm_local+10  ; 12 bytes
@@ -235,25 +237,37 @@ pmdm_loop7: LDA (TMP0),Y
 
 ;------------------------------------------------------------------
 ; Initialise sprite table
+            ; Pacman
             LDA #112
             STA PM_ST_SPR1_X
             LDA #144
             STA PM_ST_SPR1_Y
             LDA #0
             STA PM_ST_SPR1_P
-            LDA #11
+            LDA #LIT_YELLOW
             STA PM_ST_SPR1_C
 
-            LDA #0
+            ; Red Ghost
+            LDA #96
             STA PM_ST_SPR2_X
-            LDA #0
+            LDA #88
             STA PM_ST_SPR2_Y
             LDA #9
             STA PM_ST_SPR2_P
-            LDA #14
+            LDA #DRK_RED
             STA PM_ST_SPR2_C
 
-            LDA #1
+            ; Green Ghost
+            LDA #112
+            STA PM_ST_SPR3_X
+            LDA #88
+            STA PM_ST_SPR3_Y
+            LDA #9
+            STA PM_ST_SPR3_P
+            LDA #LIT_GREEN
+            STA PM_ST_SPR3_C
+
+            LDA #3
             STA PM_NUMPRITES
 ;------------------------------------------------------------------
 ; Initialise Positon data
@@ -267,7 +281,7 @@ pmdm_loop7: LDA (TMP0),Y
 
 ;------------------------------------------------------------------
 ; Enable sprites
-            LDA #1                     ; enable 1 sprite
+            LDA PM_NUMPRITES           ; enable sprites
             STA ZP_TMP0                ; Pass number of sprites in ZP_TMP0
             JSR vdp_enable_sprites
 
@@ -296,6 +310,7 @@ pmih_save_old:
 
             LDA #$00
             STA PM_IRQCOUNT
+            STA GHOST_IRQCOUNT
 
             LDA #<PM_IRQ
             STA IRQ_ADDR
@@ -606,102 +621,6 @@ gis_no_dir_input:
             ;STA pm_input_dir
             RTS
 
-.ifdef KEYB
-debug_row_col:
-            ; DEBUG
-            ld16 R0,PM_STR_BUFFER
-            LDA KBD_ROW
-            JSR fmt_bin_string
-            JSR acia_puts
-            LDA #' '
-            JSR acia_putc
-            LDA KBD_COL
-            JSR fmt_bin_string
-            JSR acia_puts
-            JSR acia_put_newline
-            RTS
-;---------------------------------------
-; Get input from KEYBOARD
-pm_get_input_keyboard:
-            JSR kbd_getkey              ; result in KBD_COL, KBD_ROW (zero-page)
-            BCC gik_earlyexit           ; No key pressed
-            LDA KBD_ROW                 ; Check of the same key again
-            CMP KBD_LAST_ROW
-            BNE gik_got_key             ; New key - process
-            LDA KBD_COL
-            CMP KBD_LAST_COL
-            BNE gik_got_key             ; New key - process
-
-gik_earlyexit:
-            RTS
-
-gik_got_key:
-            LDA KBD_ROW                 ; save last
-            STA KBD_LAST_ROW
-            LDA KBD_COL
-            STA KBD_LAST_COL
-
-            JSR debug_row_col
-
-gik_repeat:
-            ; q and <spc> in row 0
-            ; a, w, s are in row 1
-            ; d in row 2
-            BBS0 KBD_ROW,gik_test_row0
-            BBS1 KBD_ROW,gik_test_row1
-            BBS2 KBD_ROW,gik_test_row2
-            JMP gik_done
-
-gik_test_row0:
-			BBS4 KBD_COL,gik_do_spc
-			BBS6 KBD_COL,gik_do_q
-			RMB0 KBD_ROW				; no columns set (anymore) so reset row bit
-            BRA gik_repeat
-gik_test_row1:
-			BBS1 KBD_COL,gik_do_w
-			BBS2 KBD_COL,gik_do_a
-			BBS5 KBD_COL,gik_do_s
-			RMB1 KBD_ROW				; no columns set (anymore) so reset row bit
-            BRA gik_repeat
-gik_test_row2:
-			BBS2 KBD_COL,gik_do_d
-			RMB2 KBD_ROW				; no columns set (anymore) so reset row bit
-            BRA gik_repeat
-
-gik_do_spc:								; SPACE = Start Game
-			LDA #$01					; Start game flag
-            STA pm_game
-			RMB4 KBD_COL
-            BRA gik_repeat
-gik_do_q:								; Q = Quit Game
-            LDA #$FF                    ; else mark end-of-game
-            STA pm_game                 ; in game state variable
-			RMB6 KBD_COL
-            BRA gik_repeat
-gik_do_w:								; W = Up
-            LDA #PM_DIR_U
-            STA pm_input_dir
-			RMB1 KBD_COL
-            BRA gik_repeat
-gik_do_a:								; A = Left
-            LDA #PM_DIR_L
-            STA pm_input_dir
-			RMB2 KBD_COL
-            BRA gik_repeat
-gik_do_s:								; S = Down
-            LDA #PM_DIR_D
-            STA pm_input_dir
-			RMB5 KBD_COL
-            BRA gik_repeat
-gik_do_d:								; D = Right
-			LDA #PM_DIR_R
-			STA pm_input_dir
-			RMB2 KBD_COL
-            BRA gik_repeat
-gik_done:
-            RTS
-.endif
-
 .if .def(PS2K) || .def(VKEYB)
 pm_get_input_ps2k:
             jsr KBSCAN_GAME
@@ -907,6 +826,7 @@ PM_IRQ:		PHP                         ; save status flags (so BCD is correct)
             JSR pm_draw_sprites
 			DEC PM_IRQCOUNT             ;; count--
             DEC PM_INTERRUPT            ;; make interrupt flag != 0
+            INC GHOST_IRQCOUNT
 
 @skip:		JSR vdp_getstatus           ;; read VDP status to reenable the VDP interrupt
             PLA 
@@ -984,6 +904,22 @@ pm_update_pm_sprite:
             LDA PM_SPR_INDEX,Y
             ; store in pattern
             STA PM_ST_SPR1_P
+
+; update ghost animation - not dependent on pos of PM for now!
+; ghost sprite toggles between 9 and 10
+            LDA GHOST_IRQCOUNT
+            CMP #2                 ; Every 12 tick
+            BNE pups_done
+            LDA PM_ST_SPR2_P
+            ADC #1
+            CMP #$0B
+            BNE pups_save
+            LDA #$09
+pups_save:
+            STA PM_ST_SPR2_P
+            STA PM_ST_SPR3_P
+            STZ GHOST_IRQCOUNT
+pups_done:            
 			RTS
 
 quit_message:
