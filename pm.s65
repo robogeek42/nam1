@@ -217,12 +217,12 @@ pmdm_loop7: LDA (TMP0),Y
 ;            BNE pmdm_loop10
 
 ;------------------------------------------------------------------
+; 5. Sprites
 ; Init and Set sprite type (8x8 unmag)
             JSR vdp_init_sprites
             JSR spr_set_small
             JSR spr_set_mag_off
 
-;------------------------------------------------------------------
 ; Load sprite patterns
             ld16 ZP_TMP0, PM_SPRITES
             STZ ZP_TMP2                ; load into P=0,1 ...
@@ -235,7 +235,6 @@ pmdm_loop7: LDA (TMP0),Y
             CMP #PM_NUM_SPRITE_PATTERNS
             BNE @next_pattern
 
-;------------------------------------------------------------------
 ; Initialise sprite table
             ; Pacman
             LDA #112
@@ -267,9 +266,19 @@ pmdm_loop7: LDA (TMP0),Y
             LDA #LIT_GREEN
             STA PM_ST_SPR3_C
 
-            LDA #3
+            ; Cyan Ghost
+            LDA #128
+            STA PM_ST_SPR4_X
+            LDA #88
+            STA PM_ST_SPR4_Y
+            LDA #9
+            STA PM_ST_SPR4_P
+            LDA #CYAN
+            STA PM_ST_SPR4_C
+
+            LDA #4
             STA PM_NUMPRITES
-;------------------------------------------------------------------
+
 ; Initialise Positon data
 ; start at (14,18) = (14+18*32)=590=$24E
             LDA #$4E
@@ -279,13 +288,13 @@ pmdm_loop7: LDA (TMP0),Y
             LDA #PM_DIR_L              ; facing left
             STA PM_DIR
 
-;------------------------------------------------------------------
 ; Enable sprites
             LDA PM_NUMPRITES           ; enable sprites
             STA ZP_TMP0                ; Pass number of sprites in ZP_TMP0
             JSR vdp_enable_sprites
 
 ;------------------------------------------------------------------
+; 6. General setup
 ; write score
             STZ PM_SCORE
             STZ PM_SCORE+1
@@ -301,6 +310,8 @@ pmdm_loop7: LDA (TMP0),Y
 .endif
 
 ;------------------------------------------------------------------
+; 7. Interrupts
+;
 ; Setup interrupt handler
 pmih_save_old:
             LDA IRQ_ADDR
@@ -329,13 +340,18 @@ pmih_save_old:
 ; Start allowing interrupts at CPU
             CLI
 
-;------------------------------------------------------------------
-; GAME LOOP
-;
             STZ pm_game         ; start at state 0 - not playing yet
             JSR pm_readmap      ; get allowed directions
             STA pm_allowed
 
+;------------------------------------------------------------------
+; GAME LOOP
+;   -- Busy loop waiting for interrupt to occur
+;   -- On Interrupt:
+;      -- Get KBD Input - this sets flags of which keys are currently pressed
+;      -- Read the map and set allowed directions PM can move in
+;      -- Process the key presses into movement
+;      
 game_loop:
 gl_dogame:
             LDA PM_INTERRUPT        ; check interrupt has happened
@@ -408,6 +424,7 @@ gl_update_score:
 
 gl_update_pm:
 			JSR pm_update_pm_sprite
+            JSR pm_update_ghost_sprite
 
             LDA #1
             STA PM_UPDATE_FLAG   ; tell update routine to update sprites
@@ -540,7 +557,9 @@ quit_game:
 ;==================================================================
 ; Subroutines
 
-; Read game map at position PM_NT_LO/HI
+;---------------------------------------
+; Read game map at pacmans's position PM_NT_LO/HI
+;
 pm_readmap: CLC
             LDA #<PACMAN_MAP
             ADC PM_NT_LO
@@ -552,7 +571,9 @@ pm_readmap: CLC
             LDA (TMP2),Y
             RTS
 
-; read from name table
+;---------------------------------------
+; read from name table (i.e. screen)
+;
 pm_read_nametable:
             LDY PM_NT_LO             ;; Set VRAM address to name table (VDP_REG2 * 0x400) + PM_NT_LO/HI
             LDA VDP_REGS+2
@@ -563,7 +584,10 @@ pm_read_nametable:
             JSR vdp_set_addr_r
             LDA VDP_RD_VRAM
             RTS
-; write to name table
+;---------------------------------------
+; write to name table (i.e screen) at pacman's position
+;  - will generally be to blank out a pill
+;
 pm_write_nametable:
             LDY PM_NT_LO             ;; Set VRAM address to name table (VDP_REG2 * 0x400) + PM_NT_LO/HI
             LDA VDP_REGS+2
@@ -578,6 +602,7 @@ pm_write_nametable:
 
 ;---------------------------------------
 ; Get input from ACIA
+;
 pm_get_input_serial:
             LDA ACIA_STATUS
             AND #ACIA_STATUS_RX_FULL
@@ -621,6 +646,9 @@ gis_no_dir_input:
             ;STA pm_input_dir
             RTS
 
+;---------------------------------------
+; Get input PC Keyboard
+;
 .if .def(PS2K) || .def(VKEYB)
 pm_get_input_ps2k:
             jsr KBSCAN_GAME
@@ -820,10 +848,10 @@ pm_quit_game:
             RTS
 
 ;------------------------------------------------------------------
-; IRQ Handler
+; VDP IRQ Handler
 PM_IRQ:		PHP                         ; save status flags (so BCD is correct)
             PHA
-            JSR pm_draw_sprites
+            JSR pm_draw_sprites         ; Write current sprite info to Sprite Atrr table
 			DEC PM_IRQCOUNT             ;; count--
             DEC PM_INTERRUPT            ;; make interrupt flag != 0
             INC GHOST_IRQCOUNT
@@ -835,6 +863,9 @@ PM_IRQ:		PHP                         ; save status flags (so BCD is correct)
 
 ;------------------------------------------------------------------
 ; draw sprites from table
+;   -- draws all enabled sprites if update-flag is set
+;   -- by writing to the Sprite Attribute table
+;
 pm_draw_sprites:
             LDA PM_UPDATE_FLAG
             BNE pm_do_draw
@@ -886,40 +917,46 @@ pm_draw_score:
             
 ;------------------------------------------------------------------
 ; update the PM sprite animation
+;   -- PM_IRQCOUNT starts at 0, decremented every 1/50 sec (20ms)
+;   -- every 8*20=160ms the sprite pattern is changed 
 pm_update_pm_sprite:
             LDA PM_IRQCOUNT
             AND #%00011000          ; change sprite from 0-3 every 8th tick
             LSR
             LSR
-            LSR
+            LSR                     ; value is now 0-3
             ; add 4*PM_DIR
             STA TMP0
-            LDA PM_DIR                ; direction 
+            LDA PM_DIR              ; direction 
             ASL
             ASL
             CLC
-            ADC TMP0
+            ADC TMP0                ; add 4*PM_DIR to tick number
             ; lookup sprite number
             TAY
             LDA PM_SPR_INDEX,Y
             ; store in pattern
             STA PM_ST_SPR1_P
+            RTS
 
+;------------------------------------------------------------------
 ; update ghost animation - not dependent on pos of PM for now!
-; ghost sprite toggles between 9 and 10
+;   -- ghost sprite toggles between 9 and 10
+;   -- GHOST_IRQCOUNT is incremented every 1/50 sec (20ms)
+pm_update_ghost_sprite:
             LDA GHOST_IRQCOUNT
-            CMP #2                 ; Every 12 tick
-            BNE pups_done
-            LDA PM_ST_SPR2_P
-            ADC #1
-            CMP #$0B
-            BNE pups_save
-            LDA #$09
-pups_save:
+            AND #%00010000          ; every 16*20ms = 320ms
+            LSR
+            LSR
+            LSR
+            LSR                     ; now 0-1
+            CLC
+            ADC #9                  ; now 9-10
+pugs_save:
             STA PM_ST_SPR2_P
             STA PM_ST_SPR3_P
-            STZ GHOST_IRQCOUNT
-pups_done:            
+            STA PM_ST_SPR4_P
+pugs_done:            
 			RTS
 
 quit_message:
