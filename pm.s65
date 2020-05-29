@@ -591,17 +591,66 @@ get_pm_pos:
 ;           PM_POS_X/Y that reflects nametable position PM_NT_LO/HI.... not finished
 ;   output: Change PM_NT_LO/HI 
 ;           Change PM_POS_X/Y
+;
 update_pm_nametable_pos:
-			PHA					; save A/Y on stack
+			STA TMP0			; Save A/Y
+			STY TMP0+1
 			TYA
-			PHA
 			; if Y position hasn't changed don't recalc Y
 			CMP PM_POS_Y
-			BEQ upmp_do_x
+			BEQ upmp_do_x		; NewY == OldY
 	upmp_do_y:			
-	upmp_do_x:			
+			BCC upmp_do_y_neg	; NewY < OldY
+			; Y has increased. Get difference and add 32 for each line
+			; note: carry is already set here
+			SBC PM_POS_Y		; Acc = NewY - OldY
+			TAY					; counter
+	@loop:	add8To16 #32, PM_NT_LO
+			DEY
+			BNE @loop
+			BRA upmp_do_x		; finished - go do the X part
+
+	upmp_do_y_neg:				; Y change is negative
+			LDA PM_POS_Y
+			SEC
+			SBC TMP0+1
+			TAY
+	@loop:	sub8From16 #32, PM_NT_LO
+			DEY
+			BNE @loop
+
+	upmp_do_x:					; X part
+			LDA TMP0
+			CMP PM_POS_X
+			BEQ upmp_done		; X NewX == OldX
+
+			BCC upmp_do_x_neg	; NewX < OldX
+			; X has increased.  Add 32 for each difference
+			; note: carry is already set here
+			SBC PM_POS_X		; Acc = NewX - OldX
+			TAY					; counter
+	@loop:	inc16 PM_NT_LO
+			DEY
+			BNE @loop
+			BRA upmp_done
+
+	upmp_do_x_neg:			
+			LDA PM_POS_Y
+			SEC
+			SBC TMP0+1
+			TAY
+	@loop:	dec16 PM_NT_LO
+			DEY
+			BNE @loop
+
+
 	upmp_done:
+			LDA TMP0
+			STA PM_POS_X
+			LDA TMP0+1
+			STA PM_POS_Y
 			RTS
+
 ;---------------------------------------
 ; Read game map at pacmans's position PM_NT_LO/HI
 ;
