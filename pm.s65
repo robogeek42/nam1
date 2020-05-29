@@ -52,8 +52,12 @@ G3_X = pm_positions+11
 G3_Y = pm_positions+12
 G3_D = pm_positions+13
 G3_M = pm_positions+14
+;
+; PM position in chars on screen
+PM_POS_X = pm_positions+15
+PM_POS_Y = pm_positions+16
 ; only 3 for now ...
-pm_positions_end = pm_positions+14	  ; (15)
+pm_positions_end = pm_positions+16	  ; 
 
 ; sprite data table, 4 bytes per sprite
 ; Y, X, Pattern No, Color/EarlyFlag
@@ -65,7 +69,7 @@ pm_sprite_table = pm_positions_end + 2
 
 PM_NUMPRITES = pm_sprite_table+0
 
-PM_ST_SPR1_Y = pm_sprite_table+1	; (19)
+PM_ST_SPR1_Y = pm_sprite_table+1	; 
 PM_ST_SPR1_X = pm_sprite_table+2
 PM_ST_SPR1_P = pm_sprite_table+3
 PM_ST_SPR1_C = pm_sprite_table+4
@@ -381,7 +385,15 @@ gl_get_input:
 			CMP #$FF		; 	quit requested?
 			BNE gl_do_update	; 		no, then continue
 			JMP quit_game	; 		yes, quit
-
+;
+; PM_ST_SPR1_X/Y is XY position of 8x8 PM sprite
+; But actual square is dependent on position of PM centre
+;  +-------+-------+
+;  +   ........    +
+;  position MOD 8 0-3 means it is in left square 4-7, right
+; Function set_pm_nametable_pos will set nametable position
+; of pacman based on Sprite positon
+;
 gl_do_update:
 			; check if is in square
 			LDA PM_DIR				; check depends on direction of movement U/D or L/R
@@ -558,6 +570,38 @@ quit_game:
 ;==================================================================
 ; Subroutines
 
+;---------------------------------------
+; Function get_pm_pos will return pacman x/y character position
+; of pacman based on sprite top-left position
+;   returns Acc = X, Yreg = Y
+;
+get_pm_pos:
+			LDA PM_ST_SPR1_Y
+			LSR
+			LSR
+			LSR					; divide by 8
+			TAY
+			LDA PM_ST_SPR1_X
+			LSR
+			LSR
+			LSR					; divide by 8
+			RTS
+; update nametable position 
+;   input : Acc = X, Yreg = Y
+;           PM_POS_X/Y that reflects nametable position PM_NT_LO/HI.... not finished
+;   output: Change PM_NT_LO/HI 
+;           Change PM_POS_X/Y
+update_pm_nametable_pos:
+			PHA					; save A/Y on stack
+			TYA
+			PHA
+			; if Y position hasn't changed don't recalc Y
+			CMP PM_POS_Y
+			BEQ upmp_do_x
+	upmp_do_y:			
+	upmp_do_x:			
+	upmp_done:
+			RTS
 ;---------------------------------------
 ; Read game map at pacmans's position PM_NT_LO/HI
 ;
