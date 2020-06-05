@@ -391,26 +391,14 @@ gl_get_input:
 ;  +-------+-------+
 ;  +   ........    +
 ;  position MOD 8 0-3 means it is in left square 4-7, right
-; Function set_pm_nametable_pos will set nametable position
-; of pacman based on Sprite positon
-;
+;     Actual position is stored in PM_POS_X/Y
+
 gl_do_update:
-			; check if is in square
-			LDA PM_DIR				; check depends on direction of movement U/D or L/R
-			CMP #PM_DIR_D			 ;
-			BCS gl_check_vert		 ; >= Down = Down/Up
-
 			LDA PM_ST_SPR1_X
-			AND #$04				; 0-3, in square, 4-7 in square to right
-			BNE gl_update_pm		; not in square
-			BRA gl_do_insquare
+			LDY PM_ST_SPR1_Y
+			JSR get_pm_pos                          ; Gets sprite character X/Y
+			JSR update_pm_nametable_pos ; Updates the POS and NT location
 
-gl_check_vert:
-			LDA PM_ST_SPR1_Y
-			AND #$04				; 0-3, in square, 4-7 in square below
-			BNE gl_update_pm		; not in square
-			
-gl_do_insquare:
 			JSR pm_read_nametable
 			CMP #28				 ; 28 = dot
 			BEQ gl_is_dot
@@ -476,85 +464,85 @@ gl_skip_update:
 pm_move_left:
 			; if pos is at left of current square then move
 			; to next square of pos. Otherwise just move
-			LDA PM_ST_SPR1_X
-			AND #$07
-			BNE pml_decx		 ; not 0 (fully in square) so keep moving
-
-			; check allowed directions
-			LDA pm_allowed
-			AND #PM_MAP_DIR_L_BIT
-			BEQ pml_skipx
-
-			; decrement PM pos (absolute)
-			dec16 PM_NT_LO
-pml_decx:
+;			LDA PM_ST_SPR1_X
+;			AND #$07
+;			BNE pml_decx		 ; not 0 (fully in square) so keep moving
+;
+;			; check allowed directions
+;			LDA pm_allowed
+;			AND #PM_MAP_DIR_L_BIT
+;			BEQ pml_skipx
+;
+;			; decrement PM pos (absolute)
+;			dec16 PM_NT_LO
+;pml_decx:
 			DEC PM_ST_SPR1_X
 pml_skipx:
 			RTS
 pm_move_right:
 			; if pos is at far right of current square then move
 			; to next square of pos. Otherwise just move
-			LDA PM_ST_SPR1_X
-			AND #$07
-			CMP #$07
-			BNE pml_incx		 ; not 7 so keep moving
-
-			; check allowed directions
-			LDA pm_allowed
-			AND #PM_MAP_DIR_R_BIT
-			BEQ pml_skipx
-
-			; increment PM pos (absolute)
-			inc16 PM_NT_LO
-			INC PM_ST_SPR1_X
-			RTS
-pml_incx:
-			; check allowed directions
-			LDA pm_allowed
-			AND #PM_MAP_DIR_R_BIT
-			BEQ pml_skipx
+;			LDA PM_ST_SPR1_X
+;			AND #$07
+;			CMP #$07
+;			BNE pml_incx		 ; not 7 so keep moving
+;
+;			; check allowed directions
+;			LDA pm_allowed
+;			AND #PM_MAP_DIR_R_BIT
+;			BEQ pml_skipx
+;
+;			; increment PM pos (absolute)
+;			inc16 PM_NT_LO
+;			INC PM_ST_SPR1_X
+;			RTS
+;pml_incx:
+;			; check allowed directions
+;			LDA pm_allowed
+;			AND #PM_MAP_DIR_R_BIT
+;			BEQ pml_skipx
 			INC PM_ST_SPR1_X
 			RTS
 
 pm_move_up:
 			; if pos is at top of current square then move
 			; to next square of pos. Otherwise just move
-			LDA PM_ST_SPR1_Y
-			AND #$07
-			BNE pml_decy		 ; not 0 (fully in square) so keep moving
-
-			; check allowed directions
-			LDA pm_allowed
-			AND #PM_MAP_DIR_U_BIT
-			BEQ pml_skipy
-
-			; subtract 32 from PM pos (absolute)
-			sub8From16 #32, PM_NT_LO
-pml_decy:
+;			LDA PM_ST_SPR1_Y
+;			AND #$07
+;			BNE pml_decy		 ; not 0 (fully in square) so keep moving
+;
+;			; check allowed directions
+;			LDA pm_allowed
+;			AND #PM_MAP_DIR_U_BIT
+;			BEQ pml_skipy
+;
+;			; subtract 32 from PM pos (absolute)
+;			sub8From16 #32, PM_NT_LO
+;pml_decy:
 			DEC PM_ST_SPR1_Y
 pml_skipy:
 			RTS
 pm_move_down:
 			; if pos is at bottom right of current square then move
 			; to next square of pos. Otherwise just move
-			LDA PM_ST_SPR1_Y
-			AND #$07
-			CMP #$07
-			BNE pml_incy		 ; not 7 so keep moving
-
-			; check allowed directions
-			LDA pm_allowed
-			AND #PM_MAP_DIR_D_BIT
-			BEQ pml_skipy
-
-			; add 32 to PM pos (absolute)
-			add8To16 #32, PM_NT_LO
-			INC PM_ST_SPR1_Y
-			RTS
-pml_incy:
-			LDA pm_allowed
-			AND #PM_MAP_DIR_D_BIT
-			BEQ pml_skipy
+;			LDA PM_ST_SPR1_Y
+;			AND #$07
+;			CMP #$07
+;;			BNE pml_incy		 ; not 7 so keep moving
+;
+;			; check allowed directions
+;			LDA pm_allowed
+;			AND #PM_MAP_DIR_D_BIT
+;			BEQ pml_skipy
+;
+;			; add 32 to PM pos (absolute)
+;			add8To16 #32, PM_NT_LO
+;			INC PM_ST_SPR1_Y
+;			RTS
+;pml_incy:
+;			LDA pm_allowed
+;			AND #PM_MAP_DIR_D_BIT
+;			BEQ pml_skipy
 			INC PM_ST_SPR1_Y
 			RTS
  
@@ -577,18 +565,22 @@ quit_game:
 ;
 get_pm_pos:
 			LDA PM_ST_SPR1_Y
+			CLC
+			ADC #4
 			LSR
 			LSR
 			LSR					; divide by 8
 			TAY
 			LDA PM_ST_SPR1_X
+			CLC
+			ADC #4
 			LSR
 			LSR
 			LSR					; divide by 8
 			RTS
 ; update nametable position 
 ;   input : Acc = X, Yreg = Y
-;           PM_POS_X/Y that reflects nametable position PM_NT_LO/HI.... not finished
+;           PM_POS_X/Y that reflects nametable position PM_NT_LO/HI
 ;   output: Change PM_NT_LO/HI 
 ;           Change PM_POS_X/Y
 ;
