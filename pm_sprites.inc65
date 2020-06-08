@@ -5,10 +5,10 @@ PM_SPR_INDEX:
     .byte 0,7,8,7   ;   Down    3
     .byte 0,5,6,5   ;   Up      2
 
-PM_DIR_R = 0
-PM_DIR_L = 1
-PM_DIR_D = 2
-PM_DIR_U = 3
+PM_DIR_NUM_R = 0
+PM_DIR_NUM_L = 1
+PM_DIR_NUM_D = 2
+PM_DIR_NUM_U = 3
 
 PM_SPRITES:
 ;..****..
