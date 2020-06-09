@@ -872,29 +872,36 @@ pm_check_input_and_direction:
 	curr_move_is_lr:
 			LDA pm_input_dir_mask
 			AND #$03					
-			BNE pcid_check_allowed 	; new dir is also L/R
+			BNE pcid_filter_allowed 	; new dir is also L/R
 
 	; change dir from L/R to U/D - must be in square (only need to check L/R)
 	check_in_square_horiz:
 			LDA PM_ST_SPR1_X	
 			AND #7
-			BNE pcid_done
-			BRA pcid_check_allowed
+			BEQ pcid_filter_allowed		; in centre, go check all possibilities
+		; don't allow change of direction
+			LDA pm_input_dir_mask
+			AND #$03
+			STA pm_input_dir_mask
+			BRA pcid_filter_allowed
 
 	curr_move_is_ud:
 			LDA pm_input_dir_mask
 			AND #$0C
-			BNE pcid_check_allowed	; new dir is also U/D
+			BNE pcid_filter_allowed	; new dir is also U/D
 
 	; change dir from U/D to L/R - must be in square (only need to check U/D)
 	check_in_square_vert:
 			LDA PM_ST_SPR1_Y
 			AND #7
-			BNE pcid_done
-			;BRA pcid_check_allowed
+			BEQ pcid_filter_allowed		; in centre, go check all possibilities
+		; don't allow change of direction
+			LDA pm_input_dir_mask
+			AND #$0C
+			STA pm_input_dir_mask
 
 	; now check allowed movement directions
-	pcid_check_allowed:
+	pcid_filter_allowed:
 			LDA pm_input_dir_mask
 			AND pm_allowed			; mask of allowed directions
 			STA PM_DIR_MASK			
