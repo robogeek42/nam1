@@ -111,6 +111,16 @@ PM_STR_BUFFER  = pm_local+8		; 12 bytes
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
 
+PM_DIR_R_BIT = $1
+PM_DIR_L_BIT = $2
+PM_DIR_D_BIT = $4
+PM_DIR_U_BIT = $8
+
+PM_DIR_NUM_R = 0
+PM_DIR_NUM_L = 1
+PM_DIR_NUM_D = 2
+PM_DIR_NUM_U = 3
+
 .code
 
 ;------------------------------------------------------------------
@@ -379,6 +389,8 @@ gl_get_input:
 			; Get input - sets pm_input_dir_mask
 			;   - only one of u/d/l/r is set
 			;
+			LDA pm_input_dir_mask
+			PHA
 			JSR pm_get_input_serial
 .ifdef KEYB
 			JSR pm_get_input_keyboard
@@ -391,6 +403,15 @@ gl_get_input:
 			BEQ game_loop	; 		yes, keep just checking input
 			CMP #$FF		; 	quit requested?
 			BEQ quit_game	; 		yes, quit
+
+			LDA pm_input_dir_mask
+			BNE @over
+			PLA
+			STA pm_input_dir_mask
+			JMP @next
+		@over:
+			PLA
+		@next:
 
 			;------------------------------------------------
 			; get allowed directions of movement for PM_NT_LO/HI
@@ -414,7 +435,9 @@ gl_get_input:
 			;------------------------------------------------
 			; update sprite position and animation
 			;
+		;jsr printdebug
 			JSR gl_do_update
+			JSR gl_update_sprites
 
 			;------------------------------------------------
 			; loop
@@ -428,6 +451,29 @@ quit_game:
 			ply
 			plx
 			RTS
+
+_print_num:
+	jsr fmt_hex_string
+	jsr acia_puts
+	lda #' '
+	jsr acia_putc
+	rts
+printdebug:
+	ld16 R0,buffer
+	lda #'A'
+	jsr acia_putc
+	lda #':'
+	jsr acia_putc
+	lda pm_allowed
+	jsr _print_num
+	lda pm_input_dir_mask
+	jsr _print_num
+	lda PM_DIR_MASK
+	jsr _print_num
+	lda PM_DIR_NUM
+	jsr _print_num
+	jsr acia_put_newline
+	rts
 
 ;==================================================================
 ; Subroutines
@@ -448,10 +494,10 @@ gl_do_update:
 			; check if sprite is exactly in square
 			LDA PM_ST_SPR1_X
 			AND #%00000111
-			BNE gl_update_pm
+			BNE glu_done
 			LDA PM_ST_SPR1_Y
 			AND #%00000111
-			BNE gl_update_pm
+			BNE glu_done
 
 			; in square exactly
 			JSR pm_read_nametable
@@ -460,7 +506,8 @@ gl_do_update:
 			CMP #29
 			BEQ gl_is_pill
 			
-			JMP gl_update_pm
+glu_done:
+			RTS
 
 gl_is_dot:
 			; dot = add 10 to score
@@ -477,8 +524,10 @@ gl_update_score:
 
 			; write to name table - space
 			JSR pm_write_nametable
+			RTS
 
-gl_update_pm:
+;------------------------------------------------------------------
+gl_update_sprites:
 			JSR pm_update_pm_sprite		; update animation
 			JSR pm_update_ghost_sprite
 
@@ -500,25 +549,35 @@ move_pacman:
 			BEQ mp_do_update
 			RTS
 mp_do_update:
-			LDA PM_DIR_NUM
-			CMP #PM_DIR_NUM_L
-			BEQ mp_move_left
-			CMP #PM_DIR_NUM_R
-			BEQ mp_move_right
-			CMP #PM_DIR_NUM_D
-			BEQ mp_move_down
-			CMP #PM_DIR_NUM_U
-			BEQ mp_move_up
+			LDA PM_DIR_MASK
+			AND #PM_DIR_L_BIT
+			BNE mp_move_left
+
+			LDA PM_DIR_MASK
+			AND #PM_DIR_R_BIT
+			BNE mp_move_right
+
+			LDA PM_DIR_MASK
+			AND #PM_DIR_D_BIT
+			BNE mp_move_down
+
+			LDA PM_DIR_MASK
+			AND #PM_DIR_U_BIT
+			BNE mp_move_up
 			RTS
 
 mp_move_right:
-			JMP pm_move_right
+			INC PM_ST_SPR1_X
+			RTS
 mp_move_left:
-			JMP pm_move_left
+			DEC PM_ST_SPR1_X
+			RTS
 mp_move_up:
-			JMP pm_move_up
+			DEC PM_ST_SPR1_Y
+			RTS
 mp_move_down:
-			JMP pm_move_down
+			INC PM_ST_SPR1_Y
+			RTS
 
 
 ;------------------------------------------------------------------
@@ -689,7 +748,25 @@ update_pm_nametable_pos:
 			STA PM_POS_X
 			LDA TMP0+1
 			STA PM_POS_Y
+	;jsr print_pos_debug
 			RTS
+
+print_pos_debug:
+	ld16 R0,buffer
+	lda #'P'
+	jsr acia_putc
+	lda #':'
+	jsr acia_putc
+	lda PM_POS_X
+	jsr _print_num
+	lda PM_POS_Y
+	jsr _print_num
+	lda PM_NT_HI
+	jsr _print_num
+	lda PM_NT_LO
+	jsr _print_num
+	jsr acia_put_newline
+	rts
 
 ;---------------------------------------
 ; Read game map at pacmans's position PM_NT_LO/HI
@@ -855,50 +932,30 @@ gip_done:
 ;  - PM_DIR_MASK   - dir as a move bitmask
 ;
 pm_check_input_and_direction:
-			LDA pm_input_dir_mask
-			CMP PM_DIR_MASK
-			BNE pcid_do_check		; if input has changed, check
-	pcid_done:
-			RTS
-
-	pcid_do_check:
-	
 	; only check when exactly in square if turning
 		
 			LDA PM_DIR_MASK
-			AND #$0C				; U/D
+			AND #$C				; U/D
 			BNE curr_move_is_ud
 
 	curr_move_is_lr:
-			LDA pm_input_dir_mask
-			AND #$03					
-			BNE pcid_filter_allowed 	; new dir is also L/R
-
-	; change dir from L/R to U/D - must be in square (only need to check L/R)
-	check_in_square_horiz:
 			LDA PM_ST_SPR1_X	
 			AND #7
 			BEQ pcid_filter_allowed		; in centre, go check all possibilities
 		; don't allow change of direction
-			LDA pm_input_dir_mask
-			AND #$03
-			STA pm_input_dir_mask
+			LDA pm_allowed
+			AND #$3
+			STA pm_allowed
 			BRA pcid_filter_allowed
 
 	curr_move_is_ud:
-			LDA pm_input_dir_mask
-			AND #$0C
-			BNE pcid_filter_allowed	; new dir is also U/D
-
-	; change dir from U/D to L/R - must be in square (only need to check U/D)
-	check_in_square_vert:
 			LDA PM_ST_SPR1_Y
 			AND #7
 			BEQ pcid_filter_allowed		; in centre, go check all possibilities
 		; don't allow change of direction
-			LDA pm_input_dir_mask
-			AND #$0C
-			STA pm_input_dir_mask
+			LDA pm_allowed
+			AND #$C
+			STA pm_allowed
 
 	; now check allowed movement directions
 	pcid_filter_allowed:
@@ -907,6 +964,7 @@ pm_check_input_and_direction:
 			STA PM_DIR_MASK			
 
 	; convert mask to a number for sprite direction movement
+			LDA PM_DIR_MASK
 			CMP #PM_DIR_L_BIT
 			BNE @next1
 			LDX #PM_DIR_NUM_L
@@ -930,6 +988,7 @@ pm_check_input_and_direction:
 			LDX #PM_DIR_NUM_U
 			STX PM_DIR_NUM
 		@done:
+	pcid_done:
 			RTS
 
 ;------------------------------------------------------------------
