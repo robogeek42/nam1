@@ -17,6 +17,7 @@ $(info ** Compile with PONG game **)
 	SOURCES += pong.s65
 	PONG_DEF = -D PONG=1
 endif
+
 ifdef PACMAN
 $(info ** Compile with PACMAN game **)
 	SOURCES += pm.s65
@@ -34,6 +35,12 @@ $(info ** Compile with Image Test **)
 	IT_DEF = -D IMAGETEST=1
 endif
 
+ifdef BREAKOUT
+$(info ** Compile with BREAKOUT game **)
+	SOURCES += breakout.s65
+	BREAKOUT_DEF = -D BREAKOUT=1
+endif
+
 # May need to set CC65_LIB to path to compiler libs
 ifdef CC65_LIB
 	LIBS = -L $(CC65_LIB)
@@ -45,8 +52,7 @@ endif
 # comodore keyboard now not available
 #KEYB ?= 0
 
-DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(VKEYB_DEF) $(UC_DEF) $(PM_DEF) $(PONG_DEF) $(IT_DEF)
-
+DEFINES = $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(VKEYB_DEF) $(UC_DEF) $(PM_DEF) $(PONG_DEF) $(IT_DEF) $(BREAKOUT_DEF)
 ifdef SDIO
 $(info ** Compile with SD card support **)
 	SDIO_DEF = -D SDIO=$(SDIO)
