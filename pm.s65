@@ -1039,6 +1039,10 @@ get_ghost_allowed:
 			STA G1_ALLOWED,X
 			RTS
 
+;------------------------------------------------------------------
+;
+move_ghosts:
+			RTS
 
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00

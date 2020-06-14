@@ -24,11 +24,17 @@
 
 ; breakout vars in basic program area
 bout_vars = $7000
-IRQ_COUNT = pong_vars+9
-IRQ_OLD   = pong_vars+10 ; 2 bytes
-bo_interval = bo_vars+12  ; number of 1/60sec intervals between updating screen
-bo_c0_vol	= bo_vars + 20;
-strbuf	   = pong_vars + 21;
+
+pp_ballx	= bout_vars+0
+pp_bally	= bout_vars+1
+pp_ballxv	= bout_vars+4; ball velocity in X
+pp_ballyv	= bout_vars+5; ball velocity in Y
+pp_game		= bout_vars+8; Game state. 0=not started, 1=playing, FF=quit, FE=win message
+IRQ_COUNT	= bout_vars+9
+IRQ_OLD		= bout_vars+10 ; 2 bytes
+bo_interval	= bout_vars+12  ; number of 1/60sec intervals between updating screen
+bo_c0_vol	= bout_vars+20;
+strbuf		= bout_vars+21;
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -59,9 +65,10 @@ breakout:
 		JSR vdp_regwrite
 
 ; Draw board
-        JSR pp_draw_board
+        JSR draw_board
 
 ;; initialise game variables
+		STZ pp_game
 
 
 ;---------------------------------------
@@ -84,13 +91,13 @@ pih_save_old:
 		STA IRQ_OLD+1
 
 		LDA #$01
-		STA pp_interval
+		STA bo_interval
 		STA IRQ_COUNT
 
 pih_setup_new:
-		LDA #<PONG_IRQ
+		LDA #<BOUT_IRQ
 		STA IRQ_ADDR
-		LDA #>PONG_IRQ
+		LDA #>BOUT_IRQ
 		STA IRQ_ADDR+1
 
 ; Enable VDP IRQ output (every 1/60th second)
@@ -119,19 +126,16 @@ game_loop:
 check_irq_count:
 		LDA IRQ_COUNT
 		BNE gl_skip_update
-		LDA pp_interval		 ;; start counting again (pp_interval * 1/60th)
+		LDA bo_interval		 ;; start counting again (bo_interval * 1/60th)
 		STA IRQ_COUNT
 
 		JSR sound_vol       ; reduce sound vol after a note
 
-.ifdef KEYB
-		JSR get_input_keyboard
-.endif
 .if .def(PS2K) || .def(VKEYB)
 		JSR check_key_flags
 .endif
 
-		JSR draw_paddles
+		JSR draw_paddle
 
 		LDA pp_game		; check game state:
 		CMP #$00		; 	game not started?
@@ -145,24 +149,17 @@ gl_dogame:
 		JSR move_ball
 		JSR draw_ball
 		JSR check_game
-		JSR draw_score
+		;JSR draw_score
 
 gl_skip_update:
         JMP game_loop
 
 ;---------------------------------------
 ; Interrupt handler
-PONG_IRQ:
+BOUT_IRQ:
 		PHA
 
 		JSR vdp_getstatus		   ;; read VDP status to reenable the VDP interrupt
-		; sprite collision detection
-		LDA VDP_STATUS
-		AND #%00100000
-		BEQ @no_colision
-		LDA #1
-		STA pp_collision
-@no_colision:
 		LDA IRQ_COUNT			   ;; if count >0
 		BEQ @skip
 		DEC IRQ_COUNT			   ;; count--
@@ -185,25 +182,28 @@ get_input_serial:
 		CMP #'x'
         BEQ gi_move_right
 		CMP #'q'
-        BEQ gip_do_quit
+        BEQ gi_do_QUIT
 
 gi_check_space:
 		CMP #' '
-        BEQ gip_do_START
+        BEQ gi_do_START
 
 gi_done:
 		RTS
 
-gip_do_QUIT:
+gi_do_QUIT:
 		LDA #$FF
 		STA pp_game
 		rts
-gip_do_START:
+gi_do_START:
 		LDA #$01
 		STA pp_game
-		JSR pp_clear_message
 		rts
 
+gi_move_left:
+		RTS
+gi_move_right:
+		RTS
 ;---------------------------------------
 .if .def(PS2K) || .def(VKEYB)
 check_key_flags:
@@ -242,11 +242,11 @@ gip_skip_set_breakcode:
 		beq gip_do_RIGHT
 
 		cmp #SC_S
-		beq gip_do_START
+		beq gi_do_START
 		cmp #SC_SPC
-		beq gip_do_START
+		beq gi_do_START
 		cmp #SC_Q
-		beq gip_do_QUIT
+		beq gi_do_QUIT
 		
 gip_done:
 		rts
@@ -271,6 +271,75 @@ gip_do_LEFT:
 
 .endif
 
+;---------------------------------------
+; Check game conditions
+; Check ball position - if going off left, inc R score
+check_game:
+		RTS
+
+;---------------------------------------
+; Draw ball
+draw_ball:
+		RTS
+
+;--------------------------------------------------
+; Check ball position and change speed as necessary
+; Move the ball according to current speed
+;
+move_ball:
+		RTS
+
+;---------------------------------------
+; Draw paddle
+draw_paddle:
+		RTS
+
+
+
+;---------------------------------------
+;
+quit_game:
+		ld16 R0,quit_message
+		JSR acia_puts
+; restore interrupt vector 
+pih_restore_irq:
+		LDA IRQ_OLD
+		STA IRQ_ADDR
+		LDA IRQ_OLD+1
+		STA IRQ_ADDR+1
+; disable interrupts at CPU
+		SEI
+
+; disable interrupts from VDP
+		LDA VDP_REGS+1	  ;; data to write is existing Reg1
+		AND #$DF			;; unset interrupt bit
+		STA VDP_REGS+1
+		LDY #$81			;; register to write (1)
+		JSR vdp_regwrite
+
+		JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
+.ifdef SOUND
+		; stop any sounds
+		JSR snd_all_off
+.endif
+.if .def(PS2K) || .def(VKEYB)
+		; reenable typematic repeat
+		jsr KBTMON
+.endif
+		LDA #0
+		JSR vdp_set_mode
+		RTS
+
+;----------------------------------------------------------------------
+; Draw board
+;
+draw_board:
+		RTS
+
+;----------------------------------------------------------------------
+; Sound
+;
 .ifdef SOUND
 sound_vol:
 		LDA pp_c0_vol
@@ -311,3 +380,7 @@ sound_pong:
 sound_score:
 		RTS
 .endif
+
+
+quit_message:
+	.byte "Goodbye!",$0d,$0a,$00

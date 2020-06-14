@@ -30,6 +30,9 @@
 .ifdef PACMAN
 .import pacman
 .endif
+.ifdef BREAKOUT
+.import breakout
+.endif
 
 .segment "VECTORS"
 
@@ -369,9 +372,15 @@ check_pong:
 .endif
                 RTS
 check_pacman:   CMP #'m'
-                BNE cmd_m_error
+		BNE check_breakout
 .ifdef PACMAN
                 JSR pacman
+.endif
+                RTS
+check_breakout: CMP #'b'
+                BNE cmd_m_error
+.ifdef BREAKOUT
+		JSR breakout
 .endif
                 RTS
                 
