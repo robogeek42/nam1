@@ -1,0 +1,313 @@
+; vim: ts=4 sw=4
+; Pong 
+
+.setcpu "65C02"
+
+.include "macros.inc65"
+.include "zeropage.inc65"
+.include "acia.inc65"
+.include "io.inc65"
+.include "string.inc65"
+.include "video.inc65"
+.include "video_common.inc65"
+.include "video_registers.inc65"
+.include "sprite.inc65"
+.include "bcd.inc65"
+.include "kbdvia.inc65"
+.include "sound.inc65"
+.include "colors.inc65"
+.include "scancodes.inc65"
+.include "pckybd.inc65"
+
+.export breakout
+.export BOUT_IRQ
+
+; breakout vars in basic program area
+bout_vars = $7000
+IRQ_COUNT = pong_vars+9
+IRQ_OLD   = pong_vars+10 ; 2 bytes
+bo_interval = bo_vars+12  ; number of 1/60sec intervals between updating screen
+bo_c0_vol	= bo_vars + 20;
+strbuf	   = pong_vars + 21;
+
+; IRQ location - points to address part of JMP xxxx
+IRQ_ADDR = $20A
+
+.bss
+score_buffer:
+	.res 4,0
+
+.code
+
+breakout:
+; sound channels all off
+.ifdef SOUND
+		JSR snd_all_off
+.endif
+
+; set mode
+		LDA #3					; Graphics II mode
+		JSR vdp_set_mode
+		; Set main play area colors
+		LDA #FG_WHITE
+		ORA #BG_DRK_BLUE
+		JSR vdp_load_flat_colors
+		; set corder color
+		LDA #FG_WHITE
+		ORA #BG_LIT_GREEN
+		LDY #$87
+		JSR vdp_regwrite
+
+; Draw board
+        JSR pp_draw_board
+
+;; initialise game variables
+
+
+;---------------------------------------
+.if .def(PS2K) || .def(VKEYB)
+; init keyboard
+		jsr KBINIT
+		lda #0
+		sta KBD_FLAGS ; use KBD_FLAGS zp var to hold key flags
+					  ; 7  6  5  4  3  2  1  0
+					  ;				      L  R
+					  ;				      z  x
+.endif
+
+;=======================================
+; Setup interrupt handler
+pih_save_old:
+		LDA IRQ_ADDR
+		STA IRQ_OLD
+		LDA IRQ_ADDR+1
+		STA IRQ_OLD+1
+
+		LDA #$01
+		STA pp_interval
+		STA IRQ_COUNT
+
+pih_setup_new:
+		LDA #<PONG_IRQ
+		STA IRQ_ADDR
+		LDA #>PONG_IRQ
+		STA IRQ_ADDR+1
+
+; Enable VDP IRQ output (every 1/60th second)
+pih_enable_vdp_irq:
+		LDA VDP_REGS+1	  ;; data to write is existing Reg1 (was set by MODE command)
+		ORA #$20			;; with bit2 set - actually bit 5 if numbered from LSb like sensible chips
+		STA VDP_REGS+1
+		LDY #$81			;; register to write (1)
+		JSR vdp_regwrite
+
+		JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
+; Start allowing interrupts at CPU
+		CLI
+
+;=======================================
+; Game loop
+game_loop:
+
+		JSR get_input_serial
+
+.if .def(PS2K) || .def(VKEYB)
+		JSR get_input_ps2k
+.endif
+
+check_irq_count:
+		LDA IRQ_COUNT
+		BNE gl_skip_update
+		LDA pp_interval		 ;; start counting again (pp_interval * 1/60th)
+		STA IRQ_COUNT
+
+		JSR sound_vol       ; reduce sound vol after a note
+
+.ifdef KEYB
+		JSR get_input_keyboard
+.endif
+.if .def(PS2K) || .def(VKEYB)
+		JSR check_key_flags
+.endif
+
+		JSR draw_paddles
+
+		LDA pp_game		; check game state:
+		CMP #$00		; 	game not started?
+		BEQ game_loop	; 		yes, keep just checking input and drawing paddles
+		CMP #$02		;   pause state?
+		BEQ game_loop
+		CMP #$FF		; 	quit requested?
+		BNE gl_dogame	; 		no, then continue
+		JMP quit_game	; 		yes, quit
+gl_dogame:
+		JSR move_ball
+		JSR draw_ball
+		JSR check_game
+		JSR draw_score
+
+gl_skip_update:
+        JMP game_loop
+
+;---------------------------------------
+; Interrupt handler
+PONG_IRQ:
+		PHA
+
+		JSR vdp_getstatus		   ;; read VDP status to reenable the VDP interrupt
+		; sprite collision detection
+		LDA VDP_STATUS
+		AND #%00100000
+		BEQ @no_colision
+		LDA #1
+		STA pp_collision
+@no_colision:
+		LDA IRQ_COUNT			   ;; if count >0
+		BEQ @skip
+		DEC IRQ_COUNT			   ;; count--
+@skip:
+		PLA
+		RTI
+;---------------------------------------
+
+
+;---------------------------------------
+; Get input from ACIA
+get_input_serial:
+		LDA ACIA_STATUS
+		AND #ACIA_STATUS_RX_FULL
+		BEQ gi_done
+		LDA ACIA_DATA
+
+		CMP #'z'
+        BEQ gi_move_left
+		CMP #'x'
+        BEQ gi_move_right
+		CMP #'q'
+        BEQ gip_do_quit
+
+gi_check_space:
+		CMP #' '
+        BEQ gip_do_START
+
+gi_done:
+		RTS
+
+gip_do_QUIT:
+		LDA #$FF
+		STA pp_game
+		rts
+gip_do_START:
+		LDA #$01
+		STA pp_game
+		JSR pp_clear_message
+		rts
+
+;---------------------------------------
+.if .def(PS2K) || .def(VKEYB)
+check_key_flags:
+		lda #1
+		bit KBD_FLAGS
+		beq @next1
+        jsr gi_move_right
+	@next1:
+		lda #2
+		bit KBD_FLAGS
+        beq @over
+        jsr gi_move_left
+	@over:
+		rts
+
+;-----------------------------------------------------
+; This sets the KBD_FLAGS variable as above
+;
+get_input_ps2k:
+		jsr KBSCAN_GAME
+		bcc gip_done
+		
+		ldx #0				  ; 0 in X means this is a make code
+		lda KBD_CHAR
+		cmp #SC_SPECIAL		 ; check for a break code
+		bne gip_skip_set_breakcode
+
+		lda KBD_SPECIAL		 ; get break code
+		;beq gip_done
+		ldx #1				  ; 1 in X means this is a break code
+		
+gip_skip_set_breakcode:
+		cmp #SC_Z
+		beq gip_do_LEFT
+		cmp #SC_X
+		beq gip_do_RIGHT
+
+		cmp #SC_S
+		beq gip_do_START
+		cmp #SC_SPC
+		beq gip_do_START
+		cmp #SC_Q
+		beq gip_do_QUIT
+		
+gip_done:
+		rts
+
+gip_do_RIGHT:
+		cpx #0
+		beq @do_make
+		RMB0 KBD_FLAGS	  ; key unpressed - unset bit 0
+		rts
+  @do_make:
+		SMB0 KBD_FLAGS	  ; key was pressed - set bit 0
+		rts
+
+gip_do_LEFT:
+		cpx #0
+		beq @do_make
+		RMB1 KBD_FLAGS
+		rts
+  @do_make:
+		SMB1 KBD_FLAGS
+		rts
+
+.endif
+
+.ifdef SOUND
+sound_vol:
+		LDA pp_c0_vol
+		CMP #$0F
+		BCS @over
+		INC pp_c0_vol
+		LDA #%10010000 ; c0 vol
+		ORA pp_c0_vol
+		JSR snd_write
+@over:
+		RTS
+sound_ping:
+		; Set frequency to %0001111111 = 127 -> 3.6864MHz/32*127 = 907Hz
+		LDA #%10001111  ; Freq Channel 1 (of 3)
+		JSR snd_write
+		LDA #%00000111  ; Freq DDDDDD 
+		JSR snd_write
+		LDA #%10010000 ; c0 vol = full (0)
+		JSR snd_write
+		STZ pp_c0_vol
+		RTS
+sound_pong:
+		; Set frequency to %0100000110 = 262 -> 3.6864MHz/32*262 ~= 440Hz
+		LDA #%10000110  ; Freq Channel 1 (of 3)
+		JSR snd_write
+		LDA #%00010000  ; Freq DDDDDD 
+		JSR snd_write
+		LDA #%10010000 ; c0 vol = full (0)
+		JSR snd_write
+		STZ pp_c0_vol
+		RTS
+sound_score:
+		RTS
+.else
+sound_vol:
+sound_ping:
+sound_pong:
+sound_score:
+		RTS
+.endif
