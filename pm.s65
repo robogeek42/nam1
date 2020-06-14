@@ -25,43 +25,57 @@ pm_vars = $7000
 
 ; game state 0 = not started 1 = playing  FF =  quit
 pm_game = pm_vars + 0
-pm_allowed = pm_vars + 1
-pm_input_dir = pm_vars + 2
-KBD_LAST_ROW = pm_vars + 3
-KBD_LAST_COL = pm_vars + 4
+pm_input_dir = pm_vars + 1
 
 ; positions (x,y) and direction for each actor
-pm_positions = pm_vars + 5
+pm_info = pm_vars + 2
 
 ; PACMAN position info
-PM_NT_LO = pm_positions+0   ; map (name table) position
-PM_NT_HI = pm_positions+1   ; map (name table) position
-PM_DIR = pm_positions+2   ; Direction
+PM_POS_X	= pm_info+0	  ; X/Y in screen characters
+PM_POS_Y	= pm_info+1
+PM_DIR		= pm_info+2   ; Direction (number)
+PM_NT_LO	= pm_info+3   ; map (name table) position
+PM_NT_HI	= pm_info+4   ; map (name table) position
+PM_ALLOWED	= pm_info+5   ; bitmask of allowed directions
+
+g1_info		= pm_info+8		; exact 8 between all data sections
 ; Ghost 1
-G1_X = pm_positions+3
-G1_Y = pm_positions+4
-G1_D = pm_positions+5   ; Direction
-G1_M = pm_positions+6   ; Mode (0=norm 1=scared)
+G1_X		= g1_info+0
+G1_Y		= g1_info+1
+G1_DIR		= g1_info+2   ; Direction
+G1_NT_LO	= g1_info+3
+G1_NT_HI	= g1_info+4
+G1_ALLOWED	= g1_info+5
+G1_MODE		= g1_info+6   ; Mode (0=norm 1=scared)
+
+g2_info		= g1_info+8
 ; Ghost 2
-G2_X = pm_positions+7
-G2_Y = pm_positions+8
-G2_D = pm_positions+9
-G2_M = pm_positions+10
+G2_X		= g2_info+0
+G2_Y		= g2_info+1
+G2_DIR		= g2_info+2   ; Direction
+G2_NT_LO	= g2_info+3
+G2_NT_HI	= g2_info+4
+G2_ALLOWED	= g2_info+5
+G2_MODE		= g2_info+6   ; Mode (0=norm 1=scared)
+
+g3_info		= g2_info+8
 ; Ghost 3
-G3_X = pm_positions+11
-G3_Y = pm_positions+12
-G3_D = pm_positions+13
-G3_M = pm_positions+14
+G3_X		= g3_info+0
+G3_Y		= g3_info+1
+G3_DIR		= g3_info+2   ; Direction
+G3_NT_LO	= g3_info+3
+G3_NT_HI	= g3_info+4
+G3_ALLOWED	= g3_info+5
+G3_MODE		= g3_info+6   ; Mode (0=norm 1=scared)
+
 ; only 3 for now ...
-pm_positions_end = pm_positions+14	  ; (15)
+pm_positions_end = g3_info+7
 
 ; sprite data table, 4 bytes per sprite
 ; Y, X, Pattern No, Color/EarlyFlag
 ; starts with number of sprites enabled
 
-PM_UPDATE_FLAG = pm_positions_end +1 ; flag 1 = update sprites
-
-pm_sprite_table = pm_positions_end + 2
+pm_sprite_table = pm_positions_end+0
 
 PM_NUMPRITES = pm_sprite_table+0
 
@@ -90,17 +104,15 @@ PM_ST_SPR5_X = pm_sprite_table+18
 PM_ST_SPR5_P = pm_sprite_table+19
 PM_ST_SPR5_C = pm_sprite_table+20
 
-pm_sprite_table_end = pm_sprite_table+20
+pm_local =  pm_sprite_table+21
 
-pm_local =  pm_sprite_table_end+1
-
-IRQ_OLD		= pm_local+0  ; 2 bytes
-PM_IRQCOUNT	= pm_local+2
-PM_INTERRUPT   = pm_local+3
-GHOST_IRQCOUNT = pm_local+4
-
-PM_SCORE = pm_local+8	   ; 2 bytes
-PM_STR_BUFFER = pm_local+10  ; 12 bytes
+IRQ_OLD			= pm_local+0  ; 2 bytes
+PM_IRQCOUNT		= pm_local+2
+PM_INTERRUPT	= pm_local+3
+GHOST_IRQCOUNT	= pm_local+4
+UPDATE_FLAG		= pm_local+5  ; flag 1 = update sprites
+PM_SCORE		= pm_local+6  ; 2 bytes
+PM_STR_BUFFER	= pm_local+8  ; 12 bytes
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -288,6 +300,7 @@ pmdm_loop7: LDA (TMP0),Y
 			STA PM_NT_HI
 			LDA #PM_DIR_L			  ; facing left
 			STA PM_DIR
+			JSR calc_pm_pos
 
 ; Enable sprites
 			LDA PM_NUMPRITES		   ; enable sprites
@@ -342,8 +355,7 @@ pmih_save_old:
 			CLI
 
 			STZ pm_game			; start at state 0 - not playing yet
-			JSR pm_readmap		; get allowed directions
-			STA pm_allowed
+			JSR get_pm_allowed	; get allowed directions
 
 ;------------------------------------------------------------------
 ; GAME LOOP
@@ -370,8 +382,9 @@ gl_get_input:
 .if .def(PS2K) || .def(VKEYB)
 			JSR pm_get_input_ps2k
 .endif
-			JSR pm_readmap
-			STA pm_allowed
+			JSR get_pm_allowed
+			LDA #0
+			JSR get_ghost_allowed
 
 			JSR pm_process_input
 
@@ -383,6 +396,11 @@ gl_get_input:
 			JMP quit_game	; 		yes, quit
 
 gl_do_update:
+			; Move the pacman position (PM_NT_LO/HI and sprite pos) 
+			; based on PM_DIR and sprite pos
+			JSR move_pacman
+			JSR move_ghosts
+
 			; check if is in square
 			LDA PM_DIR				; check depends on direction of movement U/D or L/R
 			CMP #PM_DIR_D			 ;
@@ -424,43 +442,51 @@ gl_update_score:
 			JSR pm_write_nametable
 
 gl_update_pm:
+			; update the sprite animations based on PM_DIR and tick number
 			JSR pm_update_pm_sprite
 			JSR pm_update_ghost_sprite
 
 			LDA #1
-			STA PM_UPDATE_FLAG   ; tell update routine to update sprites
+			STA UPDATE_FLAG	   ; tell update routine to update sprites
 
-gl_move_pacman:
-			LDA PM_IRQCOUNT				 ; update every N ticks
-			AND #$01						; N=2 
-			BNE gl_skip_update
-			LDA PM_DIR
-			CMP #PM_DIR_R
-			BEQ gl_move_right
-			CMP #PM_DIR_L
-			BEQ gl_move_left
-			CMP #PM_DIR_U
-			BEQ gl_move_up
-			CMP #PM_DIR_D
-			BEQ gl_move_down
-			JMP gl_skip_update
-
-gl_move_right:
-			JSR pm_move_right
-			JMP gl_skip_update
-gl_move_left:
-			JSR pm_move_left
-			JMP gl_skip_update
-gl_move_up:
-			JSR pm_move_up
-			JMP gl_skip_update
-gl_move_down:
-			JSR pm_move_down
-
-gl_skip_update:
 			JMP game_loop
 
 ;------------------------------------------------------------------
+; Exit
+quit_game:
+			JSR pm_quit_game
+			ply
+			plx
+			RTS
+
+;==================================================================
+; Subroutines
+
+;------------------------------------------------------------------
+; move pacman based on 
+;  - PM_DIR - (num 0=R,1=L,2=D,3=U) Current dir of movement
+;  - PM_ST_SPR1_X/Y - to determine "In-square"
+;  - PM_ALLOWED - (bitmask) allowed move directions
+;  Updates 
+;  - PM_NT_LO/HI	- new nametable pos
+;  - PM_ST_SPR1_X/Y	- new sprite pos
+;
+move_pacman:
+			LDA PM_IRQCOUNT				 ; update every N ticks
+			AND #$01						; N=2 
+			BNE mp_done
+			LDA PM_DIR
+			CMP #PM_DIR_R
+			BEQ pm_move_right
+			CMP #PM_DIR_L
+			BEQ pm_move_left
+			CMP #PM_DIR_U
+			BEQ pm_move_up
+			CMP #PM_DIR_D
+			BEQ pm_move_down
+mp_done:
+			RTS
+
 pm_move_left:
 			; if pos is at left of current square then move
 			; to next square of pos. Otherwise just move
@@ -469,16 +495,17 @@ pm_move_left:
 			BNE pml_decx		 ; not 0 (fully in square) so keep moving
 
 			; check allowed directions
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_L_BIT
 			BEQ pml_skipx
 
 			; decrement PM pos (absolute)
 			dec16 PM_NT_LO
-pml_decx:
+	pml_decx:
 			DEC PM_ST_SPR1_X
-pml_skipx:
+	pml_skipx:
 			RTS
+
 pm_move_right:
 			; if pos is at far right of current square then move
 			; to next square of pos. Otherwise just move
@@ -488,7 +515,7 @@ pm_move_right:
 			BNE pml_incx		 ; not 7 so keep moving
 
 			; check allowed directions
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_R_BIT
 			BEQ pml_skipx
 
@@ -496,9 +523,9 @@ pm_move_right:
 			inc16 PM_NT_LO
 			INC PM_ST_SPR1_X
 			RTS
-pml_incx:
+	pml_incx:
 			; check allowed directions
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_R_BIT
 			BEQ pml_skipx
 			INC PM_ST_SPR1_X
@@ -512,16 +539,17 @@ pm_move_up:
 			BNE pml_decy		 ; not 0 (fully in square) so keep moving
 
 			; check allowed directions
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_U_BIT
 			BEQ pml_skipy
 
 			; subtract 32 from PM pos (absolute)
 			sub8From16 #32, PM_NT_LO
-pml_decy:
+	pml_decy:
 			DEC PM_ST_SPR1_Y
-pml_skipy:
+	pml_skipy:
 			RTS
+
 pm_move_down:
 			; if pos is at bottom right of current square then move
 			; to next square of pos. Otherwise just move
@@ -531,7 +559,7 @@ pm_move_down:
 			BNE pml_incy		 ; not 7 so keep moving
 
 			; check allowed directions
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_D_BIT
 			BEQ pml_skipy
 
@@ -539,29 +567,18 @@ pm_move_down:
 			add8To16 #32, PM_NT_LO
 			INC PM_ST_SPR1_Y
 			RTS
-pml_incy:
-			LDA pm_allowed
+	pml_incy:
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_D_BIT
 			BEQ pml_skipy
 			INC PM_ST_SPR1_Y
 			RTS
  
- 
-;------------------------------------------------------------------
-; Exit
-quit_game:
-			JSR pm_quit_game
-			ply
-			plx
-			RTS
-
-;==================================================================
-; Subroutines
-
 ;---------------------------------------
 ; Read game map at pacmans's position PM_NT_LO/HI
 ;
-pm_readmap: CLC
+get_pm_allowed:
+			CLC
 			LDA #<PACMAN_MAP
 			ADC PM_NT_LO
 			STA TMP2
@@ -570,6 +587,7 @@ pm_readmap: CLC
 			STA TMP2+1
 			LDY #0
 			LDA (TMP2),Y
+			STA PM_ALLOWED
 			RTS
 
 ;---------------------------------------
@@ -729,7 +747,13 @@ gip_do_DOWN:
 .endif
 
 ;---------------------------------------
-; Process input in terms of 0=L,1=R,2=U,3=D
+; Process input
+; Inputs:
+;   - pm_input_dir - direction number (0=L,1=R,2=U,3=D)
+;   - PM_DIR       - current movement direction (number)
+;   - PM_ALLOWED   - allowed input dirs
+; Outputs
+;   - PM_DIR       - updated with new move direction
 pm_process_input:
 			LDA pm_input_dir
 			BMI pi_done		 ; $FF = no input
@@ -796,28 +820,28 @@ pi_check_lr:
 			RTS
 
 pi_dir_right:
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_R_BIT
 			BEQ @skip
 			LDA #PM_DIR_R
 			STA PM_DIR
 @skip:	  RTS
 pi_dir_left:
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_L_BIT
 			BEQ @skip
 			LDA #PM_DIR_L
 			STA PM_DIR
 @skip:		RTS
 pi_dir_up:
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_U_BIT
 			BEQ @skip
 			LDA #PM_DIR_U
 			STA PM_DIR
 @skip:		RTS
 pi_dir_down:
-			LDA pm_allowed
+			LDA PM_ALLOWED
 			AND #PM_MAP_DIR_D_BIT
 			BEQ @skip
 			LDA #PM_DIR_D
@@ -868,7 +892,7 @@ PM_IRQ:		PHP						; save status flags (so BCD is correct)
 ;   -- by writing to the Sprite Attribute table
 ;
 pm_draw_sprites:
-			LDA PM_UPDATE_FLAG
+			LDA UPDATE_FLAG	
 			BNE pm_do_draw
 			RTS
 pm_do_draw:
@@ -891,7 +915,7 @@ pds_loop1:
 			DEX
 			BNE pds_loop1
 pds_done:
-			STZ PM_UPDATE_FLAG
+			STZ UPDATE_FLAG	
 			ply
 			plx
 			RTS
@@ -959,6 +983,62 @@ pugs_save:
 			STA PM_ST_SPR4_P
 pugs_done:			
 			RTS
+
+;------------------------------------------------------------------
+; Input - PM_ST_SPR1_X/Y
+; Output - PM_POS_X/Y
+;
+calc_pm_pos:
+			LDA PM_ST_SPR1_X
+			CLC
+			ADC #4
+			LSR
+			LSR
+			LSR
+			STA PM_POS_X
+			LDA PM_ST_SPR1_Y
+			CLC
+			ADC #4
+			LSR
+			LSR
+			LSR
+			STA PM_POS_Y
+			RTS
+
+;------------------------------------------------------------------
+; Read game map at Ghost n's position Gn_NT_LO/HI
+; Input A = ghost number. 0==G1
+get_ghost_allowed:
+			ASL			; Ghost Number 
+			ASL
+			ASL 		; * 8
+			TAX
+		; check special
+			LDA G1_NT_HI,X
+			CMP #1
+			BNE gga_readmap
+			LDA G1_NT_LO,X
+			CMP #$4E
+			BNE gga_readmap
+			CMP #$4F
+			BNE gga_readmap
+			LDA #$B
+			STA G1_ALLOWED,X
+			RTS
+
+	gga_readmap:
+            CLC
+			LDA #<PACMAN_MAP
+			ADC G1_NT_LO,X
+			STA TMP2
+			LDA #>PACMAN_MAP
+			ADC G1_NT_HI,X
+			STA TMP2+1
+			LDY #0
+			LDA (TMP2),Y
+			STA G1_ALLOWED,X
+			RTS
+
 
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
