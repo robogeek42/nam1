@@ -11,6 +11,7 @@ ACIA_BUFFER_LENGTH = 10
 .export acia_putc
 .export acia_puts
 .export acia_put_newline
+.export acia_puts_count
 
 .code
 
@@ -45,18 +46,30 @@ wait_txd_empty:   lda ACIA_STATUS
                   rts
 
 ; Send the zero terminated string pointed to by R0
-acia_puts:        ;phay
-				  pha
-				  phy
+acia_puts:     
+		  pha
+		  phy
                   ldy #$ff
 next_char:        iny
                   lda (R0),y
                   jsr acia_putc
                   bne next_char
+		  ply
+		  pla
+                  rts
+; Send the zero terminated string pointed to by R0
+;  return count of chars printed in R1
+acia_puts_count:
+		  pha
+		  phy
+                  ldy #$ff
+apc_next_char:    iny
+                  lda (R0),y
+                  jsr acia_putc
+		  bne apc_next_char
                   STY R1            ; number of chars printed
-                  ;play
-				  ply
-				  pla
+		  ply
+		  pla
                   rts
 
 ; ACIA entry point

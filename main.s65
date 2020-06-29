@@ -457,7 +457,7 @@ cd_dir_show_entry:
                 JSR sdfs_set_dir_ptr        ; load addr of fh_dir into X(lo)A(hi)
                 STX R0                        ; store them in string pointer so we can print
                 STA R0+1
-                JSR    acia_puts                ; print string (file name)
+		JSR acia_puts_count         ; print string (file name)
                 LDY R1                      ; number of chars printed is put into R1
                 LDA #' '                    ; print spaces to pad to 14
 cd_dir_pad:
