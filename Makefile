@@ -32,6 +32,7 @@ endif
 
 ifdef IMAGETEST
 $(info ** Compile with Image Test **)
+	SOURCES += video_load_mc.s65
 	IT_DEF = -D IMAGETEST=1
 endif
 

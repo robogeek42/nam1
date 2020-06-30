@@ -23,6 +23,9 @@
 .ifdef UCHESS2
 .include "uchess2.inc65"
 .endif
+.ifdef IMAGETEST
+.include "video_load_mc.inc65"
+.endif
 
 .ifdef PONG
 .import pong
@@ -218,7 +221,21 @@ loop:           ld16 R0, prompt
 
 @cmd_l:         cmp #'l'
                 bne @cmd_l_end
+                lda buffer+1
+
+		cmp #'1'
+		bne @cmd_l_test_2
                 jsr cmd_loadimage
+                jmp loop
+		@cmd_l_test_2:
+		cmp #'2'
+		bne @cmd_l_test_3
+                jsr cmd_loadimage
+                jmp loop
+		@cmd_l_test_3:
+		cmp #'3'
+		bne @cmd_l_end
+		jsr cmd_loadimage_mc
                 jmp loop
                 @cmd_l_end:
 
@@ -536,6 +553,23 @@ cmd_loadimage:
                 RTS
 image_smashmario_COMP:
     .include "smashmario_COMP.inc65"
+.else
+                RTS
+.endif
+cmd_loadimage_mc:
+.ifdef IMAGETEST
+		; switch to mode 3 (Multicolor)
+                LDA #3
+                JSR vdp_set_mode
+                ; put address into TMP1
+		LDA #<multicolor_test_data
+                STA TMP1
+                LDA #>multicolor_test_data
+                STA TMP1+1
+                ; load image
+                JSR vdp_load_mc_pic
+                RTS
+    .include "mode3_example.inc65"
 .else
                 RTS
 .endif

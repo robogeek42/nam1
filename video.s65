@@ -741,15 +741,16 @@ vdp_load_mc_standard_name_table:
 				STA TMP0			;; name value at start of current row is stored in TMP0
 
 vlsnt_loop3:	LDA #4
-				STA TMP1			;; 4 rows the same - counter in here
+				STA TMP0+1			;; 4 rows the same - counter in here
 				
 vlsnt_loop2:	LDY #$20			;; count 32 chars per row
 				LDX TMP0			;; starting name value for this row
-vlsnt_loop1:	JSR vdp_write
+vlsnt_loop1:	STX VDP_RD_VRAM
+				NOP
 				INX
 				DEY
 				BNE vlsnt_loop1
-				DEC TMP1
+				DEC TMP0+1
 				BNE vlsnt_loop2
 
 				; 4 rows of 32 done, repeat till we get to end of screen (24 rows)
