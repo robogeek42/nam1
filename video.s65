@@ -745,7 +745,9 @@ vlsnt_loop3:	LDA #4
 				
 vlsnt_loop2:	LDY #$20			;; count 32 chars per row
 				LDX TMP0			;; starting name value for this row
-vlsnt_loop1:	STX VDP_RD_VRAM
+vlsnt_loop1:	STX VDP_WR_VRAM
+				NOP
+				NOP
 				NOP
 				INX
 				DEY
