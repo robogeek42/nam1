@@ -301,10 +301,47 @@ gip_do_LEFT:
 check_game:
 		RTS
 
+;--------------------------------------------------
+; return the VDP address of any pos X,Y in TMP1
+; X and Y are in TMP2
+get_mc_point_address:
+		; Calculate address to write to
+		; Address (Ydiv8)*256 + Ymod8 + (Xdiv2)*8
+		; store addess in TMP1 (2 bytes)
+		
+		; (Ydiv8)*256 is putting Ydiv8 into high byte
+		LDA TMP2+1		; Y
+		LSR				; y div 2
+		LSR				; y div 4
+		LSR				; y div 8
+		STA TMP1+1
+
+		; now add Y mod 8, so this is putting Y mod 8 into low byte
+		LDA TMP2+1		; Y
+		AND #$07
+		STA TMP1
+		
+		; finally add Xdiv2 * 8 (X<64 so this will fit in a byte)
+		LDA TMP2  		; X
+		AND #$FE
+		ASL
+		ASL
+		; now add to TMP1
+		ADC TMP1
+		STA TMP1
+		LDA TMP1+1
+		ADC #0
+		STA TMP1+1
+		RTS
+
 ;---------------------------------------
 ; Draw ball
 draw_ball:
-		JSR get_ball_address 	; read into TMP1
+		LDA ballx
+		STA TMP2
+		LDA bally
+		STA TMP2+1
+		JSR get_mc_point_address 	; read into TMP1
 
 		; start write on VDP at correct address
 		LDA TMP1+1
@@ -325,7 +362,11 @@ draw_ball:
 ;---------------------------------------
 ; Clear ball
 clear_ball:
-		JSR get_ball_address 	; read into TMP1
+		LDA ballx
+		STA TMP2
+		LDA bally
+		STA TMP2+1
+		JSR get_mc_point_address 	; read into TMP1
 
 		; read byte at ball address
 		LDA TMP1+1
@@ -353,46 +394,16 @@ clear_ball:
 		JSR vdp_write
 		RTS
 		
-
-;--------------------------------------------------
-; return the VDP address of the ball in TMP1
-;
-get_ball_address:
-		; Calculate address to write to
-		; Address (Ydiv8)*256 + Ymod8 + (Xdiv2)*8
-		; store addess in TMP1 (2 bytes)
-		
-		; (Ydiv8)*256 is putting Ydiv8 into high byte
-		LDA bally
-		LSR  ; y div 2
-		LSR  ; y div 4
-		LSR  ; y div 8
-		STA TMP1+1
-
-		; now add Y mod 8, so this is putting Y mod 8 into low byte
-		LDA bally
-		AND #$07
-		STA TMP1
-		
-		; finally add Xdiv2 * 8 (X<64 so this will fit in a byte)
-		LDA ballx
-		AND #$FE
-		ASL
-		ASL
-		; now add to TMP1
-		ADC TMP1
-		STA TMP1
-		LDA TMP1+1
-		ADC #0
-		STA TMP1+1
-		RTS
-
 ;--------------------------------------------------
 ; Read color under the ball
 ; return in Acc
 ;
 read_ball:
-		JSR get_ball_address 	; read into TMP1
+		LDA ballx
+		STA TMP2
+		LDA bally
+		STA TMP2+1
+		JSR get_mc_point_address ; read into TMP1
 		LDA TMP1+1
 		LDY TMP1
 		JSR vdp_set_addr_r
@@ -428,6 +439,8 @@ move_ball:
 		BMI mb_make_x_positive	; X < 0
 		CMP #64
 		BCS mb_make_x_negative  ; X >= 64
+		; check under new ball pos
+
 		STA ballx				; change is good, store new X
 		JMP mb_do_y				; and do y next
 mb_make_x_positive:
@@ -448,7 +461,7 @@ mb_do_y:
 		LDA ballyv
 		ADC bally
 		
-		; check new ball x position
+		; check new ball y position
 		; 1. Check top/bottom walls
 		CMP #0
 		BMI mb_make_y_positive	; Y < 0
