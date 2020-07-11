@@ -27,8 +27,10 @@ bout_vars = $7000
 
 ballx	= bout_vars+0
 bally	= bout_vars+1
-ballxv	= bout_vars+4; ball velocity in X
-ballyv	= bout_vars+5; ball velocity in Y
+ballxv	= bout_vars+4		; ball velocity in X
+ballyv	= bout_vars+5		; ball velocity in Y
+batx    = bout_vars+6		; left pos of bat
+
 br_game		= bout_vars+8; Game state. 0=not started, 1=playing, FF=quit, FE=win message
 IRQ_COUNT	= bout_vars+9
 IRQ_OLD		= bout_vars+10 ; 2 bytes
@@ -74,14 +76,19 @@ breakout:
 
 ;; initialise game variables
 		STZ br_game
+
+	; starting bat position
+		LDA #30
+		STA batx
 		
 	; starting ball position and sped
-		LDA #17 
+		LDA #32 
 		STA ballx
-		LDA #19 
+		LDA #46 
 		STA bally
-		LDA #1
+		LDA #$01
 		STA ballxv
+		LDA #$FF
 		STA ballyv
 
 ;---------------------------------------
@@ -103,7 +110,7 @@ pih_save_old:
 		LDA IRQ_ADDR+1
 		STA IRQ_OLD+1
 
-		LDA #$01
+		LDA #$02
 		STA bo_interval
 		STA IRQ_COUNT
 		LDA #0
@@ -144,6 +151,11 @@ check_irq_count:
 		LDA #0
 		STA IRQ_EVENT
 
+.if .def(PS2K) || .def(VKEYB)
+		JSR check_key_flags
+.endif
+		JSR draw_paddle
+
 		LDA IRQ_COUNT
 		CMP #0
 		BNE gl_skip_update
@@ -151,12 +163,6 @@ check_irq_count:
 		STA IRQ_COUNT
 
 		JSR sound_vol       ; reduce sound vol after a note
-
-.if .def(PS2K) || .def(VKEYB)
-		JSR check_key_flags
-.endif
-
-		JSR draw_paddle
 
 		LDA br_game		; check game state:
 		CMP #$00		; 	game not started?
@@ -226,8 +232,20 @@ gi_do_START:
 		rts
 
 gi_move_left:
+		LDA batx
+		DEC
+		CMP #0
+		BEQ giml_over
+		STA batx
+	giml_over:
 		RTS
 gi_move_right:
+		LDA batx
+		INC
+		CMP #56
+		BCS gimr_over
+		STA batx
+	gimr_over:
 		RTS
 ;---------------------------------------
 .if .def(PS2K) || .def(VKEYB)
@@ -263,7 +281,11 @@ get_input_ps2k:
 gip_skip_set_breakcode:
 		cmp #SC_Z
 		beq gip_do_LEFT
+		cmp #SC_COMMA
+		beq gip_do_LEFT
 		cmp #SC_X
+		beq gip_do_RIGHT
+		cmp #SC_DOT
 		beq gip_do_RIGHT
 
 		cmp #SC_S
@@ -395,21 +417,17 @@ clear_ball:
 		RTS
 		
 ;--------------------------------------------------
-; Read color under the ball
+; Read color under pos TMP2
 ; return in Acc
 ;
-read_ball:
-		LDA ballx
-		STA TMP2
-		LDA bally
-		STA TMP2+1
+read_col_at_pos:
 		JSR get_mc_point_address ; read into TMP1
 		LDA TMP1+1
 		LDY TMP1
 		JSR vdp_set_addr_r
 		JSR vdp_read
 		PHA
-		LDA ballx				; Check if X is odd/even to get correct nybble
+		LDA TMP2				; Check if X is odd/even to get correct nybble
 		AND #1
 		BEQ rb_hi_nybble
 		PLA
@@ -422,71 +440,126 @@ read_ball:
 		LSR
 		LSR
 		RTS
+
+;--------------------------------------------------
+; Read color under the ball
+; return in Acc
+;
+read_ball:
+		LDA ballx
+		STA TMP2
+		LDA bally
+		STA TMP2+1
+		JSR read_col_at_pos
 		
 ;--------------------------------------------------
 ; Check ball position and change speed as necessary
 ; Move the ball according to current speed
+;    logic:
+;      -- current ball position in ballx/y
+;         current movement velocity in ballxv/yv
+;      -- next ball position in TMP2/TMP2+1 == nextx/y
+;      1. Add XV to X -> nextx
+;      2. IF X<0 or X>64 reverse XV
+;         - Add XV to X -> nextx
+;      3. Add YV to Y -> nexty
+;      4. IF Y>48 reverse YV
+;         - Add YV to Y -> nexty
+;         IF Y<0 ==> new ball
+;
+;      -- TMP2(nextx/y) contains next position including wall bounce
+;
+;      5. Check under next ball position (Acc -> NextCol)
+;         IF NextCol == WHITE reverse Y 
+;           Adjust YV/XV 
+;           Add YV to Y -> nexty
+;
+;	   6. IF NextCol != BLACK Reverse YV
+;	      Remove Brick
+;	      Add YV tio Y -> nexty
+;
+;      7. Finalise movment TMP2 -> ballx/y
 ;
 move_ball:
-		; X first
+
+; Check walls
+; 1. Add XV to X -> nextx
 		CLC	
 		LDA ballxv
 		ADC ballx
-		
-		; check new ball x position
-		; 1. Check side walls
-		CMP #0
-		BMI mb_make_x_positive	; X < 0
-		CMP #64
-		BCS mb_make_x_negative  ; X >= 64
-		; check under new ball pos
+		STA TMP2
 
-		STA ballx				; change is good, store new X
-		JMP mb_do_y				; and do y next
-mb_make_x_positive:
-		LDA #1
+; 2. IF X<0 or X>64 reverse XV
+		CMP #0
+		BMI mb_reverse_xv
+		CMP #64
+		BCS mb_reverse_xv
+		JMP mb_do_y
+	mb_reverse_xv:
+		LDA ballxv
+		COMP					; 2s complement
 		STA ballxv
-		JMP mb_add_x
-mb_make_x_negative:
-		LDA #$FF
-		STA ballxv
-mb_add_x:
+; - Add XV to X -> nextx
 		CLC
-		LDA ballxv				; add new speed
 		ADC ballx				; to X
-		STA ballx				; and save
-		; Y next
+		STA TMP2				; and save
+	
+; 3. Add YV to Y -> nexty
 mb_do_y:
 		CLC
 		LDA ballyv
 		ADC bally
+		STA TMP2+1
 		
-		; check new ball y position
-		; 1. Check top/bottom walls
-		CMP #0
-		BMI mb_make_y_positive	; Y < 0
+; 4. IF Y>48 reverse YV
 		CMP #48
-		BCS mb_make_y_negative  ; Y >= 48
-		STA bally				; change is good, store new Y
-		RTS
-mb_make_y_positive:
-		LDA #1
+		BCS mb_reverse_yv		; Y >= 48
+		CMP #0
+		BMI mb_reverse_yv		; Y < 0 ... should be newball_score
+		JMP mb_hit_check
+	mb_reverse_yv:
+		LDA ballyv
+		COMP
 		STA ballyv
-		JMP mb_add_y
-mb_make_y_negative:
-		LDA #$FF
-		STA ballyv
-mb_add_y:
+	; - Add YV to Y -> nexty
 		CLC
-		LDA ballyv				; add new speed
-		ADC bally				; to Y
-		STA bally				; and save
+		ADC bally				; add new speed to Y
+		STA TMP2+1				; and save
+
+; 5. Check under next ball position (Acc -> NextCol)
+mb_hit_check:
+		JSR read_col_at_pos
+
+; IF NextCol == WHITE reverse Y 
+		CMP #15
+		BEQ mb5_reverse_y
+		JMP mb_check_brick
+mb5_reverse_y:
+	; Adjust YV/XV 
+		; so far just bounce evenly
+		LDA ballyv
+		COMP
+		STA ballyv
+	; Add YV to Y -> nexty
+		CLC
+		ADC bally				; add new speed to Y
+		STA TMP2+1				; and save
+
+mb_check_brick:
+;	   6. IF NextCol != BLACK Reverse YV
+;	      Remove Brick
+;	      Add YV to Y -> nexty
+
+;
+;      7. Finalise movment TMP2 -> ballx/y
+mb_store_final:
+		; change is good
+		LDA TMP2
+		STA ballx				; store new X
+		LDA TMP2+1
+		STA bally				; store new Y
 		RTS
 
-;---------------------------------------
-; Draw paddle
-draw_paddle:
-		RTS
 
 
 
@@ -529,6 +602,92 @@ pih_restore_irq:
 ; Draw board
 ;
 draw_board:
+
+		RTS
+
+;----------------------------------------------------------------------
+; Draw paddle - width 6 pixels
+draw_paddle:
+		; check if batx is even or odd
+		; if even store $FF in X, odd store $0F - this wil be 1st write
+		LDA batx
+		ROR
+		BCC db_iseven
+		LDX #$0F
+		JMP db_overif
+	db_iseven:
+		LDX #$FF
+		; also need to clear previous position so bat moving right 
+		; cleared behind it
+		;
+		; convert batx-2 to position on line $05*6, this will be X*4
+		LDA batx
+		DEC
+		DEC
+		LSR
+		ASL
+		ASL
+		ASL
+		; Add $0506
+		CLC
+		ADC #$06
+		TAY
+		LDA #$05
+		JSR vdp_set_addr_w
+		LDA #$00
+		JSR vdp_write
+
+	db_overif:
+		; convert batx to position on line $05*6, this will be X*4
+		LDA batx
+		LSR
+		ASL
+		ASL
+		ASL
+		; Add $0506
+		CLC
+		ADC #$06
+		TAY
+		LDA #$05
+		JSR vdp_set_addr_w
+		JSR vdp_writex
+		; move to next dot-pair and write $FF
+		TYA 
+		CLC
+		ADC #$08
+		TAY
+		LDA #$05
+		JSR vdp_set_addr_w
+		LDA #$FF
+		JSR vdp_write
+		; move to next dot-pair and write $FF
+		TYA 
+		CLC
+		ADC #$08
+		TAY
+		LDA #$05
+		JSR vdp_set_addr_w
+		LDA #$FF
+		JSR vdp_write
+		; last byte write, either $F0 (batx was odd) or $00
+		; has effect of overwriting previous bat pos if bat is moving left
+		LDA batx
+		ROR
+		BCC db_iseven2
+		LDX #$F0
+		JMP db_overif2
+	db_iseven2:
+		LDX #$0
+	db_overif2:
+		; move to next dot-pair and write val in X
+		TYA 
+		CLC
+		ADC #8
+		TAY
+		LDA #$05
+		JSR vdp_set_addr_w
+		JSR vdp_writex
+
 		RTS
 
 ;----------------------------------------------------------------------

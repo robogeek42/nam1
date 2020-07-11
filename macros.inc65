@@ -119,3 +119,14 @@
     sbc #0
 	sta word+1
 .endmacro
+
+; logical NOT of value in accumulator
+.macro NOT 
+	eor #$FF
+.endmacro
+; 2s complement of value in acc
+.macro COMP
+	clc
+	eor #$FF
+	adc #$01
+.endmacro

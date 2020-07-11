@@ -45,6 +45,7 @@
 .export vdp_setaddr_pattern_table_offset
 .export vdp_write
 .export vdp_read
+.export vdp_writex
 
 .bss
 VDP_REGS:   .res  8,0
@@ -186,6 +187,16 @@ vdp_setaddr_color_table_g2:
 ; VDP Write VRAM
 vdp_write:
                 STA VDP_WR_VRAM
+                NOP
+.ifdef FASTCPU
+                NOP
+                NOP
+                NOP
+                NOP
+.endif
+                RTS
+vdp_writex:
+                STX VDP_WR_VRAM
                 NOP
 .ifdef FASTCPU
                 NOP
