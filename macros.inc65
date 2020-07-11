@@ -125,7 +125,7 @@
 	eor #$FF
 .endmacro
 ; 2s complement of value in acc
-.macro COMP
+.macro TWOSCOMP
 	clc
 	eor #$FF
 	adc #$01

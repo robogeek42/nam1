@@ -110,7 +110,7 @@ pih_save_old:
 		LDA IRQ_ADDR+1
 		STA IRQ_OLD+1
 
-		LDA #$02
+		LDA #$03
 		STA bo_interval
 		STA IRQ_COUNT
 		LDA #0
@@ -234,15 +234,14 @@ gi_do_START:
 gi_move_left:
 		LDA batx
 		DEC
-		CMP #0
-		BEQ giml_over
+		BMI giml_over
 		STA batx
 	giml_over:
 		RTS
 gi_move_right:
 		LDA batx
 		INC
-		CMP #56
+		CMP #59
 		BCS gimr_over
 		STA batx
 	gimr_over:
@@ -497,7 +496,7 @@ move_ball:
 		JMP mb_do_y
 	mb_reverse_xv:
 		LDA ballxv
-		COMP					; 2s complement
+		TWOSCOMP				; 2s complement
 		STA ballxv
 ; - Add XV to X -> nextx
 		CLC
@@ -519,7 +518,7 @@ mb_do_y:
 		JMP mb_hit_check
 	mb_reverse_yv:
 		LDA ballyv
-		COMP
+		TWOSCOMP
 		STA ballyv
 	; - Add YV to Y -> nexty
 		CLC
@@ -538,7 +537,7 @@ mb5_reverse_y:
 	; Adjust YV/XV 
 		; so far just bounce evenly
 		LDA ballyv
-		COMP
+		TWOSCOMP
 		STA ballyv
 	; Add YV to Y -> nexty
 		CLC
