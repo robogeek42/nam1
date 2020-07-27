@@ -527,15 +527,37 @@ mb_do_y:
 
 ; 5. Check under next ball position (Acc -> NextCol)
 mb_hit_check:
-		JSR read_col_at_pos
 
-; IF NextCol == WHITE reverse Y 
-		CMP #15
-		BEQ mb5_reverse_y
-		JMP mb_check_brick
-mb5_reverse_y:
+;		JSR read_col_at_pos
+;
+;; IF NextCol == WHITE reverse Y 
+;		CMP #15
+;		BEQ mb5_reverse_y
+;		JMP mb_check_brick
+;mb5_reverse_y:
+;	; Adjust YV/XV 
+;		; so far just bounce evenly
+;		LDA ballyv
+;		TWOSCOMP
+;		STA ballyv
+;	; Add YV to Y -> nexty
+;		CLC
+;		ADC bally				; add new speed to Y
+;		STA TMP2+1				; and save
+
+; 5. detect bat position
+		; if ball nexty >=46 
+		LDA TMP2+1				; nexty
+		CMP #46
+		BCC mb_nohit1			; < 46
+
+		LDA TMP2				; nextx
+		CMP batx
+		BCS mb_nohit1			; Ball < Batx (left)
+		ADC #3
+		CMP batx
+		BCC mb_nohit1
 	; Adjust YV/XV 
-		; so far just bounce evenly
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
@@ -543,11 +565,13 @@ mb5_reverse_y:
 		CLC
 		ADC bally				; add new speed to Y
 		STA TMP2+1				; and save
+mb_nohit1:
 
 mb_check_brick:
 ;	   6. IF NextCol != BLACK Reverse YV
 ;	      Remove Brick
 ;	      Add YV to Y -> nexty
+;		JSR read_col_at_pos
 
 ;
 ;      7. Finalise movment TMP2 -> ballx/y
