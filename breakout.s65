@@ -37,7 +37,7 @@ IRQ_OLD		= bout_vars+10 ; 2 bytes
 bo_interval	= bout_vars+12  ; number of 1/60sec intervals between updating screen
 IRQ_EVENT   = bout_vars+13
 
-bo_c0_vol	= bout_vars+20;
+br_c0_vol	= bout_vars+20;
 strbuf		= bout_vars+21;
 
 ; IRQ location - points to address part of JMP xxxx
