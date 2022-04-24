@@ -1,4 +1,4 @@
-export CC65_LIB=/cygdrive/c/cc65/lib
+export CC65_LIB=/mnt/c/cc65/lib
 export SYMON_ROOT=~/symon
 
 export FASTCPU=1
