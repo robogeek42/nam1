@@ -108,14 +108,14 @@ msg_EOF: .byte "EOF",$0D,$0A,$00
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-long_delay
+long_delay:
 	php
 	pha
 	phx
 	phy
 	
 	ldy #$00
-long_delay_1
+long_delay_1:
 	nop
 	nop
 	nop
@@ -139,10 +139,10 @@ long_delay_1
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-init_sdcard
+init_sdcard:
 	ld16 R0,sd_msg_initialising
 	JSR acia_puts
-init_retry
+init_retry:
     LDA #'.'
     JSR acia_putc
 
@@ -157,7 +157,7 @@ init_retry
 
 	ldx #8							; 10 bytes of $ff
 	lda #$ff
-init_sd_pulse
+init_sd_pulse:
 	jsr sd_sendbyte					; Send the $ff byte
 	dex
 	bne init_sd_pulse
@@ -174,7 +174,7 @@ init_sd_pulse
 ; 	   |  |  \ Erase sequence error
 ; 	   |  \ Address error
 ; 	    \ Parameter error
-init_cmd0
+init_cmd0:
 	jsr sd_sendcmd0					; GO_IDLE_STATE
 	cmp #$ff						; $ff is not a valid response
 	bne init_acmd41
@@ -183,7 +183,7 @@ init_cmd0
 ; Send command 41 APP_SEND_OP_COND (Initiate initialisation process)
 ; needs CMD55 first as this is an APP command
 ; expect R1=0 (not idle)
-init_acmd41
+init_acmd41:
     LDA #'+'
     JSR acia_putc
 
@@ -194,7 +194,7 @@ init_acmd41
 	bne init_acmd41					; Retry if not
 	
 ; Now can send command16 SET_BLOCKLEN
-init_cmd16
+init_cmd16:
 	jsr sd_sendcmd16
 
     ld16 R0,sd_msg_initdone
@@ -209,7 +209,7 @@ init_cmd16
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_startcmd
+sd_startcmd:
 	pha
 	lda #$ff						; Send $ff
 	jsr sd_sendbyte					; Delay / synch pulses
@@ -227,7 +227,7 @@ sd_startcmd
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_endcmd
+sd_endcmd:
 	pha
 	lda #SD_CS						; Chip select bit
 	tsb SD_REG						; First set it high
@@ -241,19 +241,19 @@ sd_endcmd
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendbyte
+sd_sendbyte:
 	pha
 	phy
 
 	sta ZP_TMP2						; For shifting out
 	ldy #8							; 8 bits to shift out
 	lda SD_REG						; Load the SD register to A
-sd_shiftoutbit
+sd_shiftoutbit:
 	ora #SD_MOSI					; And initially set output bit to '1'
 	asl ZP_TMP2						; Unless the bit to transmit is '0'
 	bcs sd_shiftskiplo				; so then EOR the bit back to 0
 	eor #SD_MOSI
-sd_shiftskiplo
+sd_shiftskiplo:
 	sta SD_REG						; Save data bit first, it seems, before clocking
 	
 	inc SD_REG
@@ -275,7 +275,7 @@ sd_shiftskiplo
 ;* Regs affected : None
 ;****************************************
 
-sd_getbyte
+sd_getbyte:
 	phy
 	phx
 
@@ -373,16 +373,16 @@ sd_getbyte
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_getrespbyte
+sd_getrespbyte:
 	phx
 	ldx #0							; Try up to 256 times
-sd_respff
+sd_respff:
 	inx								; Retry counter
 	beq sd_resptimeout
 	jsr sd_getbyte
 	cmp #$ff						; Keep reading MISO until not FF
 	beq sd_respff
-sd_resptimeout
+sd_resptimeout:
 	plx
 	rts
 
@@ -393,13 +393,13 @@ sd_resptimeout
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_busy
+sd_busy:
 	pha
 
 ;    ld16 R0,sd_msg_waitbusy
 ;	JSR acia_puts
 
-sd_isbusy
+sd_isbusy:
 	jsr sd_getbyte
 	cmp #$ff						; Keep reading MISO until FF
 	bne sd_isbusy
@@ -415,7 +415,7 @@ sd_isbusy
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_waitforn0byte
+sd_waitforn0byte:
 	jsr sd_getrespbyte
 	beq sd_waitforn0byte					; Zero byte means not ready
 	rts
@@ -427,7 +427,7 @@ sd_waitforn0byte
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendcmd0
+sd_sendcmd0:
 	jsr sd_startcmd
 
 	; Send $40, $00, $00, $00, $00, $95
@@ -454,7 +454,7 @@ sd_sendcmd0
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendcmd55
+sd_sendcmd55:
 	jsr sd_startcmd
 
 	; Send $40+55, $00, $00, $00, $00, $95
@@ -481,7 +481,7 @@ sd_sendcmd55
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendcmd41
+sd_sendcmd41:
 	jsr sd_startcmd
 
 	; Send $40+41, $00, $00, $00, $00, $95
@@ -508,7 +508,7 @@ sd_sendcmd41
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendcmd16
+sd_sendcmd16:
 	jsr sd_startcmd
 
 	; Send $40+16, $00, $00, $02, $00, $95
@@ -537,7 +537,7 @@ sd_sendcmd16
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_getrespR1
+sd_getrespR1:
 	jsr sd_getrespbyte
 	rts
 
@@ -548,7 +548,7 @@ sd_getrespR1
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendcmd17
+sd_sendcmd17:
 	phx
 	pha								; A is the page to write to
 	
@@ -582,7 +582,7 @@ sd_sendcmd17
 	rol sd_addr+1
 	rol sd_addr+0
 
-sd_cmd17addr
+sd_cmd17addr:
 	; Send $40+17, $A3, $A2, $A1, $A0, $95
 	lda #$40+17
 	jsr sd_sendbyte
@@ -619,7 +619,7 @@ sd_cmd17addr
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_getrespR17
+sd_getrespR17:
 	pha
 	phy
 
@@ -628,7 +628,7 @@ sd_getrespR17
 
 	sta ZP_TMP0+1					; Page to read in to
 	stz ZP_TMP0						; Always a page boundary
-sd_getrespR17token
+sd_getrespR17token:
 	jsr sd_getbyte					; Get a byte
 	cmp #$fe						; Is it the token?
 	bne sd_getrespR17token			; No
@@ -636,7 +636,7 @@ sd_getrespR17token
 ;            ld16 R0,charbuffer
 
 	ldy #0							; read 1st 256 bytes
-sd_getrespR17block1
+sd_getrespR17block1:
 	jsr sd_getbyte					; get a byte
 	sta (ZP_TMP0),y					; Save the byte
 
@@ -663,7 +663,7 @@ sd_getrespR17block1
 	bne sd_getrespR17block1			; Until all bytes read
 
 	inc ZP_TMP0+1					; Next page
-sd_getrespR17block2
+sd_getrespR17block2:
 	jsr sd_getbyte					; get a byet
 	sta (ZP_TMP0),y					; Save the byte
 
@@ -728,7 +728,7 @@ sd_getrespR17block2
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-sd_sendcmd24
+sd_sendcmd24:
 	phy
 	pha
 
@@ -776,13 +776,13 @@ sd_sendcmd24
 	stz ZP_TMP0					; Address is always page boundary
 
 	ldy #00
-sd_writeblock_1					; Send first 256 bytes
+sd_writeblock_1:					; Send first 256 bytes
 	lda (ZP_TMP0), y
 	jsr sd_sendbyte
 	iny
 	bne sd_writeblock_1
 	inc ZP_TMP0+1				; Next page for second 256 bytes
-sd_writeblock_2					; Send second 256 bytes
+sd_writeblock_2:					; Send second 256 bytes
 	lda (ZP_TMP0), y
 	jsr sd_sendbyte
 	iny
@@ -795,7 +795,7 @@ sd_writeblock_2					; Send second 256 bytes
 	jsr sd_getbyte				; Get data response byte
 	pha							; Save it to return
 
-sd_waitforwritecomplete
+sd_waitforwritecomplete:
 	jsr sd_busy					; Wait for card to be ready
 	
 	jsr sd_endcmd				; Release the card
@@ -858,12 +858,12 @@ sdfs_set_dir_filesize_ptr:
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-init_fs
+init_fs:
 	ld16 R0, msg_initialising_fs
 	JSR acia_puts
 
 	ldx #$03					; Init sector to 0
-init_fs_clr_sect
+init_fs_clr_sect:
 	stz sd_sect,x
 	dex
 	bpl init_fs_clr_sect
@@ -873,7 +873,7 @@ init_fs_clr_sect
 
 	;Extract data from boot record
 	ldx #$03					; Assuming boot sector 0
-init_fs_clr_boot
+init_fs_clr_boot:
 	stz fs_bootsect,x
 	dex
 	bpl init_fs_clr_boot
@@ -911,7 +911,7 @@ init_fs_clr_boot
 	clc
 	ldx #$00
 	ldy #$04
-fs_init_add_fat
+fs_init_add_fat:
 	lda fs_fatsect,x
 	adc fs_rootsect,x
 	sta fs_rootsect,x
@@ -928,7 +928,7 @@ fs_init_add_fat
 	stz fs_datasect+3
 	
 	ldy #5						; Multiply by 32 to get root dir size in sectors
-fs_rootmult1
+fs_rootmult1:
 	clc
 	asl fs_datasect
 	rol fs_datasect+1
@@ -941,7 +941,7 @@ fs_rootmult1
 	clc
 	ldx #$00
 	ldy #$04
-fs_init_data
+fs_init_data:
 	lda fs_rootsect,x
 	adc fs_datasect,x
 	sta fs_datasect,x
@@ -965,7 +965,7 @@ fs_init_data
 
 	; Current directory = root dir
 	ldx #$03
-fs_init_dir_sect
+fs_init_dir_sect:
 	lda fs_rootsect,x
 	sta fs_dirsect,x
 	dex
@@ -981,13 +981,13 @@ fs_init_dir_sect
 ;* Output : A=Byte
 ;* Regs affected : None
 ;****************************************
-fs_getbyte_sd_buf
+fs_getbyte_sd_buf:
 	tya
 	and #1
 	bne fs_getbyte_sd_buf_hi
 	lda sd_buf,x
 	rts
-fs_getbyte_sd_buf_hi
+fs_getbyte_sd_buf_hi:
 	lda sd_buf+$100,x
 	rts
 
@@ -999,7 +999,7 @@ fs_getbyte_sd_buf_hi
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_putbyte_sd_buf
+fs_putbyte_sd_buf:
 	pha
 	tya
 	and #1
@@ -1007,7 +1007,7 @@ fs_putbyte_sd_buf
 	pla
 	sta sd_buf,x
 	rts
-fs_putbyte_sd_buf_hi
+fs_putbyte_sd_buf_hi:
 	pla
 	sta sd_buf+$100,x
 	rts
@@ -1020,7 +1020,7 @@ fs_putbyte_sd_buf_hi
 ;* Output : X,A=Word
 ;* Regs affected : None
 ;****************************************
-fs_getword_sd_buf
+fs_getword_sd_buf:
 	tya
 	asl a
 	tax
@@ -1030,7 +1030,7 @@ fs_getword_sd_buf
 	lda sd_buf+1,x
 	plx
 	rts
-fs_getword_sd_buf_hi
+fs_getword_sd_buf_hi:
 	lda sd_buf+$100,x
 	pha
 	lda sd_buf+$100+1,x
@@ -1045,7 +1045,7 @@ fs_getword_sd_buf_hi
 ;* Output : X,A=Word
 ;* Regs affected : None
 ;****************************************
-fs_putword_sd_buf
+fs_putword_sd_buf:
 	phy
 	pha
 	phx
@@ -1060,7 +1060,7 @@ fs_putword_sd_buf
 	sta sd_buf+1,y
 	ply
 	rts
-fs_putword_sd_buf_hi
+fs_putword_sd_buf_hi:
 	pla
 	tax
 	sta sd_buf+$100,y
@@ -1077,13 +1077,13 @@ fs_putword_sd_buf_hi
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_dir_root_start
+fs_dir_root_start:
 	pha
 	phx
 
 	; Set SD sector to root directory
 	ldx #$03
-fs_dir_set_sd
+fs_dir_set_sd:
 	lda fs_dirsect,x
 	sta sd_sect,x
 	dex
@@ -1110,12 +1110,12 @@ fs_dir_set_sd
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_dir_find_entry
+fs_dir_find_entry:
 	pha
 	phx
 	phy
 	php							; Save C state for checking later
-fs_dir_check_entry
+fs_dir_check_entry:
 	; Not LFN aware
 	ldy #FAT_Attr				; Check attribute
 	lda #$5e					; Any of H, S, V, D, I then skip
@@ -1131,26 +1131,26 @@ fs_dir_check_entry
 	cmp #$e5
 	beq fs_dir_found_entry
 	bra fs_dir_invalid_entry	; Else not an entry we're interested in
-fs_find_active_slot
+fs_find_active_slot:
 	cmp #0
 	beq fs_dir_done				; If zero then no more entries
 	cmp #$e5					; Deleted entry?
 	bne fs_dir_found_entry
-fs_dir_invalid_entry
+fs_dir_invalid_entry:
 	jsr fs_dir_next_entry		; Advance read for next iteration
 	bra fs_dir_check_entry
 
 	; Found a valid entry or finished
-fs_dir_done						; No more entries
+fs_dir_done:						; No more entries
 	plp							; Remove temp P from stack
 	sec							; Set carry to indicate no more
 	bra fs_dir_fin
-fs_dir_found_entry
+fs_dir_found_entry:
 	plp							; Remove temp P from stack
 	jsr fs_dir_copy_entry		; Copy the important entry details
 	jsr fs_dir_next_entry		; Advance read for next iteration
 	clc							; Clear carry to indicate found
-fs_dir_fin						; Finalise
+fs_dir_fin:						; Finalise
 	ply
 	plx
 	pla
@@ -1164,7 +1164,7 @@ fs_dir_fin						; Finalise
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_dir_next_entry
+fs_dir_next_entry:
 	pha
 	phx
 	phy
@@ -1183,7 +1183,7 @@ fs_dir_next_entry
 	ldx #$00
     ldy #$04                    ; Assif 4 byte word LSB first
     sec                         ; will increment first byte
-fs_dir_inc_sect
+fs_dir_inc_sect:
 	lda sd_sect,x
     adc #0                      ; any carries will ripple
 	sta sd_sect,x
@@ -1199,7 +1199,7 @@ fs_dir_inc_sect
 	lda #SD_BUF				; Goes in to sd_buf
 	jsr sd_sendcmd17			; Load it
 
-fs_dir_next_done
+fs_dir_next_done:
 	ply
 	plx
 	pla
@@ -1215,7 +1215,7 @@ fs_dir_next_done
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_dir_copy_entry
+fs_dir_copy_entry:
 	pha
 	phx
 	phy
@@ -1224,7 +1224,7 @@ fs_dir_copy_entry
 	;Normal processing of an entry loaded from the directory
 	ldx #FileHandle::FH_Name	; Point to where name will go (X=>0)
     ldy #FAT_Name               ; offset into 32byte dir entry to find Name ($00)
-fs_dir_get_name_ch
+fs_dir_get_name_ch:
 	lda (sd_slo),y				; Get name char
 	cmp #' '					; Don't copy space
 	beq	fs_dir_skip_name_ch
@@ -1235,21 +1235,21 @@ fs_dir_get_name_ch
 	sta fh_dir,x				; Copy byte
 	pla							; Restore A
 	inx							; Advance
-fs_dir_skip_ext_ch
+fs_dir_skip_ext_ch:
 	sta fh_dir,x				; Copy byte
 	inx							; Advance
-fs_dir_skip_name_ch
+fs_dir_skip_name_ch:
 	iny							; Next SD dir entry
 	cpy #FAT_Attr				; Passed end of name?
 	bne fs_dir_get_name_ch	
-fs_dir_entry_pad_name
+fs_dir_entry_pad_name:
 	cpx #FileHandle::FH_Size				; End of FH name space?
 	beq fs_dir_entry_size		; Yes, then copy size
 	stz fh_dir,x				; Else put 0
 	inx
 	bra fs_dir_entry_pad_name
 
-fs_dir_entry_size
+fs_dir_entry_size:
 	ldx #FileHandle::FH_Size				; Point to where size will go
 	ldy #FAT_FileSize			; Point to get size from
 	jsr fs_dir_util_copy		; Copy 4 bytes
@@ -1257,28 +1257,28 @@ fs_dir_entry_size
 	jsr fs_dir_util_copy
 	jsr fs_dir_util_copy
 	
-fs_dir_entry_attr
+fs_dir_entry_attr:
 	ldx #FileHandle::FH_Attr				; Point to where attributes go
 	ldy #FAT_Attr				; Point from where to get attributes
 	jsr fs_dir_util_copy		; Copy 1 byte
 
-fs_dir_entry_clust
+fs_dir_entry_clust:
 	ldx #FileHandle::FH_FirstClust
 	ldy	#FAT_FirstClust
 	jsr fs_dir_util_copy		; Copy 2 bytes
 	jsr fs_dir_util_copy
 
 	; Empty slot data goes here
-fs_dir_empty_slot
-fs_dir_entry_dirsect			; Directory sector in which FH entry belongs
+fs_dir_empty_slot:
+fs_dir_entry_dirsect:			; Directory sector in which FH entry belongs
 	ldx #$03
-fs_dir_copy_sd_sect
+fs_dir_copy_sd_sect:
 	lda sd_sect,x
 	sta fh_dir+FileHandle::FH_DirSect,x
 	dex
 	bpl fs_dir_copy_sd_sect
 	
-fs_dir_entry_diroffset			; Offset in to directory sector of FH entry
+fs_dir_entry_diroffset:			; Offset in to directory sector of FH entry
 	lda sd_slo
 	sta fh_dir+FileHandle::FH_DirOffset
 	lda sd_shi
@@ -1299,7 +1299,7 @@ fs_dir_entry_diroffset			; Offset in to directory sector of FH entry
 ;* Output 	: None
 ;* Regs affected : All
 ;****************************************
-fs_dir_util_copy
+fs_dir_util_copy:
 	pha
 	lda (sd_slo),y
 	sta fh_dir,x
@@ -1317,7 +1317,7 @@ fs_dir_util_copy
 ;* Output : 
 ;* Regs affected : None
 ;****************************************
-fs_get_next_cluster
+fs_get_next_cluster:
 	pha
 	phx
 	phy
@@ -1351,12 +1351,12 @@ fs_get_next_cluster
 ;* Output : 
 ;* Regs affected : None
 ;****************************************
-fs_isEOF
+fs_isEOF:
 	pha
 	phx
 	
 	ldx #$03
-fs_is_eof_cmp
+fs_is_eof_cmp:
 	lda fh_handle+FileHandle::FH_Pointer,x
 	cmp fh_handle+FileHandle::FH_Size,x
 	bne fs_notEOF
@@ -1368,7 +1368,7 @@ fs_is_eof_cmp
 	sec							; C = 1 for EOF
 	rts
 
-fs_notEOF	
+fs_notEOF:	
 	plx
 	pla
 	clc							; C = 0 for not EOF
@@ -1383,7 +1383,7 @@ fs_notEOF
 ;* Output : 
 ;* Regs affected : None
 ;****************************************
-fs_inc_pointer
+fs_inc_pointer:
 	pha
 	phx
 	phy
@@ -1392,7 +1392,7 @@ fs_inc_pointer
 	ldx #$00
 	ldy #$04
 	sec									; Always adds 1 first
-fs_inc_fh_pointer
+fs_inc_fh_pointer:
 	lda fh_handle+FileHandle::FH_Pointer,x
 	adc #$00
 	sta fh_handle+FileHandle::FH_Pointer,x
@@ -1402,13 +1402,13 @@ fs_inc_fh_pointer
 
 	lda fh_handle+FileHandle::FH_Pointer			; If low order == 0
 	beq fs_inc_sector_ov				; Then sector 8 bits has overflowed
-fs_inc_fin
+fs_inc_fin:
 	ply
 	plx
 	pla
 	
 	rts
-fs_inc_sector_ov						; Check if sector bit 8 has overflowed
+fs_inc_sector_ov:						; Check if sector bit 8 has overflowed
 	lda fh_handle+FileHandle::FH_Pointer+1			; Load up next highest byte
 	and #1								; If bit zero = 0 then must have
 	bne fs_inc_fin						; overflowed.
@@ -1416,24 +1416,24 @@ fs_inc_sector_ov						; Check if sector bit 8 has overflowed
 	ldx #$00
 	ldy #$04
 	sec									; Always adds 1 first
-fs_inc_fh_sect
+fs_inc_fh_sect:
 	lda fh_handle+FileHandle::FH_CurrSec,x
 	adc #$00
 	sta fh_handle+FileHandle::FH_CurrSec,x
 	inx
 	dey
 	bne fs_inc_fh_sect
-fs_inc_skip_sec_wrap
+fs_inc_skip_sec_wrap:
 	dec fh_handle+FileHandle::FH_SectCounter		; If reached the end of a cluster
 	bne fs_inc_load_sector				; Then get next cluster
 	; Cluster change required
 	jsr fs_get_next_cluster				; Get next cluster based on current	
 	jsr fs_load_curr_sect				; Load it
-fs_inc_load_sector
+fs_inc_load_sector:
 	jsr fs_isEOF						; Check not EOF
 	bcs fs_skip_load_sect				; if so then don't load sector
 	jsr fs_load_curr_sect				; Load the sector
-fs_skip_load_sect
+fs_skip_load_sect:
 	ply
 	plx
 	pla
@@ -1448,7 +1448,7 @@ fs_skip_load_sect
 ;* Output : A = char, C = 1 (EOF)
 ;* Regs affected : None
 ;****************************************
-fs_get_next_byte
+fs_get_next_byte:
 	phx
 	phy
 
@@ -1462,7 +1462,7 @@ fs_get_next_byte
 	plx
 	rts
 
-fs_get_skip_EOF
+fs_get_skip_EOF:
 	ldx fh_handle+FileHandle::FH_Pointer			; Low 8 bits of sector index
 	ldy fh_handle+FileHandle::FH_Pointer+1			; Which half of sector?
 	; A=SD buffer byte
@@ -1482,7 +1482,7 @@ fs_get_skip_EOF
 ; Given clust in LoX,HiA
 ; Outputs to fh_handle->FH_CurrSec
 ;****************************************
-fs_get_start_sect_data
+fs_get_start_sect_data:
 	pha
 	phx
 	phy
@@ -1499,7 +1499,7 @@ fs_get_start_sect_data
 	; Sector = Cluster * 32
 	; Shift left 5 times
 	ldy #5
-fs_get_data_sect_m5
+fs_get_data_sect_m5:
 	clc
 	asl fh_handle+FileHandle::FH_CurrSec+0
 	rol fh_handle+FileHandle::FH_CurrSec+1
@@ -1512,7 +1512,7 @@ fs_get_data_sect_m5
 	ldx #$00
 	ldy #$04
 	clc
-fs_get_start_data
+fs_get_start_data:
 	lda fh_handle+FileHandle::FH_CurrSec,x
 	adc fs_datasect,x
 	sta fh_handle+FileHandle::FH_CurrSec,x
@@ -1528,12 +1528,12 @@ fs_get_start_data
 ;****************************************
 ; Load the current sector in FH
 ;****************************************
-fs_load_curr_sect
+fs_load_curr_sect:
 	pha
 	phx
 
 	ldx #$03
-fs_load_cpy_sect
+fs_load_cpy_sect:
 	lda fh_handle+FileHandle::FH_CurrSec,x
 	sta sd_sect,x
 	dex
@@ -1548,12 +1548,12 @@ fs_load_cpy_sect
 ;****************************************
 ; Flush the current sector
 ;****************************************
-fs_flush_curr_sect
+fs_flush_curr_sect:
 	pha
 	phx
 
 	ldx #$03
-fs_flush_cpy_sect
+fs_flush_cpy_sect:
 	lda fh_handle+FileHandle::FH_CurrSec,x
 	sta sd_sect,x
 	dex
@@ -1573,13 +1573,13 @@ fs_flush_cpy_sect
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_copy_dir_to_fh
+fs_copy_dir_to_fh:
 	pha
 	phx
 	ldx #FileHandle::FH_Name			; By default copy all
 	bcc fs_copy_dir_to_fh_byte
 	ldx #FileHandle::FH_Size			; But skip name if new file
-fs_copy_dir_to_fh_byte
+fs_copy_dir_to_fh_byte:
 	lda fh_dir,x
 	sta fh_handle,x
 	inx
@@ -1596,7 +1596,7 @@ fs_copy_dir_to_fh_byte
 ;* Output : fh_handle->FH_CurrClust is the empty cluster
 ;* Regs affected : None
 ;****************************************
-fs_find_empty_clust
+fs_find_empty_clust:
 	pha
 	phx
 	phy
@@ -1609,7 +1609,7 @@ fs_find_empty_clust
 	
 	; Start at the first FAT sector
 	ldx #$03
-fs_find_init_fat
+fs_find_init_fat:
 	lda fs_fatsect,x
 	sta fh_handle+FileHandle::FH_CurrSec,x
 	dex
@@ -1618,9 +1618,9 @@ fs_find_init_fat
 	; There is only enough room for 512/2 = 256 cluster entries per sector
 	; There are 256 sectors of FAT entries
 
-fs_check_empty_sector
+fs_check_empty_sector:
 	jsr fs_load_curr_sect			; Load a FAT sector
-fs_check_curr_clust
+fs_check_curr_clust:
 	ldy fh_handle+FileHandle::FH_CurrClust		; Index in to this FAT sector
 	jsr fs_getword_sd_buf
 	cpx #0
@@ -1648,13 +1648,13 @@ fs_check_curr_clust
 	pla
 	rts
 	; If got here then need to find another cluster
-fs_next_fat_entry
+fs_next_fat_entry:
 	inc16 fh_handle+FileHandle::FH_CurrClust	; Increment the cluster number
 	; Only 256 FAT entries in a sector of 512 bytes
 	lda fh_handle+FileHandle::FH_CurrClust		; Check low byte of cluster number
 	bne fs_check_curr_clust			; Else keep checking clusters in this sector
 	; Every 256 FAT entries, need to get a new FAT sector
-fs_next_fat_sect
+fs_next_fat_sect:
 	jsr fs_inc_curr_sec				; Increment to the next FAT sector
 	bra fs_check_empty_sector		; Go an load the new FAT sector and continue
 	
@@ -1664,7 +1664,7 @@ fs_next_fat_sect
 ;* Increment sector by 1
 ;* Input : fh_handle has the sector
 ;****************************************
-fs_inc_curr_sec
+fs_inc_curr_sec:
 	pha
 	phx
 	phy
@@ -1673,7 +1673,7 @@ fs_inc_curr_sec
 	ldx #$00
 	ldy #$04
 	sec
-fs_inc_sec_byte
+fs_inc_sec_byte:
 	lda fh_handle+FileHandle::FH_CurrSec,x
 	adc #$00
 	sta fh_handle+FileHandle::FH_CurrSec,x
@@ -1695,7 +1695,7 @@ fs_inc_sec_byte
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_get_FAT_clust_sect
+fs_get_FAT_clust_sect:
 	pha
 	phx
 	phy
@@ -1712,7 +1712,7 @@ fs_get_FAT_clust_sect
 	clc
 	ldx #$00
 	ldy #$04
-fs_get_add_fat
+fs_get_add_fat:
 	lda fh_handle+FileHandle::FH_CurrSec,x
 	adc fs_fatsect,x
 	sta fh_handle+FileHandle::FH_CurrSec,x
@@ -1735,7 +1735,7 @@ fs_get_add_fat
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_update_FAT_entry
+fs_update_FAT_entry:
 	pha
 	phx
 	phy
@@ -1779,7 +1779,7 @@ fs_update_FAT_entry
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_put_byte
+fs_put_byte:
 	phx
 	phy
 	pha
@@ -1816,24 +1816,24 @@ fs_put_byte
 	jsr fs_find_empty_clust
 	; Finally, can write a byte to the
 	; SD buffer in memory
-fs_put_do_put	
+fs_put_do_put:	
 	ldx fh_handle+FileHandle::FH_Size			; Load size low as index in to buffer
 	ldy fh_handle+FileHandle::FH_Size+1			; Check which half
 	pla								; Get A off stack and put back
 	pha
 	jsr fs_putbyte_sd_buf
-fs_put_inc_size
+fs_put_inc_size:
 	sec
 	ldx #$00
 	ldy #$04
-fs_put_inc_size_byte
+fs_put_inc_size_byte:
 	lda fh_handle+FileHandle::FH_Size,x
 	adc #0
 	sta fh_handle+FileHandle::FH_Size,x
 	inx
 	dey
 	bne fs_put_inc_size_byte
-fs_put_fin
+fs_put_fin:
 	pla
 	ply
 	plx
@@ -1846,14 +1846,14 @@ fs_put_fin
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_dir_save_entry
+fs_dir_save_entry:
 	pha
 	phx
 	phy
 
 	; Retrieve the sector where the file entry goes
 	ldx #$03
-fs_dir_curr_sect
+fs_dir_curr_sect:
 	lda fh_handle+FileHandle::FH_DirSect,x
 	sta fh_handle+FileHandle::FH_CurrSec,x
 	dex
@@ -1870,32 +1870,32 @@ fs_dir_curr_sect
 	;Save the filename
 	ldx #FileHandle::FH_Name				; Point to where name will go
 	ldy #FAT_Name
-fs_dir_save_name_ch
+fs_dir_save_name_ch:
 	lda fh_handle,x				; Get a char
 	beq fs_dir_name_done		; If zero then name done
 	cmp #'.'					; Is it '.'
 	bne fs_dir_name_skip		; If so then don't consider
 	inx							; Jump over '.'
 	bra fs_dir_name_done		; and start processing the ext
-fs_dir_name_skip
+fs_dir_name_skip:
 	cpy #FAT_Ext				; Reached the end of the name?
 	beq fs_dir_name_done
 	sta (sd_slo),y				; No, so store the byte in name
 	inx
 	iny
 	bra fs_dir_save_name_ch
-fs_dir_name_done
+fs_dir_name_done:
 	
 	lda #' '					; Pad name with spaces
-fs_dir_pad_name
+fs_dir_pad_name:
 	cpy #FAT_Ext				; Padded enough?
 	beq fs_dir_pad_name_done
 	sta (sd_slo),y				; Fill with space
 	iny
 	bra fs_dir_pad_name
-fs_dir_pad_name_done
+fs_dir_pad_name_done:
 	
-fs_dir_save_ext_ch
+fs_dir_save_ext_ch:
 	cpy #FAT_Attr				; End of extension?
 	beq fs_dir_ext_done
 	lda fh_handle,x				; Get a char
@@ -1904,20 +1904,20 @@ fs_dir_save_ext_ch
 	inx
 	iny
 	bra fs_dir_save_ext_ch	
-fs_dir_ext_done
+fs_dir_ext_done:
 	
 	lda #' '					; Pad out any remaining with space
-fs_dir_ext_pad
+fs_dir_ext_pad:
 	cpy #FAT_Attr				; Reached the end of the extension?
 	beq fs_dir_ext_pad_done
 	sta (sd_slo),y
 	iny
 	bra fs_dir_ext_pad
 	; At the Attribute byte, zero out everything until size
-fs_dir_ext_pad_done
+fs_dir_ext_pad_done:
 	
 	lda #0
-fs_dir_save_rest_ch
+fs_dir_save_rest_ch:
 	sta (sd_slo),y
 	iny
 	cpy #FAT_FirstClust
@@ -1932,7 +1932,7 @@ fs_dir_save_rest_ch
 
 	; Now save size
 	ldx #0
-df_dir_save_size_ch
+df_dir_save_size_ch:
 	lda fh_handle+FileHandle::FH_Size,x
 	sta (sd_slo),y
 	iny
@@ -1959,7 +1959,7 @@ df_dir_save_size_ch
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_open_read
+fs_open_read:
 	pha
 	phx
 	phy
@@ -1975,7 +1975,7 @@ fs_open_read
             JSR acia_put_newline
 
 	jsr fs_dir_root_start		; Start at root
-fs_open_find
+fs_open_find:
 	clc							; Only look for active files
 	jsr fs_dir_find_entry		; Find a valid entry
 	bcs	fs_open_not_found		; If C then no more entries
@@ -1989,7 +1989,7 @@ fs_open_find
             JSR acia_put_newline
             
 	ldx #0						; Check name matches
-fs_open_check_name
+fs_open_check_name:
 	lda fh_handle,x
     
     ; fh_handle is in upper case - convert the directory entry too
@@ -2004,7 +2004,7 @@ fs_open_check_name
 	beq fs_open_found
 	inx
 	bra fs_open_check_name
-fs_open_found
+fs_open_found:
 	jsr fs_copy_dir_to_fh		; Put entry in to fh_handle
 
             ; Debug
@@ -2023,7 +2023,7 @@ fs_open_found
 
 
 	ldx #$03					; Initialise pointer to beginning
-fs_open_init_pointer
+fs_open_init_pointer:
 	stz fh_handle+FileHandle::FH_Pointer,x
 	dex
 	bpl fs_open_init_pointer
@@ -2033,7 +2033,7 @@ fs_open_init_pointer
 	sta fh_handle+FileHandle::FH_FileMode
 
 	clc
-fs_open_not_found
+fs_open_not_found:
 	ply
 	plx
 	pla
@@ -2065,7 +2065,7 @@ fps_done:
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_open_write
+fs_open_write:
 	pha
 	phx
 	phy
@@ -2103,7 +2103,7 @@ fs_open_write
 	sta fh_handle+FileHandle::FH_FileMode
 
 	clc
-fs_open_write_fin
+fs_open_write_fin:
 	ply
 	plx
 	pla
@@ -2117,7 +2117,7 @@ fs_open_write_fin
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_close
+fs_close:
 	pha
 
 	; Only need to close down stuff in write mode
@@ -2146,7 +2146,7 @@ fs_close
 
 	jsr fs_dir_save_entry
 
-fs_close_done
+fs_close_done:
 	pla
 	rts
 
@@ -2157,7 +2157,7 @@ fs_close_done
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-fs_delete
+fs_delete:
 	pha
 	phx
 	phy
@@ -2177,7 +2177,7 @@ fs_delete
 	stx fh_handle+FileHandle::FH_CurrClust
 	ldy fh_handle+FileHandle::FH_FirstClust+1
 	sty fh_handle+FileHandle::FH_CurrClust+1
-fs_delete_clust
+fs_delete_clust:
 	; X and Y always contain current cluster
 	; Make last = current
 	stx fh_handle+FileHandle::FH_LastClust
@@ -2208,7 +2208,7 @@ fs_delete_clust
 	cpy #$ff
 	bne fs_delete_clust
 	clc
-fs_delete_fin
+fs_delete_fin:
 	ply
 	plx
 	pla
@@ -2293,9 +2293,9 @@ fs_delete_fin
 ;	rts	
 
 
-sd_msg_initialising
+sd_msg_initialising:
 	.byte "Initialising SD Card ",$00
-sd_msg_initdone
+sd_msg_initdone:
     .byte " done.", $0D,$0A,$00
 ;sd_msg_startcmd
 ;        .byte "Start cmd",$0D,$0A,$00
@@ -2313,23 +2313,23 @@ sd_msg_initdone
 ;        .byte "EndResp17",$0D,$0A,$00
 ;sd_msg_backinsend17
 ;        .byte "back",$0D,$0A,$00
-sd_msg_find_file
+sd_msg_find_file:
         .byte "Find file ",$00
-sd_msg_found_entry
+sd_msg_found_entry:
         .byte "found file",$0D,$0A,$00
-sd_msg_readsector
+sd_msg_readsector:
     .byte "Sector:",$00
 
-sd_cmd55
+sd_cmd55:
 	.byte ($40+55), $00, $00, $00, $00, $95
-sd_cmd58
+sd_cmd58:
 	.byte ($40+58), $00, $00, $00, $00, $95
-sd_acmd41
+sd_acmd41:
 	.byte ($40+41), $00, $00, $00, $00, $95
 	
 	
-msg_initialising_fs
+msg_initialising_fs:
 	.byte "Initialising filesystem",$0D,$0A,$00
-fs_msg_directory_listing
+fs_msg_directory_listing:
 	.byte "SD Card Directory",$0D,$0A,$00
 

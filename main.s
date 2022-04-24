@@ -619,7 +619,7 @@ LAB_vec:
 
 ; EhBASIC IRQ support
 
-IRQ_CODE
+IRQ_CODE:
         PHA                ; save A
         LDA    IrqBase        ; get the IRQ flag byte
         LSR                ; shift the set b7 to b6, and on down ...
@@ -630,7 +630,7 @@ IRQ_CODE
 
 ; EhBASIC NMI support
 
-NMI_CODE
+NMI_CODE:
         PHA                ; save A
         LDA    NmiBase        ; get the NMI flag byte
         LSR                ; shift the set b7 to b6, and on down ...
@@ -639,7 +639,7 @@ NMI_CODE
         PLA                ; restore A
         RTI
 
-END_CODE
+END_CODE:
 
 ; Output to serial & video
 CHARout:
