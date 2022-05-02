@@ -6,7 +6,6 @@
 .include "zeropage.inc65"
 .include "acia.inc65"
 .include "scancodes.inc65"
-.include "basic.asm"
 .include "io.inc65"
 .include "string.inc65"
 .include "print_util.inc65"
@@ -26,6 +25,7 @@
 .ifdef IMAGETEST
 .include "video_load_mc.inc65"
 .endif
+.include "basic.s"
 
 .ifdef PONG
 .import pong

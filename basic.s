@@ -19,6 +19,7 @@
 ; 2.21	fixed IF .. THEN RETURN to not cause error
 ; 2.22	fixed RND() breaking the get byte routine
 
+.setcpu "65C02"
 ; zero page use ..
 
 LAB_WARM 		= $00		; BASIC warm start entry point

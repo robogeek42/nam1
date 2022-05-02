@@ -1,11 +1,12 @@
 ; vim: ts=4 et sw=4
 .setcpu "65C02"
 .include "zeropage.inc65"
+.include "macros.inc65"
 .include "io.inc65"
 .include "acia.inc65"
 .include "string.inc65"
-.include "macros.inc65"
 .include "scancodes.inc65"
+
 
 ;****************************************************************************
 ; PC keyboard Interface for the 6502 Microprocessor utilizing a 6522 VIA
@@ -286,165 +287,7 @@ printunkown:
             jsr acia_putc
             rts
 
-;--------------------------------------------------------------
-; tests non-typematic - outputs flags for asdfghjk (8 keys)
-;    KBD_CHAR_LAST ($ED) if this is not 0 print Scan code debug
-; q to quit
-.export test_ps2_keyboard_2
-test_ps2_keyboard_2:
-    jsr KBINIT
-    jsr KBTMOFF
-    lda #0
-    sta KBD_FLAGS
-    
-tpk2_loop:
-    jsr KBSCAN_GAME
-    bcc tpk2_loop           ; carry-clear means no key
-
-    ldx #0
-    lda KBD_CHAR
-    cmp #SC_SPECIAL       ; check for a break code
-    bne tpk2_debug_print
-
-    ; if result is SC_SPECIAL then this is a break code and code is in KBD_SPECIAL
-    ; swap it to A and set X=1
-    lda KBD_SPECIAL
-    beq tpk2_loop         ; 0 in KBD_SPECIAL means it was a special key release code - ignore
-    ldx #1
-
-tpk2_debug_print:
-    ; Scan code printing if debug ($ED) is turned on
-    pha
-    lda KBD_CHAR_LAST
-    beq @over1                      ; flag is 0 so skip debug
-    pla
-    jsr ps2k_debug_print_scan_code  ; print scan code
-    jmp @over2
-@over1:
-    pla
-@over2:
-
-tpk2_check_keys:
-    ; check all our required keys (asdfghjk and q)
-    cmp #SC_Q
-    beq tpk2_done
-    cmp #SC_A
-    beq tpk2_do_A
-    cmp #SC_S
-    beq tpk2_do_S
-    cmp #SC_D
-    beq tpk2_do_D
-    cmp #SC_F
-    beq tpk2_do_F
-    cmp #SC_G
-    beq tpk2_do_G
-    cmp #SC_H
-    beq tpk2_do_H
-    cmp #SC_J
-    beq tpk2_do_J
-    cmp #SC_K
-    beq tpk2_do_K
-    jmp tpk2_loop
-
-tpk2_do_extended_JV:
-    jmp tpk2_do_extended
-
-tpk2_update:
-    ; write the KBD Flags out as binary
-    lda KBD_FLAGS
-    jsr print_binary
-    jsr acia_put_newline
-    jmp tpk2_loop
-
-tpk2_done:
-    jsr KBTMON
-    rts
-
-tpk2_do_A:
-    cpx #1                  ; X=1 means this is a break code
-    beq @overA
-    smb7 KBD_FLAGS          ; make code - set flag
-    jmp tpk2_update
-@overA:
-    rmb7 KBD_FLAGS          ; break code - reset flag
-    jmp tpk2_update
-
-tpk2_do_S:
-    cpx #1
-    beq @overS
-    smb6 KBD_FLAGS
-    jmp tpk2_update
-@overS:
-    rmb6 KBD_FLAGS
-    jmp tpk2_update
-
-tpk2_do_D:
-    cpx #1
-    beq @overD
-    smb5 KBD_FLAGS
-    jmp tpk2_update
-@overD:
-    rmb5 KBD_FLAGS
-    jmp tpk2_update
-
-tpk2_do_F:
-    cpx #1
-    beq @overF
-    smb4 KBD_FLAGS
-    jmp tpk2_update
-@overF:
-    rmb4 KBD_FLAGS
-    jmp tpk2_update
-
-tpk2_do_G:
-    cpx #1
-    beq @overG
-    smb3 KBD_FLAGS
-    jmp tpk2_update
-@overG:
-    rmb3 KBD_FLAGS
-    jmp tpk2_update
-
-tpk2_do_H:
-    cpx #1
-    beq @overH
-    smb2 KBD_FLAGS
-    jmp tpk2_update
-@overH:
-    rmb2 KBD_FLAGS
-    jmp tpk2_update
-
-tpk2_do_J:
-    cpx #1
-    beq @overJ
-    smb1 KBD_FLAGS
-    jmp tpk2_update
-@overJ:
-    rmb1 KBD_FLAGS
-    jmp tpk2_update
-
-tpk2_do_K:
-    cpx #1
-    beq @overK
-    smb0 KBD_FLAGS
-    jmp tpk2_update
-@overK:
-    rmb0 KBD_FLAGS
-    jmp tpk2_update
-
-    ; deal with extended key codes and just consume the remaining codes before
-    ; returning to scan loop
-tpk2_do_extended:
-    jsr KBGET
-    cmp #$F0
-    beq tpk2_ext_break_code
-    jmp tpk2_loop
-
-tpk2_ext_break_code:
-    jsr KBGET
-    jmp tpk2_loop
-
-.if .def(PS2K)
+.ifdef PS2K
 ;**************************************************************************************
 ;
 ; special read routine for my games - returns key code pressed in KBD_CHAR and KBD_SPECIAL
@@ -1304,7 +1147,7 @@ ps2k_debug_print_extcode:
     pla
     rts
 
-.if .def(VKEYB)
+.ifdef VKEYB
 PCVKB_IO = $7FA0
 ; KBSCAN  - Scan the keyboard for 105uS, returns 0 in A if no key pressed.
 ;           Return ambiguous data in A if key is pressed.  Use KBINPUT OR KBGET
@@ -1381,3 +1224,162 @@ ksg_get_code:
     sec
     rts
 .endif
+
+;--------------------------------------------------------------
+; tests non-typematic - outputs flags for asdfghjk (8 keys)
+;    KBD_CHAR_LAST ($ED) if this is not 0 print Scan code debug
+; q to quit
+.export test_ps2_keyboard_2
+test_ps2_keyboard_2:
+    jsr KBINIT
+    jsr KBTMOFF
+    lda #0
+    sta KBD_FLAGS
+    
+tpk2_loop:
+    jsr KBSCAN_GAME
+    bcc tpk2_loop           ; carry-clear means no key
+
+    ldx #0
+    lda KBD_CHAR
+    cmp #SC_SPECIAL       ; check for a break code
+    bne tpk2_debug_print
+
+    ; if result is SC_SPECIAL then this is a break code and code is in KBD_SPECIAL
+    ; swap it to A and set X=1
+    lda KBD_SPECIAL
+    beq tpk2_loop         ; 0 in KBD_SPECIAL means it was a special key release code - ignore
+    ldx #1
+
+tpk2_debug_print:
+    ; Scan code printing if debug ($ED) is turned on
+    pha
+    lda KBD_CHAR_LAST
+    beq @over1                      ; flag is 0 so skip debug
+    pla
+    jsr ps2k_debug_print_scan_code  ; print scan code
+    jmp @over2
+@over1:
+    pla
+@over2:
+
+tpk2_check_keys:
+    ; check all our required keys (asdfghjk and q)
+    cmp #SC_Q
+    beq tpk2_done
+    cmp #SC_A
+    beq tpk2_do_A
+    cmp #SC_S
+    beq tpk2_do_S
+    cmp #SC_D
+    beq tpk2_do_D
+    cmp #SC_F
+    beq tpk2_do_F
+    cmp #SC_G
+    beq tpk2_do_G
+    cmp #SC_H
+    beq tpk2_do_H
+    cmp #SC_J
+    beq tpk2_do_J
+    cmp #SC_K
+    beq tpk2_do_K
+    jmp tpk2_loop
+
+tpk2_do_extended_JV:
+    jmp tpk2_do_extended
+
+tpk2_update:
+    ; write the KBD Flags out as binary
+    lda KBD_FLAGS
+    jsr print_binary
+    jsr acia_put_newline
+    jmp tpk2_loop
+
+tpk2_done:
+    jsr KBTMON
+    rts
+
+tpk2_do_A:
+    cpx #1                  ; X=1 means this is a break code
+    beq @overA
+    smb7 KBD_FLAGS          ; make code - set flag
+    jmp tpk2_update
+@overA:
+    rmb7 KBD_FLAGS          ; break code - reset flag
+    jmp tpk2_update
+
+tpk2_do_S:
+    cpx #1
+    beq @overS
+    smb6 KBD_FLAGS
+    jmp tpk2_update
+@overS:
+    rmb6 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_D:
+    cpx #1
+    beq @overD
+    smb5 KBD_FLAGS
+    jmp tpk2_update
+@overD:
+    rmb5 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_F:
+    cpx #1
+    beq @overF
+    smb4 KBD_FLAGS
+    jmp tpk2_update
+@overF:
+    rmb4 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_G:
+    cpx #1
+    beq @overG
+    smb3 KBD_FLAGS
+    jmp tpk2_update
+@overG:
+    rmb3 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_H:
+    cpx #1
+    beq @overH
+    smb2 KBD_FLAGS
+    jmp tpk2_update
+@overH:
+    rmb2 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_J:
+    cpx #1
+    beq @overJ
+    smb1 KBD_FLAGS
+    jmp tpk2_update
+@overJ:
+    rmb1 KBD_FLAGS
+    jmp tpk2_update
+
+tpk2_do_K:
+    cpx #1
+    beq @overK
+    smb0 KBD_FLAGS
+    jmp tpk2_update
+@overK:
+    rmb0 KBD_FLAGS
+    jmp tpk2_update
+
+    ; deal with extended key codes and just consume the remaining codes before
+    ; returning to scan loop
+tpk2_do_extended:
+    jsr KBGET
+    cmp #$F0
+    beq tpk2_ext_break_code
+    jmp tpk2_loop
+
+tpk2_ext_break_code:
+    jsr KBGET
+    jmp tpk2_loop
+
