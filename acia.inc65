@@ -5,3 +5,4 @@
 .import acia_putc
 .import acia_puts
 .import acia_put_newline
+.import acia_puts_count

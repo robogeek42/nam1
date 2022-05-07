@@ -320,6 +320,19 @@ cs_loop1:		JSR vdp_write
 
 ;================================================================
 ; Dump VRAM page 
+;   destroys Y
+;   Input : ZP_TMP0 = page to read
+;   Output : prints to console
+;   Uses : (ZP) RES  - address of page buffer
+;          (ZP) R1
+;   Calls : print_memory16
+;           Input : (ZP) RES memory location to read data from
+;                   (ZP) R1 (address to print)
+;           Uses  : (ZP) R0 
+;           Calls : fmt_hex_string
+;                   Input : Acc
+;                         : R0
+;                   Uses : TMP0
 vdp_dump_page:
 				; read back to CPU memory
 				ld16 RES, page_buffer	;; set read-back address
@@ -333,15 +346,21 @@ vt1_loop1:	  JSR vdp_read				;; read back
 
 				; print out the page
 				LDX #$10				;; 16*16 bytes
+				; R1 will contain the VDP page address (not buffer address)
 				LDA ZP_TMP0 
 				STA R1+1
 				LDA #0
 				STA R1
 vt1_loop2:	  JSR print_memory16		;; print 16 bytes from (RES) and inc RES by 16
+				; increment the VDP age address
+	vt1_add16:
 				CLC
 				LDA #16
 				ADC R1
 				STA R1
+				LDA #0
+				ADC R1+1
+				STA R1+1
 				DEX
 				BNE vt1_loop2
 				RTS
@@ -722,15 +741,18 @@ vdp_load_mc_standard_name_table:
 				STA TMP0			;; name value at start of current row is stored in TMP0
 
 vlsnt_loop3:	LDA #4
-				STA TMP1			;; 4 rows the same - counter in here
+				STA TMP0+1			;; 4 rows the same - counter in here
 				
 vlsnt_loop2:	LDY #$20			;; count 32 chars per row
 				LDX TMP0			;; starting name value for this row
-vlsnt_loop1:	JSR vdp_write
+vlsnt_loop1:	STX VDP_WR_VRAM
+				NOP
+				NOP
+				NOP
 				INX
 				DEY
 				BNE vlsnt_loop1
-				DEC TMP1
+				DEC TMP0+1
 				BNE vlsnt_loop2
 
 				; 4 rows of 32 done, repeat till we get to end of screen (24 rows)

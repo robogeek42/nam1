@@ -86,7 +86,7 @@ uchess2:
 		LDA     #$00		; REVERSE TOGGLE
 		STA     REV
 		;JSR     Init_6551
-CHESS   CLD             ; INITIALIZE
+CHESS:   CLD             ; INITIALIZE
 		LDX	#$FF		; TWO STACKS
 		TXS	
 		LDX	#$C8
@@ -96,7 +96,7 @@ CHESS   CLD             ; INITIALIZE
 ;       DISPLAY AND GET KEY
 ;       FROM KEYBOARD
 ;		
-OUT		JSR	POUT		; DISPLAY AND
+OUT:		JSR	POUT		; DISPLAY AND
 		JSR	KIN		; GET INPUT   *** my routine waits for a keypress
 ;		CMP	OLDKY		; KEY IN ACC  *** no need to debounce
 ;		BEQ	OUT		; (DEBOUNCE)
@@ -105,7 +105,7 @@ OUT		JSR	POUT		; DISPLAY AND
 		CMP	#$43		; [C]
 		BNE	NOSET		; SET UP
 		LDX	#$1F		; BOARD
-WHSET		LDA	SETW,X		; FROM
+WHSET:		LDA	SETW,X		; FROM
 		STA	BOARD,X		; SETW
 		DEX	
 		BPL	WHSET
@@ -114,7 +114,7 @@ WHSET		LDA	SETW,X		; FROM
 		LDA	#$CC		; Display CCC
 		BNE	CLDSP
 ;		
-NOSET		CMP	#$45		; [E]
+NOSET:		CMP	#$45		; [E]
 		BNE	NOREV		; REVERSE
 		JSR	REVERSE		; BOARD IS
 		SEC
@@ -124,22 +124,22 @@ NOSET		CMP	#$45		; [E]
 		LDA	#$EE	    ; IS
 		BNE	CLDSP
 ;		
-NOREV		CMP	#$40			; [P]
+NOREV:		CMP	#$40			; [P]
 		BNE	NOGO	   	; PLAY CHESS
 		JSR	GO
-CLDSP		STA	DIS1	  	; DISPLAY
+CLDSP:		STA	DIS1	  	; DISPLAY
 		STA	DIS2	 	; ACROSS
 		STA	DIS3	  	; DISPLAY
 		BNE	CHESS
 ;		
-NOGO		CMP	#$0D	    ; [Enter]
+NOGO:		CMP	#$0D	    ; [Enter]
 		BNE	NOMV	  	; MOVE MAN
 		JSR	MOVE	  	; AS ENTERED
 		JMP	DISP
-NOMV		CMP     #$41		; [Q] ***Added to allow game exit***
+NOMV:		CMP     #$41		; [Q] ***Added to allow game exit***
 		BEQ     DONE		; quit the game, exit back to system.  
 		JMP	INPUT		; process move
-DONE		JMP     main		; *** MUST set this to YOUR OS starting address
+DONE:		JMP     main		; *** MUST set this to YOUR OS starting address
 ;		
 ;       THE ROUTINE JANUS DIRECTS THE
 ;       ANALYSIS BY DETERMINING WHAT
@@ -148,53 +148,53 @@ DONE		JMP     main		; *** MUST set this to YOUR OS starting address
 ;		
 ;		
 ;
-JANUS		LDX	STATE
+JANUS:		LDX	STATE
 		BMI	NOCOUNT
 ;		
 ;       THIS ROUTINE COUNTS OCCURRENCES
 ;       IT DEPENDS UPON STATE TO INDEX
 ;       THE CORRECT COUNTERS
 ;		
-COUNTS		LDA	PIECE
+COUNTS:		LDA	PIECE
 		BEQ	OVER	   	; IF STATE=8
 		CPX 	#$08	   	; DO NOT COUNT
 		BNE	OVER	  	; BLK MAX CAP
 		CMP	BMAXP		; MOVES FOR
 		BEQ	XRT	   	; WHITE
 ; 		
-OVER		INC	MOB,X	  	; MOBILITY
+OVER:		INC	MOB,X	  	; MOBILITY
 		CMP 	#$01	   	;  + QUEEN
 		BNE	NOQ	   	; FOR TWO
 		INC	MOB,X
 ;		
-NOQ		BVC	NOCAP
+NOQ:		BVC	NOCAP
 		LDY	#$0F	   	; CALCULATE
 		LDA	SQUARE       	; POINTS
-ELOOP		CMP	BK,Y	   	; CAPTURED
+ELOOP:		CMP	BK,Y	   	; CAPTURED
 		BEQ	FOUN	  	; BY THIS
 		DEY			; MOVE
 		BPL	ELOOP
-FOUN		LDA	POINTS,Y
+FOUN:		LDA	POINTS,Y
 		CMP	MAXC,X
 		BCC	LESS	  	; SAVE IF
 		STY	PCAP,X	 	; BEST THIS
 		STA	MAXC,X	 	; STATE
 ;		
-LESS		CLC	
+LESS:		CLC	
 		PHP			; ADD TO
 		ADC	CC,X	   	; CAPTURE
 		STA	CC,X	   	; COUNTS
 		PLP	
 ;		
-NOCAP		CPX	#$04
+NOCAP:		CPX	#$04
 		BEQ	ON4
 		BMI	TREE	  	;(=00 ONLY)
-XRT		RTS	
+XRT:		RTS	
 ;		
 ;      GENERATE FURTHER MOVES FOR COUNT
 ;      AND ANALYSIS	
 ;		
-ON4		LDA	XMAXC		; SAVE ACTUAL 
+ON4:		LDA	XMAXC		; SAVE ACTUAL 
 		STA	WCAP0	 	; CAPTURE
 		LDA	#$00	   	; STATE=0
 		STA	STATE
@@ -209,7 +209,7 @@ ON4		LDA	XMAXC		; SAVE ACTUAL
 		JSR	UMOVE	 	; MOVES
 ;		
 		JMP	STRATGY       	; FINAL EVALUATION
-NOCOUNT	CPX	#$F9
+NOCOUNT:	CPX	#$F9
 		BNE	TREE
 ;		
 ;      DETERMINE IF THE KING CAN BE
@@ -220,65 +220,65 @@ NOCOUNT	CPX	#$F9
 		BNE	RETJ	  	; SET INCHEK=0
 		LDA	#$00	   	; IF IT IS
 		STA	INCHEK
-RETJ		RTS	
+RETJ:		RTS	
 ;		
 ;      IF A PIECE HAS BEEN CAPTURED BY
 ;      A TRIAL MOVE, GENERATE REPLIES &
 ;      EVALUATE THE EXCHANGE GAIN/LOSS
 ;		
-TREE		BVC	RETJ	  	; NO CAP
+TREE:		BVC	RETJ	  	; NO CAP
 		LDY	#$07	   	; (PIECES)
 		LDA	SQUARE
-LOOPX		CMP	BK,Y
+LOOPX:		CMP	BK,Y
 		BEQ	FOUNX
 		DEY	
 		BEQ	RETJ	  	; (KING)
 		BPL	LOOPX	 	; SAVE
-FOUNX		LDA	POINTS,Y       	; BEST CAP
+FOUNX:		LDA	POINTS,Y       	; BEST CAP
 		CMP	BCAP0,X		; AT THIS
 		BCC	NOMAX	 	; LEVEL
 		STA	BCAP0,X
-NOMAX		DEC	STATE
+NOMAX:		DEC	STATE
 		LDA	#$FB	   	; IF STATE=FB
 		CMP	STATE		; TIME TO TURN
 		BEQ	UPTREE		; AROUND
 		JSR	GENRM	 	; GENERATE FURTHER
-UPTREE		INC	STATE		; CAPTURES
+UPTREE:		INC	STATE		; CAPTURES
 		RTS	
 ;		
 ;      THE PLAYER'S MOVE IS INPUT
 ;		
-INPUT		CMP	#$08	   	; NOT A LEGAL
+INPUT:		CMP	#$08	   	; NOT A LEGAL
 		BCS	ERROR      	; SQUARE #
 		JSR	DISMV
-DISP		LDX	#$1F
-SEARCH		LDA	BOARD,X
+DISP:		LDX	#$1F
+SEARCH:		LDA	BOARD,X
 		CMP	DIS2
 		BEQ	HERE	  	; DISPLAY
 		DEX			; PIECE AT    
 		BPL	SEARCH		; FROM
-HERE		STX	DIS1	 	; SQUARE
+HERE:		STX	DIS1	 	; SQUARE
 		STX	PIECE
-ERROR		JMP	CHESS
+ERROR:		JMP	CHESS
 ;		
 ;      GENERATE ALL MOVES FOR ONE
 ;      SIDE, CALL JANUS AFTER EACH
 ;      ONE FOR NEXT STE?
 ;		
 ;
-GNMZ		LDX	#$10	    ; CLEAR
-GNMX		LDA	#$00	    ; COUNTERS
-CLEAR		STA	COUNT,X
+GNMZ:		LDX	#$10	    ; CLEAR
+GNMX:		LDA	#$00	    ; COUNTERS
+CLEAR:		STA	COUNT,X
 		DEX	
 		BPL	CLEAR
 ;		
-GNM		LDA	#$10	    ; SET UP
+GNM:		LDA	#$10	    ; SET UP
 		STA	PIECE		; PIECE
-NEWP		DEC	PIECE		; NEW PIECE
+NEWP:		DEC	PIECE		; NEW PIECE
 		BPL	NEX	   	; ALL DONE?
 		RTS			; #NAME?
 ;		
-NEX		JSR	RESET		; READY
+NEX:		JSR	RESET		; READY
 		LDY	PIECE		; GET PIECE
 		LDX	#$08
 		STX	MOVEN		; COMMON START
@@ -292,45 +292,45 @@ NEX		JSR	RESET		; READY
 		BEQ	QUEEN	 	; QUEEN
 		BPL	ROOK	  	; ROOK
 ;		
-KING		JSR	SNGMV	 	; MUST BE KING!
+KING:		JSR	SNGMV	 	; MUST BE KING!
 		BNE	KING	  	; MOVES
 		BEQ	NEWP	  	; 8 TO 1
-QUEEN		JSR	LINE
+QUEEN:		JSR	LINE
 		BNE	QUEEN	 	; MOVES
 		BEQ	NEWP	  	; 8 TO 1
 ;		
-ROOK		LDX	#$04
+ROOK:		LDX	#$04
 		STX	MOVEN		; MOVES
-AGNR		JSR	LINE	  	; 4 TO 1
+AGNR:		JSR	LINE	  	; 4 TO 1
 		BNE	AGNR
 		BEQ	NEWP
 ;		
-BISHOP		JSR	LINE
+BISHOP:		JSR	LINE
 		LDA	MOVEN		; MOVES
 		CMP	#$04	   	; 8 TO 5
 		BNE	BISHOP
 		BEQ	NEWP
 ;		
-KNIGHT		LDX	#$10
+KNIGHT:		LDX	#$10
 		STX	MOVEN		; MOVES
-AGNN		JSR	SNGMV	 	; 16 TO 9
+AGNN:		JSR	SNGMV	 	; 16 TO 9
 		LDA	MOVEN
 		CMP	#$08
 		BNE	AGNN
 		BEQ	NEWP
 ;		
-PAWN		LDX	#$06
+PAWN:		LDX	#$06
 		STX	MOVEN
-P1		JSR	CMOVE	 	; RIGHT CAP?
+P1:		JSR	CMOVE	 	; RIGHT CAP?
 		BVC	P2
 		BMI	P2
 		JSR	JANUS	 	; YES
-P2		JSR	RESET
+P2:		JSR	RESET
 		DEC	MOVEN		; LEFT CAP?
 		LDA	MOVEN
 		CMP	#$05
 		BEQ	P1
-P3		JSR	CMOVE	 	; AHEAD
+P3:		JSR	CMOVE	 	; AHEAD
 		BVS	NEWP	  	; ILLEGAL
 		BMI	NEWP
 		JSR	JANUS
@@ -343,33 +343,33 @@ P3		JSR	CMOVE	 	; AHEAD
 ;      CALCULATE SINGLE STEP MOVES
 ;      FOR K,N	
 ;		
-SNGMV		JSR	CMOVE		; CALC MOVE
+SNGMV:		JSR	CMOVE		; CALC MOVE
 		BMI	ILL1	   	; -IF LEGAL
 		JSR	JANUS	   ; -EVALUATE
-ILL1		JSR	RESET
+ILL1:		JSR	RESET
 		DEC	MOVEN
 		RTS	
 ;		
 ;     CALCULATE ALL MOVES DOWN A
 ;     STRAIGHT LINE FOR Q,B,R
 ;		
-LINE		JSR	CMOVE	 	; CALC MOVE
+LINE:		JSR	CMOVE	 	; CALC MOVE
 		BCC	OVL	    	; NO CHK
 		BVC	LINE		; NOCAP       
-OVL		BMI	ILL	     ; RETURN
+OVL:		BMI	ILL	     ; RETURN
 		PHP	
 		JSR	JANUS	 	; EVALUATE POSN
 		PLP	
 		BVC	LINE	  	; NOT A CAP
-ILL		JSR	RESET	 	; LINE STOPPED
+ILL:		JSR	RESET	 	; LINE STOPPED
 		DEC	MOVEN	 	; NEXT DIR
 		RTS	
 ;		
 ;      EXCHANGE SIDES FOR REPLY
 ;      ANALYSIS	
 ;		
-REVERSE		LDX	#$0F
-ETC		SEC	
+REVERSE:		LDX	#$0F
+ETC:		SEC	
 		LDY	BK,X	   	; SUBTRACT
 		LDA 	#$77	   	; POSITION
 		SBC  	BOARD,X		; FROM 77
@@ -393,7 +393,7 @@ ETC		SEC
 ;	WHO WROTE THIS MORE EFFICIENT
 ;	VERSION OF CMOVE)
 ;		
-CMOVE		LDA	SQUARE       	; GET SQUARE
+CMOVE:		LDA	SQUARE       	; GET SQUARE
 		LDX	MOVEN       	; MOVE POINTER
 		CLC	
 		ADC	MOVEX,X		; MOVE LIST
@@ -403,7 +403,7 @@ CMOVE		LDA	SQUARE       	; GET SQUARE
 		LDA	SQUARE
 ;			
 		LDX	#$20
-LOOP		DEX			; IS TO
+LOOP:		DEX			; IS TO
 		BMI	NO	    	; SQUARE
 		CMP  	BOARD,X		; OCCUPIED?
 		BNE   	LOOP
@@ -415,9 +415,9 @@ LOOP		DEX			; IS TO
 		ADC	#$01	    ; SET V FLAG
 		BVS   	SPX 		; (JMP)
 ;			
-NO		CLV			; NO CAPTURE
+NO:		CLV			; NO CAPTURE
 ;			
-SPX		LDA  	STATE	 	; SHOULD WE
+SPX:		LDA  	STATE	 	; SHOULD WE
 		BMI   	RETL	   	; DO THE
 		CMP	#$08 		; CHECK CHECK?
 		BPL  	RETL
@@ -430,7 +430,7 @@ SPX		LDA  	STATE	 	; SHOULD WE
 ;       TIME CONSUMING, IT IS NOT
 ;       ALWAYS DONE	
 ;		
-CHKCHK	PHA				; STATE  #392
+CHKCHK:	PHA				; STATE  #392
 		PHP	
 		LDA	#$F9
 		STA	STATE	 	; GENERATE
@@ -448,33 +448,33 @@ CHKCHK	PHA				; STATE  #392
 		LDA	#$FF
 		RTS	
 ;		
-RETL		CLC			; LEGAL
+RETL:		CLC			; LEGAL
 		LDA	#$00	    ; RETURN
 		RTS	
 ;		
-ILLEGAL	LDA	#$FF
+ILLEGAL:	LDA	#$FF
 		CLC			; ILLEGAL
 		CLV			; RETURN
 		RTS	
 ;		
 ;       REPLACE PIECE ON CORRECT SQUARE
 ;		
-RESET		LDX	PIECE      	; GET LOGAT
+RESET:		LDX	PIECE      	; GET LOGAT
 		LDA	BOARD,X		; FOR PIECE
 		STA	SQUARE       	; FROM BOARD
 		RTS	
 ;		
 ;		
 ;		
-GENRM		JSR	MOVE	  	; MAKE MOVE
-GENR2		JSR	REVERSE      	; REVERSE BOARD
+GENRM:		JSR	MOVE	  	; MAKE MOVE
+GENR2:		JSR	REVERSE      	; REVERSE BOARD
 		JSR	GNM	  	; GENERATE MOVES
-RUM		JSR	REVERSE   	; REVERSE BACK
+RUM:		JSR	REVERSE   	; REVERSE BACK
 ;		
 ;       ROUTINE TO UNMAKE A MOVE MADE BY
 ;	  MOVE
 ;		
-UMOVE		TSX			; UNMAKE MOVE
+UMOVE:		TSX			; UNMAKE MOVE
 		STX	SP1
 		LDX	SP2	   	; EXCHANGE
 		TXS			; STACKS
@@ -497,7 +497,7 @@ UMOVE		TSX			; UNMAKE MOVE
 ;       ARE SAVED IN A STACK TO UNMAKE
 ;       THE MOVE LATER
 ;		
-MOVE		TSX	
+MOVE:		TSX	
 		STX	SP1	  	; SWITCH
 		LDX	SP2	  	; STACKS
 		TXS	
@@ -505,11 +505,11 @@ MOVE		TSX
 		PHA			; TO SQUARE
 		TAY	
 		LDX	#$1F
-CHECK		CMP	BOARD,X		; CHECK FOR
+CHECK:		CMP	BOARD,X		; CHECK FOR
 		BEQ	TAKE	  	; CAPTURE
 		DEX	
 		BPL	CHECK
-TAKE		LDA	#$CC
+TAKE:		LDA	#$CC
 		STA	BOARD,X
 		TXA			; CAPTURED
 		PHA			; PIECE
@@ -521,7 +521,7 @@ TAKE		LDA	#$CC
 		PHA			; PIECE
 		LDA	MOVEN
 		PHA			; MOVEN
-STRV		TSX	
+STRV:		TSX	
 		STX	SP2	   	; SWITCH
 		LDX	SP1	   	; STACKS
 		TXS			; BACK
@@ -531,26 +531,26 @@ STRV		TSX
 ;       -CHECKS FOR CHECK OR CHECKMATE
 ;       AND ASSIGNS VALUE TO MOVE
 ;		
-CKMATE	LDY	BMAXC	 		; CAN BLK CAP
+CKMATE:	LDY	BMAXC	 		; CAN BLK CAP
 		CPX	POINTS       	; MY KING?
 		BNE	NOCHEK	
 		LDA	#$00	   	; GULP!
 		BEQ	RETV	  	; DUMB MOVE!
 ;		
-NOCHEK	LDX	BMOB	 		; IS BLACK
+NOCHEK:	LDX	BMOB	 		; IS BLACK
 		BNE	RETV	  	; UNABLE TO
 		LDX	WMAXP		; MOVE AND
 		BNE	RETV	  	; KING IN CH?
 		LDA	#$FF	   	; YES! MATE
 ;		
-RETV		LDX	#$04	    ; RESTORE
+RETV:		LDX	#$04	    ; RESTORE
 		STX	STATE		; STATE=4
 ;		
 ;       THE VALUE OF THE MOVE (IN ACCU)
 ;       IS COMPARED TO THE BEST MOVE AND
 ;       REPLACES IT IF IT IS BETTER
 ;		
-PUSH		CMP	BESTV	 	; IS THIS BEST
+PUSH:		CMP	BESTV	 	; IS THIS BEST
 		BCC	RETP	  	; MOVE SO FAR?
 		BEQ	RETP
 		STA	BESTV		; YES!
@@ -558,13 +558,13 @@ PUSH		CMP	BESTV	 	; IS THIS BEST
 		STA	BESTP
 		LDA	SQUARE
 		STA	BESTM		; FLASH DISPLAY
-RETP		LDA	#'.'		; print ... instead of flashing disp
+RETP:		LDA	#'.'		; print ... instead of flashing disp
 		Jmp	syschout	; print . and return
 ;		
 ;       MAIN PROGRAM TO PLAY CHESS
 ;       PLAY FROM OPENING OR THINK
 ;		
-GO		LDX	OMOVE		; OPENING?
+GO:		LDX	OMOVE		; OPENING?
 		BMI	NOOPEN	  ; -NO   *ADD CHANGE FROM BPL
 		LDA	DIS3	 	; -YES WAS
 		CMP	OPNING,X	; OPPONENT'S
@@ -579,9 +579,9 @@ GO		LDX	OMOVE		; OPENING?
 		STX	OMOVE		; MOVE IT
 		BNE	MV2	    	; (JMP)
 ;			
-END		LDA     #$FF		; *ADD - STOP CANNED MOVES
+END:		LDA     #$FF		; *ADD - STOP CANNED MOVES
 		STA	OMOVE		; FLAG OPENING
-NOOPEN	LDX	#$0C	    	; FINISHED
+NOOPEN:	LDX	#$0C	    	; FINISHED
 		STX	STATE		; STATE=C
 		STX	BESTV		; CLEAR BESTV
 		LDX	#$14	   	; GENERATE P
@@ -597,7 +597,7 @@ NOOPEN	LDX	#$0C	    	; FINISHED
 		CPX	#$0F	   	; IF NONE
 		BCC	MATE	  	; OH OH!
 ;		
-MV2		LDX	BESTP		; MOVE
+MV2:		LDX	BESTP		; MOVE
 		LDA	BOARD,X	 ; THE
 		STA	BESTV		; BEST
 		STX	PIECE		; MOVE
@@ -606,14 +606,14 @@ MV2		LDX	BESTP		; MOVE
 		JSR	MOVE	   	; IT
 		JMP	CHESS
 ;		
-MATE		LDA	#$FF	   	; RESIGN
+MATE:		LDA	#$FF	   	; RESIGN
 		RTS			; OR STALEMATE
 ;		
 ;       SUBROUTINE TO ENTER THE
 ;       PLAYER'S MOVE
 ;		
-DISMV		LDX	#$04	   	; ROTATE
-DROL		ASL	DIS3	  	; KEY
+DISMV:		LDX	#$04	   	; ROTATE
+DROL:		ASL	DIS3	  	; KEY
 		ROL	DIS2	 	; INTO
 		DEX			; DISPLAY
 		BNE	DROL		;
@@ -628,7 +628,7 @@ DROL		ASL	DIS3	  	; KEY
 ;	THE ACCUMULATOR
 ;		
 
-STRATGY	CLC	
+STRATGY:	CLC	
 		LDA	#$80
 		ADC	WMOB	 	; PARAMETERS
 		ADC	WMAXC		; WITH WHEIGHT
@@ -645,7 +645,7 @@ STRATGY	CLC
 		SBC	BMOB
 		BCS	POS	   	; UNDERFLOW
 		LDA	#$00	   	; PREVENTION
-POS		LSR	
+POS:		LSR	
 		CLC			; **************
 		ADC	#$40
 		ADC	WMAXC       	; PARAMETERS
@@ -680,24 +680,24 @@ POS		LSR
 		LDY	BOARD,X
 		CPY	#$10
 		BPL	NOPOSN
-POSN		CLC
+POSN:		CLC
 		ADC	#$02
-NOPOSN	JMP	CKMATE       		; CONTINUE
+NOPOSN:	JMP	CKMATE       		; CONTINUE
 
 
 ;-----------------------------------------------------------------
 ; The following routines were added to allow text-based board
 ; display over a standard RS-232 port.
 ;
-POUT		jsr 	POUT9		; print CRLF
+POUT:		jsr 	POUT9		; print CRLF
 		jsr     POUT13		; print copyright
 		JSR	POUT10		; print column labels
 		LDY   	#$00		; init board location
 		JSR	POUT5		; print board horz edge
-POUT1		lDA   	#'|'		; print vert edge
+POUT1:		lDA   	#'|'		; print vert edge
 		JSR   	syschout	; PRINT ONE ASCII CHR - SPACE
 		LDX   	#$1F
-POUT2		TYA			; scan the pieces for a location match
+POUT2:		TYA			; scan the pieces for a location match
 	    	CMP	BOARD,X		; match found?
 	    	BEQ   	POUT4		; yes; print the piece's color and type
 	    	DEX			; no
@@ -717,10 +717,10 @@ POUT2		TYA			; scan the pieces for a location match
 		bne	POUT25 		; white, print space
 		lda   	#'*'		; black, print *
 		.byte	$2c		; used to skip over LDA #$20
-POUT25		LDA   	#$20		; ASCII space
+POUT25:		LDA   	#$20		; ASCII space
 		JSR   	syschout	; PRINT ONE ASCII CHR - SPACE
 		JSR   	syschout	; PRINT ONE ASCII CHR - SPACE
-POUT3		INY			; 
+POUT3:		INY			; 
 		TYA			; get row number
 	    	AND   	#$08		; have we completed the row?	 
 	    	BEQ   	POUT1		; no, do next column
@@ -737,21 +737,21 @@ POUT3		INY			;
 		BEQ   	POUT8		; yes, print the LED values
 		BNE   	POUT1		; no, do new row
 
-POUT4		LDA   	REV		; print piece's color & type
+POUT4:		LDA   	REV		; print piece's color & type
 		BEQ   	POUT41		;
 		LDA	cpl+16,X	;
 		BNE	POUT42		;
-POUT41		LDA   	cpl,x		;
-POUT42		JSR	syschout	;
+POUT41:		LDA   	cpl,x		;
+POUT42:		JSR	syschout	;
 		lda	cph,x		;
 		jsr   	syschout	; 
 		BNE	POUT3		; branch always
 
-POUT5       	TXA			; print "-----...-----<crlf>"
+POUT5:       	TXA			; print "-----...-----<crlf>"
 		PHA
 		LDX	#$19
 		LDA	#'-'
-POUT6		JSR   	syschout	; PRINT ONE ASCII CHR - "-"
+POUT6:		JSR   	syschout	; PRINT ONE ASCII CHR - "-"
 		DEX
 		BNE	POUT6
 		PLA
@@ -759,7 +759,7 @@ POUT6		JSR   	syschout	; PRINT ONE ASCII CHR - "-"
 		JSR	POUT9
 		RTS	 		
 
-POUT8		jsr	POUT10		; 
+POUT8:		jsr	POUT10		; 
 		LDA   	$FB
 		JSR   	syshexout	; PRINT 1 BYTE AS 2 HEX CHRS	
 		LDA   	#$20
@@ -771,14 +771,14 @@ POUT8		jsr	POUT10		;
 		LDA   	$F9
 		JSR   	syshexout	; PRINT 1 BYTE AS 2 HEX CHRS	
 
-POUT9      	LDA   	#$0D
+POUT9:      	LDA   	#$0D
 		JSR   	syschout	; PRINT ONE ASCII CHR - CR
 		LDA   	#$0A
 		JSR   	syschout	; PRINT ONE ASCII CHR - LF
 		RTS 
 
-POUT10		ldx   	#$00		; print the column labels
-POUT11		lda	#$20		; 00 01 02 03 ... 07 <CRLF>
+POUT10:		ldx   	#$00		; print the column labels
+POUT11:		lda	#$20		; 00 01 02 03 ... 07 <CRLF>
 		jsr   	syschout
 		txa
 		jsr	syshexout
@@ -786,20 +786,20 @@ POUT11		lda	#$20		; 00 01 02 03 ... 07 <CRLF>
 		CPX   	#$08
 		BNE	POUT11
 		BEQ	POUT9
-POUT12		TYA
+POUT12:		TYA
 		and 	#$70
 		JSR 	syshexout
 		rts
 
-POUT13		ldx   	#$00		; Print the copyright banner
-POUT14		lda   	banner,x
+POUT13:		ldx   	#$00		; Print the copyright banner
+POUT14:		lda   	banner,x
 		beq   	POUT15
 		jsr   	syschout
 		inx
 		bne   	POUT14
-POUT15		rts	 
+POUT15:		rts	 
 
-KIN		LDA   	#'?'
+KIN:		LDA   	#'?'
 		JSR   	syschout	; PRINT ONE ASCII CHR - ?
 		JSR   	syskin		; GET A KEYSTROKE FROM SYSTEM
 	    	AND   	#$4F	    ; MASK 0-7, AND ALPHA'S
@@ -808,7 +808,7 @@ KIN		LDA   	#'?'
 ; 6551 I/O Support Routines
 ;
 ;
-Init_6551      lda   #$1F	       ; 19.2K/8/1
+Init_6551:      lda   #$1F	       ; 19.2K/8/1
 	       sta   ACIACtl	    ; control reg 
 	       lda   #$0B	       ; N parity/echo off/rx int off/ dtr active low
 	       sta   ACIACmd	    ; command reg 
@@ -816,7 +816,7 @@ Init_6551      lda   #$1F	       ; 19.2K/8/1
 ;
 ; input chr from ACIA1 (waiting)
 ;
-syskin	 lda   ACIASta	    ; Serial port status	     
+syskin:	 lda   ACIASta	    ; Serial port status	     
 	       and   #$08	       ; is recvr full
 	       beq   syskin	     ; no char to get
 	       lda   ACIADat	    ; get chr
@@ -824,51 +824,51 @@ syskin	 lda   ACIASta	    ; Serial port status
 ;
 ; output to OutPut Port
 ;
-syschout       PHA		      ; save registers
-ACIA_Out1      lda   ACIASta	    ; serial port status
+syschout:       PHA		      ; save registers
+ACIA_Out1:      lda   ACIASta	    ; serial port status
 	       and   #$10	       ; is tx buffer empty
 	       beq   ACIA_Out1	  ; no
 	       PLA		      ; get chr
 	       sta   ACIADat	    ; put character to Port
 	       RTS		      ; done
 
-syshexout      PHA		     ;  prints AA hex digits
+syshexout:      PHA		     ;  prints AA hex digits
 	       LSR		     ;  MOVE UPPER NIBBLE TO LOWER
 	       LSR		     ;
 	       LSR		     ;
 	       LSR		     ;
 	       JSR   PrintDig	  ;
 	       PLA		     ;
-PrintDig       PHY		     ;  prints A hex nibble (low 4 bits)
+PrintDig:       PHY		     ;  prints A hex nibble (low 4 bits)
 	       AND   #$0F	      ;
 	       TAY		     ;
 	       LDA   Hexdigdata,Y      ;
 	       PLY		     ;
 	       jmp   syschout	  ;
 
-Hexdigdata	.byte	"0123456789ABCDEF"
-banner		.byte	"MicroChess (c) 1996-2002 Peter Jennings"
+Hexdigdata:	.byte	"0123456789ABCDEF"
+banner:		.byte	"MicroChess (c) 1996-2002 Peter Jennings"
 		.byte	$0d, $0a, $00
-cpl		.byte	"WWWWWWWWWWWWWWWWBBBBBBBBBBBBBBBBWWWWWWWWWWWWWWWW"
-cph		.byte	"KQCCBBRRPPPPPPPPKQCCBBRRPPPPPPPP"
+cpl:		.byte	"WWWWWWWWWWWWWWWWBBBBBBBBBBBBBBBBWWWWWWWWWWWWWWWW"
+cph:		.byte	"KQCCBBRRPPPPPPPPKQCCBBRRPPPPPPPP"
 		.byte	$00
 ;
 ; end of added code
 ;
 ; BLOCK DATA
 ;		*= $1580
-SETW		.byte 	$03, $04, $00, $07, $02, $05, $01, $06
+SETW:		.byte 	$03, $04, $00, $07, $02, $05, $01, $06
 		.byte 	$10, $17, $11, $16, $12, $15, $14, $13
 		.byte 	$73, $74, $70, $77, $72, $75, $71, $76
 	 	.byte	$60, $67, $61, $66, $62, $65, $64, $63
 
-MOVEX   	.byte 	$00, $F0, $FF, $01, $10, $11, $0F, $EF, $F1
+MOVEX:   	.byte 	$00, $F0, $FF, $01, $10, $11, $0F, $EF, $F1
 		.byte	$DF, $E1, $EE, $F2, $12, $0E, $1F, $21
 
-POINTS  	.byte 	$0B, $0A, $06, $06, $04, $04, $04, $04
+POINTS:  	.byte 	$0B, $0A, $06, $06, $04, $04, $04, $04
 		.byte 	$02, $02, $02, $02, $02, $02, $02, $02
 
-OPNING  	.byte 	$99, $25, $0B, $25, $01, $00, $33, $25
+OPNING:  	.byte 	$99, $25, $0B, $25, $01, $00, $33, $25
 		.byte	$07, $36, $34, $0D, $34, $34, $0E, $52
 		.byte 	$25, $0D, $45, $35, $04, $55, $22, $06
 		.byte	$43, $33, $0F, $CC

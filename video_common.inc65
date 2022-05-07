@@ -13,6 +13,7 @@
 .import vdp_setaddr_pattern_table_offset
 .import vdp_write
 .import vdp_read
+.import vdp_writex
 
 .import VDP_REGS
 .import VDP_VARS

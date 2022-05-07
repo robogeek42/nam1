@@ -6,7 +6,6 @@
 .include "zeropage.inc65"
 .include "acia.inc65"
 .include "scancodes.inc65"
-.include "basic.asm"
 .include "io.inc65"
 .include "string.inc65"
 .include "print_util.inc65"
@@ -23,12 +22,19 @@
 .ifdef UCHESS2
 .include "uchess2.inc65"
 .endif
+.ifdef IMAGETEST
+.include "video_load_mc.inc65"
+.endif
+.include "basic.s"
 
 .ifdef PONG
 .import pong
 .endif
 .ifdef PACMAN
 .import pacman
+.endif
+.ifdef BREAKOUT
+.import breakout
 .endif
 
 .segment "VECTORS"
@@ -215,7 +221,21 @@ loop:           ld16 R0, prompt
 
 @cmd_l:         cmp #'l'
                 bne @cmd_l_end
+                lda buffer+1
+
+		cmp #'1'
+		bne @cmd_l_test_2
                 jsr cmd_loadimage
+                jmp loop
+		@cmd_l_test_2:
+		cmp #'2'
+		bne @cmd_l_test_3
+                jsr cmd_loadimage
+                jmp loop
+		@cmd_l_test_3:
+		cmp #'3'
+		bne @cmd_l_end
+		jsr cmd_loadimage_mc
                 jmp loop
                 @cmd_l_end:
 
@@ -369,9 +389,15 @@ check_pong:
 .endif
                 RTS
 check_pacman:   CMP #'m'
-                BNE cmd_m_error
+		BNE check_breakout
 .ifdef PACMAN
                 JSR pacman
+.endif
+                RTS
+check_breakout: CMP #'b'
+                BNE cmd_m_error
+.ifdef BREAKOUT
+		JSR breakout
 .endif
                 RTS
                 
@@ -448,7 +474,7 @@ cd_dir_show_entry:
                 JSR sdfs_set_dir_ptr        ; load addr of fh_dir into X(lo)A(hi)
                 STX R0                        ; store them in string pointer so we can print
                 STA R0+1
-                JSR    acia_puts                ; print string (file name)
+		JSR acia_puts_count         ; print string (file name)
                 LDY R1                      ; number of chars printed is put into R1
                 LDA #' '                    ; print spaces to pad to 14
 cd_dir_pad:
@@ -530,6 +556,23 @@ image_smashmario_COMP:
 .else
                 RTS
 .endif
+cmd_loadimage_mc:
+.ifdef IMAGETEST
+		; switch to mode 3 (Multicolor)
+                LDA #3
+                JSR vdp_set_mode
+                ; put address into TMP1
+		LDA #<multicolor_test_data
+                STA TMP1
+                LDA #>multicolor_test_data
+                STA TMP1+1
+                ; load image
+                JSR vdp_load_mc_pic
+                RTS
+    .include "mode3_example.inc65"
+.else
+                RTS
+.endif
 
 ;-----------------------------------------------------
 ; run Basic - b[cw]
@@ -576,7 +619,7 @@ LAB_vec:
 
 ; EhBASIC IRQ support
 
-IRQ_CODE
+IRQ_CODE:
         PHA                ; save A
         LDA    IrqBase        ; get the IRQ flag byte
         LSR                ; shift the set b7 to b6, and on down ...
@@ -587,7 +630,7 @@ IRQ_CODE
 
 ; EhBASIC NMI support
 
-NMI_CODE
+NMI_CODE:
         PHA                ; save A
         LDA    NmiBase        ; get the NMI flag byte
         LSR                ; shift the set b7 to b6, and on down ...
@@ -596,7 +639,7 @@ NMI_CODE
         PLA                ; restore A
         RTI
 
-END_CODE
+END_CODE:
 
 ; Output to serial & video
 CHARout:
