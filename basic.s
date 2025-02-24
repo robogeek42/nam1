@@ -8274,7 +8274,7 @@ LAB_LOAD:
 LAB_FILENOTFOUND:
 	LDX  #$26			; error code $26 ("File not found" error)
 	JMP  LAB_XERR		; do error #X, then warm start
-ll_over
+ll_over:
 	LDA #1
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 	
@@ -8444,14 +8444,14 @@ LAB_DIR:
 	STZ PAGECNT
 
 	JSR fs_dir_root_start		; Start at root
-dir_show_entry
+dir_show_entry:
 	CLC  						; Only looking for valid files
 	JSR fs_dir_find_entry		; Find a valid entry
 	BCS dir_done				; If C then no more entries so done
 	JSR sdfs_set_dir_ptr		; load addr of fh_dir into X(lo)A(hi)
 	JSR  AM_PRINTSTR				; print string (file name)
 	LDA #' '					; print spaces
-dir_pad
+dir_pad:
 	JSR LAB_PRNA
 	INY  						; pad to 13 chars
 	CPY #14
@@ -8469,7 +8469,7 @@ dir_pad
 	ld16 R0, msg_pause
 	JSR vdp_write_text
 	JSR acia_puts
-@loop
+@loop:
 	; wait for key press
 	JSR V_INPT
 	BCC @loop
@@ -8477,9 +8477,9 @@ dir_pad
 	JSR LAB_CRLF
 	STZ PAGECNT
 
-dir_skip_pause
+dir_skip_pause:
 	BRA dir_show_entry			; Find another entry
-dir_done
+dir_done:
 	CLC
 	ply
 	plx
@@ -8601,7 +8601,7 @@ LAB_LOADIMG:
 	JSR fs_open_read
 	BCC @over
 	JMP LAB_FILENOTFOUND
-@over
+@over:
 	; switch to mode 2 (Screen2)
 	LDA #2
 	JSR vdp_set_mode
@@ -8633,7 +8633,7 @@ LAB_LOADBIN:
 	JSR fs_open_read
 	BCC @over
 	JMP LAB_FILENOTFOUND
-@over
+@over:
 	; get address
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
 	JSR  LAB_EVNM		; evaluate expression and check is numeric,
