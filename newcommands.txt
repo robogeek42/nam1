@@ -97,3 +97,11 @@ LOADIMG <filename>
 Binary data load
 ----------------
 LOADBIN <filename> <address>
+
+Exit BASIC into Monitor
+-----------------------
+
+MON
+	Drop out of BASIC into machine code monitor program
+	Type "b" in monitor to return to BASIC (cold-start). For a warm-start enter "bw"
+	In monitor enter "h" to get help
