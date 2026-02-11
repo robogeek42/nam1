@@ -7641,7 +7641,9 @@ LAB_MODE:
 	;JSR LAB_CRLF
 	TXA
 	JSR vdp_set_mode
-    JSR snd_all_off
+.ifdef SOUND
+	JSR snd_all_off
+.endif
 	RTS
 
 ; perform CLS (VDP Clear Screen)

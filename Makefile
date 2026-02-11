@@ -62,7 +62,7 @@ ifdef VDP
 $(info ** Compile with TMS9918 Video Support **)
 	SOURCES += video_common.s
 	SOURCES += video.s
-	SOURCES +=sprite.s
+	SOURCES += sprite.s
 	SOURCES += decomp.s
 	VDP_DEF = -D VDP=$(VDP)
 	VDP_DEFA = --asm-define VDP=$(VDP)
@@ -114,13 +114,10 @@ main.o: main.s basic.s
 
 firmware: main.o $(SOURCES:.s=.o)
 ifdef SDIO
-	ld65 -vm -C firmware.cfg $(LIBS) -o $@ -m firmware.map -Ln firmware.vice $^
+	cl65 -vm -g -T -C firmware.cfg $(LIBS) -t none -o $@ -m firmware.map -l firmware.lst -Ln firmware.vice -v $^
 else
-	ld65 -vm -C firmware_nosd.cfg $(LIBS) -o $@ -m firmware.map -Ln firmware.vice $^
+	cl65 -vm -g -T -C firmware_nosd.cfg $(LIBS) -t none -o $@ -m firmware.map -l firmware.lst -Ln firmware.vice -v $^
 endif
-
-#firmware: $(SOURCES)
-#	cl65 -vm -g -T -C firmware.cfg $(LIBS) -t none -o $@ -m firmware.map -l firmware.lst -Ln firmware.vice -v -d $(DEFINES) $(ASMDEFINES) $^
 
 clean:
 	 rm -f firmware *.o *.lst *map *vice

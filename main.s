@@ -461,6 +461,7 @@ cmd_vram_dump:
                 JSR vdp_dump_page
                 RTS
 
+.ifdef SDIO
 ; SD DIR command
 cmd_dir:
                 pha
@@ -495,6 +496,10 @@ cd_dir_done:
                 plx
                 pla
                 RTS
+.else ; SDIO
+cmd_dir:
+                rts
+.endif ; SDIO
 
 ; print 4digit hex string from X/A A(hi)
 ; destroys buffer
@@ -716,7 +721,9 @@ SAVE:
         RTS
 
 DObell:
+.ifdef SOUND
         JSR snd_beep
+.endif
         RTS
 
 DObackspace:
