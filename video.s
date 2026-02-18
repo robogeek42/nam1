@@ -67,8 +67,8 @@ vdp_set_mode:	STA VDP_MODE
 				LDX #$80
 				LDY #0
 vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
-				STA VDP_REGS,Y			; Save it in zero page
 				STA VDP_WR_REG			; set registers directly as subroutine uses X for reg num
+				STA VDP_REGS,Y			; Save it in zero page
 .ifdef FASTCPU
 				NOP
 				NOP
@@ -334,12 +334,15 @@ cs_loop1:		JSR vdp_write
 ;                         : R0
 ;                   Uses : TMP0
 vdp_dump_page:
+                ; read Status register to ensure VDP is ready
+                ; for a 2-byte address
+                JSR vdp_getstatus
 				; read back to CPU memory
 				ld16 RES, page_buffer	;; set read-back address
 				LDY #0					;; set VDP VRAM read address (and test 256 bytes)
 				LDA ZP_TMP0				;; page
 				JSR vdp_set_addr_r
-vt1_loop1:	  JSR vdp_read				;; read back
+vt1_loop1:	    JSR vdp_read			;; read back
 				STA (RES),Y
 				INY
 				BNE vt1_loop1

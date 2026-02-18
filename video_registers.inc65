@@ -1,11 +1,8 @@
 ; TMS9918 VDP chip address defines
-VDP_BASE      = $7F60
-VDP_ADDR_SET  = $7F61
-
-VDP_WR_VRAM   = $7F60
-VDP_WR_REG    = $7F61
-VDP_RD_VRAM   = $7F62
-VDP_RD_STATUS = $7F63
+VDP_WR_VRAM   = $7F40
+VDP_WR_REG    = $7F41
+VDP_RD_VRAM   = $7F42
+VDP_RD_STATUS = $7F43
 
 ; VDP Operation           !CSW(a1) !CSR(!a1)  MODE(a0) Port
 ;----------------------------------------------------------

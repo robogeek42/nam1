@@ -5,21 +5,21 @@
 ;|    Operation       |  0  |  1  |  2  |  3  |  4  |  5  |  6  |  7  | CSW | CSR | MODE | a1  a0  
 ;|--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------|
 ;|Write to VRAM       |     |     |     |     |     |     |     |     |     |     |      |
-;|  Byte 1 Addr Setup | A6  | A7  | A8  | A9  | A10 | A11 | A12 | A13 |  0  |  1  |  1   |        7FC1
-;|  Byte 2 Addr Setup |  0  |  1  | A0  | A1  | A2  | A3  | A4  | A5  |  0  |  1  |  1   |        7FC1
-;|  Byte 3 Data Write | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  0  |  1  |  0   | 0   0  7FC0
+;|  Byte 1 Addr Setup | A6  | A7  | A8  | A9  | A10 | A11 | A12 | A13 |  0  |  1  |  1   |        7F41
+;|  Byte 2 Addr Setup |  0  |  1  | A0  | A1  | A2  | A3  | A4  | A5  |  0  |  1  |  1   |        7F41
+;|  Byte 3 Data Write | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  0  |  1  |  0   | 0   0  7F40
 ;|--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------|
 ;|VDP Register Write  |     |     |     |     |     |     |     |     |     |     |      |   
-;|  Byte 1 Data Write | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  0  |  1  |  1   |        7FC1
-;|  Byte 2 Reg Write  |  1  |  0  |  0  |  0  |  0  | rs0 | rs1 | rs2 |  0  |  1  |  1   | 0   1  7FC1
+;|  Byte 1 Data Write | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  0  |  1  |  1   |        7F41
+;|  Byte 2 Reg Write  |  1  |  0  |  0  |  0  |  0  | rs0 | rs1 | rs2 |  0  |  1  |  1   | 0   1  7F41
 ;|--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------|
 ;|Read from VRAM      |     |     |     |     |     |     |     |     |     |     |      |
-;|  Byte 1 Addr Setup | A6  | A7  | A8  | A9  | A10 | A11 | A12 | A13 |  0  |  1  |  1   |        7FC1
-;|  Byte 2 Addr Setup |  0  |  0  | A0  | A1  | A2  | A3  | A4  | A5  |  0  |  1  |  1   |        7FC1
-;|  Byte 3 Data Read  | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  1  |  0  |  0   | 1   0  7FC2
+;|  Byte 1 Addr Setup | A6  | A7  | A8  | A9  | A10 | A11 | A12 | A13 |  0  |  1  |  1   |        7F41
+;|  Byte 2 Addr Setup |  0  |  0  | A0  | A1  | A2  | A3  | A4  | A5  |  0  |  1  |  1   |        7F41
+;|  Byte 3 Data Read  | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  1  |  0  |  0   | 1   0  7F42
 ;|--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------|
 ;|Read VDP Status     |     |     |     |     |     |     |     |     |     |     |      |
-;|  Byte 1 Data Read  | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  1  |  0  |  1   | 1   1  7FC3
+;|  Byte 1 Data Read  | D0  | D1  | D2  | D3  | D4  | D5  | D6  | D7  |  1  |  0  |  1   | 1   1  7F43
 ;+--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
 ;
 ;
@@ -79,46 +79,55 @@ vgs_end:
 ; 2. Write VDP Register
 ; Write a value to one of seven registers
 ; Data is in Acc, Register number+$80 is in Y
-vdp_regwrite:   STA VDP_WR_REG        ; Data
+vdp_regwrite:   
+                STA VDP_WR_REG        ; Data
 .ifdef FASTCPU
                 NOP
                 NOP
 .endif
+                NOP
                 STY VDP_WR_REG        ; Register 80...87
 .ifdef FASTCPU
                 NOP
                 NOP
 .endif
+                NOP
                 RTS
 
 ; 3. Write Address
 ; Set an address in VRAM. Low byte in Y, High byte in A
 ; This should be followed by a series of writes to VDP_WR_VRAM
-vdp_set_addr_w: AND #$3F
+vdp_set_addr_w: 
+                STY VDP_WR_REG      ; Address lo byte
+.ifdef FASTCPU
+                NOP
+                NOP
+.endif
+                AND #$3F
                 ORA #$40
-                STY VDP_ADDR_SET      ; Address lo byte
+                STA VDP_WR_REG      ; Address hi byte
 .ifdef FASTCPU
                 NOP
-.endif
-                STA VDP_ADDR_SET      ; Address hi byte
-.ifdef FASTCPU
                 NOP
 .endif
+                NOP
                 RTS
 ; 3. Read Address
 ; Set an address in VRAM. Low byte in Y, High byte in A
 ; This should be followed by a series of reads from VDP_RD_VRAM
-vdp_set_addr_r: AND #$3F
-                STY VDP_ADDR_SET      ; Address lo byte
+vdp_set_addr_r: 
+                STY VDP_WR_REG      ; Address lo byte
 .ifdef FASTCPU
                 NOP
                 NOP
 .endif
-                STA VDP_ADDR_SET      ; Address hi byte
+                AND #$3F
+                STA VDP_WR_REG      ; Address hi byte
 .ifdef FASTCPU
                 NOP
                 NOP
 .endif
+                NOP
                 RTS
 ;----------------------------------------------------------------
 
@@ -188,8 +197,8 @@ vdp_setaddr_color_table_g2:
 vdp_write:
                 STA VDP_WR_VRAM
                 NOP
-.ifdef FASTCPU
                 NOP
+.ifdef FASTCPU
                 NOP
                 NOP
                 NOP
@@ -198,8 +207,8 @@ vdp_write:
 vdp_writex:
                 STX VDP_WR_VRAM
                 NOP
-.ifdef FASTCPU
                 NOP
+.ifdef FASTCPU
                 NOP
                 NOP
                 NOP
@@ -213,4 +222,5 @@ vdp_read:
                 NOP
 .endif
                 LDA VDP_RD_VRAM
+
                 RTS

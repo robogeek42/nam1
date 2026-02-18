@@ -198,6 +198,7 @@ loop:           ld16 R0, prompt
                 @cmd_c_end:
 .endif
 
+                ; vd = dump VRAM page
 @cmd_vd:        cmp #'v'
                 bne @cmd_vd_end
                 lda buffer+1
@@ -210,7 +211,36 @@ loop:           ld16 R0, prompt
                 jmp loop
                 @cmd_vd_end:
 
-@cmd_sd:        cmp #'s'
+                ; vw = write data to VDP adrress
+@cmd_vw:        lda buffer
+                cmp #'v'
+                bne @cmd_vw_end
+                lda buffer+1
+                cmp #'w'
+                bne @cmd_vw_end
+                lda buffer+2
+                cmp #' '
+                bne @cmd_vw_end
+                jsr cmd_vram_write
+                jmp loop
+                @cmd_vw_end:
+
+                ; vr = read data from VDP adrress
+@cmd_vr:        lda buffer
+                cmp #'v'
+                bne @cmd_vr_end
+                lda buffer+1
+                cmp #'r'
+                bne @cmd_vr_end
+                lda buffer+2
+                cmp #' '
+                bne @cmd_vr_end
+                jsr cmd_vram_read
+                jmp loop
+                @cmd_vr_end:
+
+@cmd_sd:        lda buffer
+                cmp #'s'
                 bne @cmd_sd_end
                 lda buffer+1
                 cmp #'d'
@@ -219,19 +249,21 @@ loop:           ld16 R0, prompt
                 jmp loop
                 @cmd_sd_end:
 
-@cmd_l:         cmp #'l'
+@cmd_l:         lda buffer
+                cmp #'l'
                 bne @cmd_l_end
                 lda buffer+1
-
 		cmp #'1'
 		bne @cmd_l_test_2
                 jsr cmd_loadimage
                 jmp loop
+
 		@cmd_l_test_2:
 		cmp #'2'
 		bne @cmd_l_test_3
                 jsr cmd_loadimage
                 jmp loop
+
 		@cmd_l_test_3:
 		cmp #'3'
 		bne @cmd_l_end
@@ -239,7 +271,8 @@ loop:           ld16 R0, prompt
                 jmp loop
                 @cmd_l_end:
 
-@cmd_t:         cmp #'t'
+@cmd_t:         lda buffer
+                cmp #'t'
                 bne @cmd_t_end
                 lda buffer+1
 
@@ -284,6 +317,14 @@ loop:           ld16 R0, prompt
 .endif
                 @cmd_t_end:
 
+@cmd_mode:      lda buffer
+                cmp #'M'
+                bne @cmd_mode_end
+                jsr cmd_do_mode
+                jmp loop
+
+                @cmd_mode_end:
+
                 ; h = print help
 @cmd_h:         cmp #'h'
                 bne @cmd_empty
@@ -317,6 +358,9 @@ msg_help:       .byte "m <addr> - dump mem",$0d,$0a
                 .byte "w <addr> <byte> - write byte",$0d,$0a
                 .byte "b - basic bw=warm start",$0d,$0a
                 .byte "vd <page> - dump VRAM page",$0d,$0a
+                .byte "vw <vaddr> <byte> - write single VRAM byte",$0d,$0a
+                .byte "vr <vaddr> - read single VRAM byte",$0d,$0a
+                .byte "M <mode> - change mode",$0d,$0a
 .ifdef PONG
                 .byte "pp - play pong",$0d,$0a
 .endif
@@ -399,8 +443,19 @@ check_breakout: CMP #'b'
 .ifdef BREAKOUT
 		JSR breakout
 .endif
+
                 RTS
-                
+
+cmd_do_mode:
+                lda buffer+1
+                cmp #' '
+                bne cmd_m_error
+                lda buffer+2
+                jsr scan_digit    ; scan a single digit char in accum - return value in A
+                cmp #255          ; returns 255 if not a valid digit
+                beq cmd_m_error
+                jsr vdp_set_mode                
+                rts 
 
 ; Write a byte to memory
 ; w <address> <byte>
@@ -419,7 +474,8 @@ cmd_write:      ld16 R0, buffer + 2
                 lda #':'
                 jsr acia_putc
 
-@read_and_print_byte: ld16 R0, buffer + 7
+@read_and_print_byte: 
+                ld16 R0, buffer + 7
                 jsr scan_hex
                 tay
                 ld16 R0, buffer
@@ -460,6 +516,93 @@ cmd_vram_dump:
                 STA ZP_TMP0
                 JSR vdp_dump_page
                 RTS
+
+; Write a byte to VDP memory
+; vw <address> <byte>
+cmd_vram_write: ld16 R0, buffer + 3
+                jsr scan_hex16
+
+; print address (hex) - reuse buffer
+                ld16 R0, buffer
+                lda RES + 1
+                jsr fmt_hex_string
+                ld16 R0, buffer + 2
+                lda RES
+                jsr fmt_hex_string
+                ld16 R0, buffer
+                jsr acia_puts
+
+                lda #':'
+                jsr acia_putc
+
+; get the byte to write 
+                ld16 R0, buffer + 8
+                jsr scan_hex
+                sta TMP2
+; print the value
+                ld16 R0, buffer
+                jsr fmt_hex_string
+                jsr acia_puts
+                ;jsr acia_put_newline
+; set the VRAM address for write
+                lda RES + 1
+                ldy RES
+                jsr vdp_set_addr_w
+
+; write the byte to vram
+                lda TMP2
+                jsr vdp_write
+
+; set the VRAM address for read
+                lda RES + 1
+                ldy RES
+                jsr vdp_set_addr_r
+; read vram
+                jsr vdp_read
+
+                tay
+                lda #' '
+                jsr acia_putc
+                tya
+; convert to hex and print
+                ld16 R0, buffer
+                jsr fmt_hex_string
+                jsr acia_puts
+                jsr acia_put_newline
+                rts
+
+; Read a byte from VDP memory
+; vr <address>
+cmd_vram_read:  ld16 R0, buffer + 3
+                jsr scan_hex16
+
+; print address (hex) - reuse buffer
+                ld16 R0, buffer
+                lda RES + 1
+                jsr fmt_hex_string
+                ld16 R0, buffer + 2
+                lda RES
+                jsr fmt_hex_string
+                ld16 R0, buffer
+                jsr acia_puts
+
+                lda #':'
+                jsr acia_putc
+
+; set the VRAM address for read
+                lda RES + 1
+                ldy RES
+                jsr vdp_set_addr_r
+; read vram
+                jsr vdp_read
+
+; convert to hex and print
+                ld16 R0, buffer
+                jsr fmt_hex_string
+                jsr acia_puts
+                jsr acia_put_newline
+                rts
+;-----------------------------------------------------
 
 .ifdef SDIO
 ; SD DIR command
@@ -650,28 +793,20 @@ END_CODE:
 CHARout:
         CMP #$07
         BEQ DObell
-        JSR ACIAout
+        JSR acia_putc
         JSR vdp_write_char
 ;jsr acia_put_newline
         RTS
 
-; Output only to serial port
 ACIAout:
-        PHA                ; A contains char to print
-@wait_txd_empty:
-        LDA ACIA_STATUS
-        AND #ACIA_STATUS_TX_EMPTY
-        BEQ @wait_txd_empty
-        PLA                ; ready to output, restore A
-        STA ACIA_DATA      ; and output
-        RTS
-        
+        JMP acia_putc
+
 ; Input from ACIA and KBD if configured
 CHARin:
-        LDA ACIA_STATUS
-        AND #ACIA_STATUS_RX_FULL
+        lda ACIA_CTRL_STATUS 
+        and #ACIA_STATUS_RDRF   ; Receiver Data Register Full
         BEQ @nobyw          ; branch if no byte waiting
-        LDA ACIA_DATA
+        lda ACIA_TX_RX          ; get data
         AND #$7F            ; clear high bit
         SEC                 ; flag byte received
         RTS

@@ -8,6 +8,7 @@
                     .export scan_hex_char
                     .export scan_hex
                     .export scan_hex16
+                    .export scan_digit
 
                     .code
 
@@ -144,4 +145,17 @@ scan_hex16:         phay
                     ora RES
                     sta RES
                     play
+                    rts
+
+; convert digit in accum to integer in accum
+; return 0 with carry-set if it is not a decimal digit
+scan_digit:         
+                    cmp #'0'
+                    bcc @invalid
+                    cmp #('9' + 1)
+                    bcs @invalid
+                    sec
+                    sbc #'0'
+                    rts
+@invalid:           lda #255
                     rts

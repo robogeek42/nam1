@@ -4,3 +4,4 @@
 .import scan_hex_char
 .import scan_hex
 .import scan_hex16
+.import scan_digit
