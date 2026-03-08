@@ -145,6 +145,10 @@ init_sdcard:
 init_retry:
     LDA #'.'
     JSR acia_putc
+.ifdef PC2K
+                JSR KBSCAN
+                BNE init_return
+.endif
 
 	lda #SD_CS						; Unselect device
 	tsb SD_REG
@@ -200,6 +204,7 @@ init_cmd16:
     ld16 R0,sd_msg_initdone
 	JSR acia_puts
 
+init_return:
 	rts
 
 ;****************************************

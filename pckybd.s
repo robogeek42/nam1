@@ -7,7 +7,6 @@
 .include "string.inc65"
 .include "scancodes.inc65"
 
-
 ;****************************************************************************
 ; PC keyboard Interface for the 6502 Microprocessor utilizing a 6522 VIA
 ; (or suitable substitute)
@@ -153,14 +152,24 @@
 ;
 ; I/O Port definitions
 
-;kbportreg      =     $7f01             ; 6522 IO port register B
-;kbportddr      =     $7f03             ; 6522 IO data direction register B
-clk            =     $10               ; 6522 IO port clock bit mask (PB4)
-data           =     $20               ; 6522 IO port data bit mask  (PB5)
 kbportreg      =  VIA1 + VIA_IRB       ; 6522 IO port register B
 kbportddr      =  VIA1 + VIA_DDRB      ; 6522 IO data direction register B
-;clk            =  PS2K_CLK             ; 6522 IO port clock bit mask (PB1)
-;data           =  PS2K_DAT             ; 6522 IO port data bit mask  (PB2)
+clk            =  PS2K_CLK             ; 6522 IO port clock bit mask io.inc65
+data           =  PS2K_DAT             ; 6522 IO port data bit mask  io.inc65
+
+portAreg = VIA1 + VIA_ORA
+portAdir = VIA1 + VIA_DDRA
+
+.macro DBG_MARK
+;    inc portAreg
+;    dec portAreg
+    PHA
+    LDA #$01
+    STA portAreg    ; set bit 0
+    LDA #$00
+    STA portAreg    ; unset bit 0
+    PLA
+.endmacro
 
 ; NOTE: some locations use the inverse of the bit masks to change the state of 
 ; bit.  You will have to find them and change them in the code acordingly.
@@ -630,79 +639,120 @@ kbscan2:        jsr   kbdis             ; disable the receiver so other routines
 ; ---------------------------------------------------------------------
 KBINIT:          JMP kbinit
 
-kbflush:        lda   #$f4              ; flush buffer
+kbflush:        lda   #$f4              ; flush buffer command - fall through to kbsend
+; ---------------------------------------------------------------------
 ;
 ; send a byte to the keyboard
 ;
+; SEND Protocol:
+; 1)   Bring the Clock line low for at least 100 microseconds.
+; 2)   Bring the Data line low.
+; 3)   Release the Clock line.
+; 4)   Wait for the device to bring the Clock line low.
+; 5)   Set/reset the Data line to send the first data bit
+; 6)   Wait for the device to bring Clock high.
+; 7)   Wait for the device to bring Clock low.
+; 8)   Repeat steps 5-7 for the other seven data bits and the parity bit
+; 9)   Release the Data line.
+; 10) Wait for the device to bring Data low.
+; 11) Wait for the device to bring Clock  low.
+; 12) Wait for the device to release Data and Clock
+;
 kbsend:         sta   byte              ; save byte to send
+    lda #0
+    sta portAreg
                phx                     ; save registers
                phy                     ; 
                sta   lastbyte          ; keep just in case the send fails
 ;debug - print send code
 ;ld16 R0,msg_send
 ;jsr acia_puts
-;lda #'['
-;jsr acia_putc
 ;lda byte
 ;jsr print1byte
-;lda #']'
+;lda #' '
 ;jsr acia_putc
-;jsr acia_put_newline
 ; end debug
-               lda   kbportreg         ; 
-               and   #$EF             ; clk low, data high (change if port bits change)
-               ora   #data             ; 
-               sta   kbportreg         ; 
                lda   kbportddr         ; 
-               ora   #$30              ;  bit bits high (change if port bits change)
-               sta   kbportddr         ; set outputs, clk=0, data=1
-               ;lda   #$10              ; 1Mhz cpu clock delay (delay = cpuclk/62500)
-               lda   #$28              ; 2.4576Mhz cpu clock delay (delay = cpuclk/62500)(Assif)
-kbsendw:        dec                     ; 
-               bne   kbsendw           ; 64uS delay
+               ora   #$30              ; set data/clk as output (change if port bits change) 
+               sta   kbportddr         ; 
+
+; 1) Bring the Clock line low for at least 100 microseconds.
+               lda   kbportreg         ; 
+               and   #$EF              ; clk low (change if port bits change)
+               ora   #data             ; data high
+               sta   kbportreg         ; 
+.ifdef FASTCPU
+               ;lda   #$28              ; 2.4576Mhz cpu clock delay (delay = cpuclk/62500)(Assif)
+               lda   #$50              ; 100us
+.else
+               lda   #$10              ; 1Mhz cpu clock delay (delay = cpuclk/62500)
+.endif
+kbsendw:       dea                     ; DEA=1 cycle, BNE=3 cycles. Total delay = 4 * loop counter ($28=40) = 64us
+               bne   kbsendw           ; 64uS delay 
+;    DBG_MARK ; mark start of send
                ldy   #$00              ; parity counter
                ldx   #$08              ; bit counter 
+; 2) Bring the Data line low.
                lda   kbportreg         ; 
                and   #$CF              ; clk low, data low (change if port bits change)
                sta   kbportreg         ; 
+
+; 3) Release the Clock line.
                lda   kbportddr         ; 
                and   #$EF              ; set clk as input (change if port bits change)
-               sta   kbportddr         ; set outputs
-               jsr   kbhighlow         ; 
-kbsend1:        ror   byte              ; get lsb first
+               sta   kbportddr         ; 
+; 4) Wait for the device to bring the Clock line low.
+               jsr   kbhighlow         
+
+kbsend1:
+;    DBG_MARK
+; 5)   Set/reset the Data line to send the first data bit
+               ror   byte              ; get lsb first
                bcs   kbmark            ; 
                lda   kbportreg         ; 
                and   #$DF              ; turn off data bit (change if port bits change)
                sta   kbportreg         ; 
                bra   kbnext            ; 
-kbmark:         lda   kbportreg         ; 
-               ora   #data             ; 
+kbmark:        lda   kbportreg         ; 
+               ora   #data             ; turn on data bit
                sta   kbportreg         ; 
                iny                     ; inc parity counter
+; 6)   Wait for the device to bring Clock high.
+; 7)   Wait for the device to bring Clock low.
 kbnext:         jsr   kbhighlow         ; 
                dex                     ; 
+; 8)   Repeat steps 5-7 for the other seven data bits and the parity bit
                bne   kbsend1           ; send 8 data bits
+
+;    DBG_MARK
                tya                     ; get parity count
                and   #$01              ; get odd or even
                bne   kbpclr            ; if odd, send 0
                lda   kbportreg         ; 
                ora   #data             ; if even, send 1
-               sta   kbportreg         ; 
+               sta   kbportreg         ;  
                bra   kback             ; 
-kbpclr:         lda   kbportreg         ; 
+kbpclr:        lda   kbportreg         ; 
                and   #$DF              ; send data=0 (change if port bits change)
                sta   kbportreg         ; 
-kback:          jsr   kbhighlow         ; 
+kback:         
+               jsr   kbhighlow         ; clock hi->lo for parity bit
+;    DBG_MARK
                lda   kbportddr         ; 
                and   #$CF              ; set clk & data to input (change if port bits change)
+; 9)   Release the Data line.
                sta   kbportddr         ; 
                ply                     ; restore saved registers
                plx                     ; 
-               jsr   kbhighlow         ; wait for ack from keyboard
+; 10) Wait for the device to bring Data low.
+; 11) Wait for the device to bring Clock  low.
+; 12) Wait for the device to release Data and Clock
+               jsr   kbhighlow         ; wait for ack from keyboard (expect data==0)
                bne   kbinit_redirect   ; VERY RUDE error handler - re-init the keyboard
-kbsend2:        lda   kbportreg         ; 
+kbsend2:       lda   kbportreg         ; 
                and   #clk              ; 
                beq   kbsend2           ; wait while clk low
+;    DBG_MARK
                jmp   kbdis             ; diable kb sending
 kbinit_redirect:
     jmp kbinit
@@ -717,8 +767,13 @@ jsr acia_puts
                lda   #KBCMD_RESEND     ; resend cmd
                jsr   kbsend            ; 
 kbget:
-KBGET:          phx                     ; 
+KBGET:
+               phx                     ; 
                phy                     ; 
+; debug - notice every get
+;    lda #'^'
+;    jsr acia_putc
+; end debug
                lda   #$00              ; 
                sta   byte              ; clear scankey holder
                sta   parity            ; clear parity holder
@@ -765,7 +820,8 @@ kbget4:         tya                     ; get parity count
                rts                     ; 
 
 ;
-kbdis:          lda   kbportreg         ; disable kb from sending more data
+kbdis:         
+               lda   kbportreg         ; disable kb from sending more data
                and   #$EF              ; clk = 0 (change if port bits change)
                sta   kbportreg         ; 
                lda   kbportddr         ; set clk to ouput low
@@ -774,20 +830,40 @@ kbdis:          lda   kbportreg         ; disable kb from sending more data
                sta   kbportddr         ; 
                rts                     ; 
 kbinit:
+; debug
+;    ld16  R0,msg_startinit
+;    jsr   acia_puts
+
+;    lda #$0 ; debug pin in port a - start with a 0
+;    sta portAreg 
+; end debug
+
                lda   #$02              ; init - num lock on, all other off
                sta   special           ; 
 kbinit1:        lda   #KBCMD_RESET      ; keybrd reset
                jsr   kbsend            ; reset keyboard
                jsr   kbget             ; 
+; debug
+;    pha
+;    jsr print1byte
+;    jsr acia_put_newline
+;    pla
+;
                cmp   #KB_ACK           ; ack?
                bne   kbinit1           ; resend reset cmd
                jsr   kbget             ; 
+; debug
+;    pha
+;    jsr print1byte
+;    jsr acia_put_newline
+;    pla
+;
                cmp   #$AA              ; reset ok
                bne   kbinit1           ; resend reset cmd        
                                        ; fall into to set the leds
-  ; debug
-               ld16  R0,msg_init
-               jsr   acia_puts
+; debug
+;               ld16  R0,msg_init
+;               jsr   acia_puts
 
 kbsled:         lda   #KBCMD_LEDS       ; Set the keybrd LED's from kbleds variable
                jsr   kbsend            ; 
@@ -800,11 +876,15 @@ kbsled:         lda   #KBCMD_LEDS       ; Set the keybrd LED's from kbleds varia
                jsr   kbget             ; get the ack
                rts                     ; 
                                        ; 
-kbhighlow:      lda   #clk              ; wait for a low to high to low transition
+kbhighlow:
+               lda   #clk              ; wait for a low to high to low transition
+kbhl2:
                bit   kbportreg         ; 
-               beq   kbhighlow         ; wait while clk low
-kbhl1:          bit   kbportreg         ; 
+               beq   kbhl2             ; wait while clk low
+kbhl1:
+               bit   kbportreg         ; 
                bne   kbhl1             ; wait while clk is high
+
                lda   kbportreg         ; 
                and   #data             ; get data line state
                rts                     ; 
@@ -1106,6 +1186,10 @@ msg_error:
     .byte "Error",$0D,$0A,$00
 msg_send:
     .byte "-->",$00
+msg_disable:
+    .byte "(dis)",$00
+msg_startinit:
+    .byte "Init:",$00
 msg_init:
     .byte "PS2 Keyboard Initialised",$0D,$0A,$00
 msg_tm_off:

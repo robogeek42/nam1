@@ -1,0 +1,92 @@
+
+*******************************************************************************
+                                     nam1
+*******************************************************************************
+
+CUPL(WM)        5.0a Serial# MW-10400000
+Device          g16v8s  Library DLIB-h-40-9
+Created         Sun Mar 08 12:34:21 2026
+Name            nam1
+Partno          nam1
+Revision        01
+Date            02/12/2025
+Designer        Assif
+Company         Assif
+Assembly        None
+Location        UK
+
+===============================================================================
+                            Expanded Product Terms
+===============================================================================
+
+acia =>
+    iocs
+  # a7
+  # a6
+  # a5
+
+ram_cs =>
+    a15
+  # !iocs
+
+ram_oe =>
+    !rwb
+  # !phi2
+
+ram_rwb =>
+    rwb
+  # !phi2
+
+vdp =>
+    !phi2
+  # iocs
+  # a7
+  # !a6
+  # a5
+
+via1 =>
+    iocs
+  # a7
+  # a6
+  # !a5
+
+via2 =>
+    iocs
+  # a7
+  # !a6
+  # !a5
+
+
+===============================================================================
+                                 Symbol Table
+===============================================================================
+
+Pin Variable                                    Pterms   Max     Min    
+Pol   Name              Ext     Pin     Type     Used   Pterms  Level   
+--- --------            ---     ---     ----    ------  ------  -----   
+
+    a5                          6        V        -       -       -     
+    a6                          5        V        -       -       -     
+    a7                          4        V        -       -       -     
+    a15                         7        V        -       -       -     
+    acia                        19       V        4       8       1     
+    iocs                        2        V        -       -       -     
+    p8                          8        V        -       -       -     
+    p9                          9        V        -       -       -     
+    p11                         11       V        -       -       -     
+    p12                         12       V        -       -       -     
+    phi2                        1        V        -       -       -     
+    ram_cs                      14       V        2       8       1     
+    ram_oe                      13       V        2       8       1     
+    ram_rwb                     15       V        2       8       1     
+    rwb                         3        V        -       -       -     
+    vdp                         17       V        5       8       1     
+    via1                        18       V        4       8       1     
+    via2                        16       V        4       8       1     
+
+
+LEGEND    D : default variable         F : field      G : group
+          I : intermediate variable    N : node       M : extended node
+          U : undefined                V : variable   X : extended variable
+          T : function
+

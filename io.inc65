@@ -1,15 +1,15 @@
 ; Device map
 ; $7F00 - $7F1F : ACIA
-; $7F20 - $7F3F : Sound --- not anymore!
-; $7F40 - $7F5F : VIA1 (Keyboard)
-; $7F60 - $7F7F : VDP
-; $7F80 - $7F9F : VIA2 (Joy & SD card)
-; $7FA0 - $7FBF : DS Clock
+; $7F20 - $7F3F : VIA1 (PS2 Keyboard, SD Card, Sound)
+; $7F40 - $7F5F : VDP
+; $7F60 - $7F7F : VIA2 (Joy?)
+; $7F80 - $7F9F : 
+; $7FA0 - $7FBF : 
 ; $7FC0 - $7FDF : --
 ; $7FE0 - $7FFF : --
 
-; New Device Map - wip
-; acia = iocs # a7 # a6 # a5;            /* 7F00 - 7F1F */
+; Device Map defined in gal/homebrew.pld
+; acia = iocs # a7 # a6 # a5;    /* 7F00 - 7F1F */
 ; via1 = !phi2 # iocs # a7 # a6 # !a5;   /* 7F20 - 7F3F */
 ; vdp  = !phi2 # iocs # a7 # !a6 # a5;   /* 7F40 - 7F5F */
 ; via2 = !phi2 # iocs # a7 # !a6 # !a5;  /* 7F60 - 7F7F */
@@ -97,13 +97,13 @@ VIA_PB7 = 1 << 7
 ;* SD Card interface definitions
 ;* The card is accessed through port B of VIA2
 SD_CLK		= $01	; bit 0  - easier for INC/DEC to simulate clock
-SD_CS		= $08	; bit 3
-SD_DI		= $10	; bit 4
-SD_DO		= $80	; bit 7
+SD_CS		= $02	; bit 1
+SD_DI		= $04	; bit 2
+SD_DO		= $08	; bit 3
 
 SD_MOSI		= SD_DI
 SD_MISO		= SD_DO
-SD_REG		= VIA2 + VIA_ORB
+SD_REG		= VIA1 + VIA_ORB
 
 CMD_ERR_NOERROR			= $00
 CMD_ERR_NOTFOUND		= $01
@@ -170,30 +170,28 @@ FS_ERR_EOF				=	$01
 ;*********************************************************
 
 ; Sound Chip SN76489
-SND_VIA_DATA			= VIA2 + VIA_ORA
-SND_VIA_CTL				= VIA2 + VIA_ORB
-SND_VIA_WE				= %01000000
-SND_VIA_CE				= %00100000
-;SND_VIA_READY			= %00000010
-SND_VIA_WE_CE           = %01100000
-SND_VIA_NOT_WE_CE       = %10011111
+SND_VIA_DATA		= VIA1 + VIA_ORA
+SND_VIA_CTL		= VIA1 + VIA_ORB
+SND_VIA_WE		= %10000000
+SND_VIA_CE		= %01000000
+SND_VIA_WE_CE           = %11000000
+SND_VIA_NOT_WE_CE       = %00111111
 
 ; PS2 Keyboard
-; see pckybd.s65
-;PS2K_CLK               = %00000010 ; $02
-;PS2K_DAT               = %00000100 ; $04
-;PS2K_DAT_OR_CLK        = %00000110 ; $06
-;PS2K_NOT_CLK           = %11111101 ; $FD
-;PS2K_NOT_DAT           = %11111011 ; $FB
-;PS2K_NOT_CLK_DAT       = %11111001 ; $F9
+PS2K_CLK               = %00010000 ; bit 4 = $10
+PS2K_DAT               = %00100000 ; bit 5 = $20
+PS2K_CLK_DAT           = %00110000 ;         $30
+PS2K_NOT_CLK_DAT       = %11001111 ;         $CF
+PS2K_NOT_CLK           = %11101111 ;         $EF
+PS2K_NOT_DAT           = %11011111 ;         $DF
 ;
-; VIA2 PORT B
+; VIA1 PORT B
 ;  B0 SD CLK
-;  B1
-;  B2
-;  B3 SD CS
-;  B4 SD DI
-;  B5 SND CE
-;  B6 SND WE
-;  B7 SD DO
+;  B1 SD CS
+;  B2 SD MOSI
+;  B3 SD MISO
+;  B4 KBD CLK
+;  B5 KBD DAT
+;  B6 SND CE
+;  B7 SND WE
 

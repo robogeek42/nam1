@@ -84,12 +84,18 @@ LAB_stlp:
                 ;JSR print_16bit_hex_string      ; print it
                 ;JSR acia_put_newline
 
-                ; Initialise VIA2 for SD card and Sound and KBD
-                ; Port A output data for sound
+                ; Initialise VIA1 for SD card and Sound and PC2K
+                ; Port A output data (all 1s), initialise to all 0s
                 LDA #$FF
-                STA VIA2 + VIA_DDRA
-                LDA #(SD_CLK | SD_CS | SD_DI | SND_VIA_WE_CE )    ; Set output pins
-                STA VIA2 + VIA_DDRB              ; SD card is attached to PortB of VIA2
+                STA VIA1 + VIA_DDRA
+                LDA #$00 
+                STA VIA1 + VIA_ORA
+                ; Port B SD is all output
+                ; PC2K is controlled by pckbd.s
+                LDA #(SD_CLK | SD_CS | SD_DI | SND_VIA_WE_CE | PS2K_CLK_DAT )    ; Set output pins
+                STA VIA1 + VIA_DDRB              ; SD card is attached to PortB of VIA1
+                LDA #(PS2K_CLK_DAT)
+                STA VIA1 + VIA_ORB
 
 .ifdef SOUND
                 JSR snd_all_off
@@ -105,6 +111,7 @@ LAB_stlp:
                 ld16 R0, msg_welcome
                 JSR acia_puts
 
+.ifdef VDP
                 ; Setup video with Mode 0
                 LDA #0
                 JSR vdp_set_mode
@@ -112,12 +119,17 @@ LAB_stlp:
                 ; display welcome message on video screen
                 ld16 R0, msg_welcome
                 JSR vdp_write_text
+.endif
 
 .ifdef SDIO
 .ifdef KEYB
                 ; Skip SD init if key is pressed
                 JSR kbd_scan
                 BCS skip_sdinit
+.endif
+.ifdef PC2K
+                JSR KBSCAN
+                BNE skip_sdinit
 .endif
                 
                 ; SD Card and filesystem

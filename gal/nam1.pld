@@ -1,0 +1,47 @@
+Name nam1;
+Partno nam1;
+Revision 01;
+Date 02/12/2025;
+Designer Assif;
+Company Assif;
+Location UK;
+Assembly None;
+Device g16v8;
+/* Use WinCUPLII to compile */
+
+/* Input pins */
+Pin 1 = phi2;
+Pin 2 = iocs; /* LOW when Address 0x7Fxx is on bus */
+Pin 3 = rwb;
+Pin 4 = a7;
+Pin 5 = a6;
+Pin 6 = a5;
+Pin 7 = a15;
+Pin 8 = p8;
+Pin 9 = p9;
+/* Pin 10 is GND */
+
+/* Output pins */
+Pin 11 = p11;
+Pin 12 = p12;
+Pin 13 = ram_oe;
+Pin 14 = ram_cs;
+Pin 15 = ram_rwb;
+Pin 16 = via2;
+Pin 17 = vdp;
+Pin 18 = via1;
+Pin 19 = acia;
+/* Pin 20 is VCC */
+
+/* Logic Equations */
+
+acia = iocs # a7 # a6 # a5;    /* 7F00 - 7F1F */
+via1 = iocs # a7 # a6 # !a5;   /* 7F20 - 7F3F */
+vdp  = !phi2 # iocs # a7 # !a6 # a5;   /* 7F40 - 7F5F */
+via2 = iocs # a7 # !a6 # !a5;  /* 7F60 - 7F7F */
+/* ram_cs = !phi2 # a15 # !iocs; */         /* CS only when CLK high */
+/* ram_oe = !rwb # a15 # !iocs; */          /* Output enable for RAM */
+
+ram_cs = a15 # !iocs;
+ram_oe = !rwb # !phi2;
+ram_rwb = rwb # !phi2;
