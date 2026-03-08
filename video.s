@@ -1,4 +1,4 @@
-; vim: ts=4
+; vim: ts=4 et sw=4
 ; TMS9918A/9929A Video Control
 ;
 		.setcpu "65C02"

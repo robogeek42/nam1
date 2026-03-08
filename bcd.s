@@ -1,4 +1,4 @@
-; vim: ts=4
+; vim: ts=4 et sw=4
 .setcpu "65C02"
 
 .include "zeropage.inc65"

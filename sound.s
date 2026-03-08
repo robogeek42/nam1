@@ -1,3 +1,4 @@
+; vim: ts=4 et sw=4
 ; SN76489 Sound Chip
 ;
         .setcpu "65C02"

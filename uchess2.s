@@ -1,4 +1,4 @@
-; vim: ts=8
+; vim: ts=4 et sw=4
 ;***********************************************************************
 ;
 ;  MicroChess (c) 1996-2002 Peter Jennings, peterj@benlo.com 

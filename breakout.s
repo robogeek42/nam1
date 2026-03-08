@@ -1,4 +1,4 @@
-; vim: ts=4 sw=4
+; vim: ts=4 et sw=4
 ; Pong 
 
 .setcpu "65C02"
