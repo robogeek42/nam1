@@ -95,11 +95,11 @@ VIA_PB7 = 1 << 7
 ;*********************************************************
 ;* (c) Dolo Miah - defs for his SD card and FAT16 FS code
 ;* SD Card interface definitions
-;* The card is accessed through port B of VIA2
+;* The card is accessed through port B of VIA1
 SD_CLK		= $01	; bit 0  - easier for INC/DEC to simulate clock
 SD_CS		= $02	; bit 1
-SD_DI		= $04	; bit 2
-SD_DO		= $08	; bit 3
+SD_DI		= $40	; bit 6
+SD_DO		= $80	; bit 7  - MISO has to be in MSB
 
 SD_MOSI		= SD_DI
 SD_MISO		= SD_DO
