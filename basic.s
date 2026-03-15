@@ -7881,7 +7881,9 @@ LAB_PONG:
 LAB_PACMAN:
 .ifdef PACMAN
 	JSR pacman
+.ifdef SOUND
 	JSR snd_all_off
+.endif
 .endif
 	RTS
 
