@@ -373,7 +373,7 @@ msg_help:       .byte "m <addr> - dump mem",$0d,$0a
                 .byte "vd <page> - dump VRAM page",$0d,$0a
                 .byte "vw <vaddr> <byte> - write single VRAM byte",$0d,$0a
                 .byte "vr <vaddr> - read single VRAM byte",$0d,$0a
-                .byte "M <mode> - change mode",$0d,$0a
+                .byte "M <mode> - change mode",$0d,$0a,$00
 .ifdef PONG
                 .byte "pp - play pong",$0d,$0a
 .endif
