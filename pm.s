@@ -201,19 +201,8 @@ pmdm_loop5: JSR vdp_write
 ;------------------------------------------------------------------
 ; 3. Load pattern to name table
 ;	Screen is 32x24 characters
-pm_loadnames:
-			JSR vdp_setaddr_name_table
-			ld16 TMP0, PACMAN_MAZE
-			LDX #24
-pmdm_loop8: LDY #0 
-pmdm_loop7: LDA (TMP0),Y
-			JSR vdp_write
-			INY
-			CPY #32					 ; 32 chars per line
-			BNE pmdm_loop7
-			add8To16 #32, TMP0
-			DEX
-			BNE pmdm_loop8
+            JSR pm_loadnames
+
 ;------------------------------------------------------------------
 ; 4. Load game map 32x24
 ;			ld16 TMP2, pm_map		   ; set address of internal map
@@ -390,10 +379,22 @@ gl_get_input:
 
 			LDA pm_game		; check game state:
 			CMP #$00		; 	game not started?
-			BEQ game_loop	; 		yes, keep just checking input
+			BEQ gl_print_start	; 		yes, keep just checking input
 			CMP #$FF		; 	quit requested?
 			BNE gl_do_update	; 		no, then continue
 			JMP quit_game	; 		yes, quit
+
+gl_print_start:
+            PHX
+            PHY
+			ld16 R0,start_message
+            LDA #10
+            LDY #13
+			JSR vdp_set_pos
+			JSR vdp_write_text  
+            PLY
+            PLX
+            JMP game_loop
 
 gl_do_update:
 			; Move the pacman position (PM_NT_LO/HI and sprite pos) 
@@ -461,6 +462,30 @@ quit_game:
 
 ;==================================================================
 ; Subroutines
+
+
+;------------------------------------------------------------------
+; Reload screen (name table part)
+pm_loadnames:
+            PHA
+            PHX
+            PHY
+			JSR vdp_setaddr_name_table
+			ld16 TMP0, PACMAN_MAZE
+			LDX #24
+pmdm_loop8: LDY #0 
+pmdm_loop7: LDA (TMP0),Y
+			JSR vdp_write
+			INY
+			CPY #32					 ; 32 chars per line
+			BNE pmdm_loop7
+			add8To16 #32, TMP0
+			DEX
+			BNE pmdm_loop8
+            PLY
+            PLX
+            PLA
+            RTS
 
 ;------------------------------------------------------------------
 ; move pacman based on 
@@ -620,13 +645,31 @@ pm_write_nametable:
 			RTS
 
 ;---------------------------------------
+; write char in A to name table (i.e screen) - position in TMP1
+;
+pm_char_write_nametable:
+            pha
+            phy
+			LDY TMP1			 ;; Set VRAM address to name table (VDP_REG2 * 0x400) + TMP1/TMP1+1
+			LDA VDP_REGS+2
+			ASL
+			ASL
+			CLC
+			ADC TMP1+1
+			JSR vdp_set_addr_w
+            ply
+            pla
+			STA VDP_WR_VRAM
+			RTS
+
+;---------------------------------------
 ; Get input from ACIA
 ;
 pm_get_input_serial:
-			LDA ACIA_STATUS
-			AND #ACIA_STATUS_RX_FULL
+			LDA ACIA_CTRL_STATUS
+			AND #ACIA_STATUS_RDRF
 			BEQ gis_no_dir_input
-			LDA ACIA_DATA
+			LDA ACIA_TX_RX
 
 			CMP #'q'
 			BNE gis_check_space
@@ -638,6 +681,7 @@ gis_check_space:
 			BNE gis_check_wasd
 			LDA #$01
 			STA pm_game
+            JSR pm_loadnames
 			RTS
 gis_check_wasd:
 			CMP #'a'
@@ -727,6 +771,7 @@ gip_do_QUIT:
 gip_do_START:
 			lda #$01
 			sta pm_game
+            JSR pm_loadnames        ; reset screen to remove "Press space" message
 			rts
 gip_do_LEFT:
 			lda #PM_DIR_L
@@ -1044,8 +1089,12 @@ get_ghost_allowed:
 move_ghosts:
 			RTS
 
+;-------------------------------------------------------
+
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
+start_message:
+    .byte "Press Space",$00
 
 .include "pm_char_set.inc65"
 .include "pm_char_map.inc65"
