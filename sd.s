@@ -104,27 +104,29 @@ msg_EOF: .byte "EOF",$0D,$0A,$00
 ;* long_delay
 ;* Long delay (X decremented every 0.125ms)
 ;* Input : X = number of 0.125ms ticks to wait (max wait approx 0.32s)
-;*       : (assif: my homebrew runs at 1MHz, Dolo's at 2.68MHz
-;*                 so this majes the X dec ~ 0.335ms
+;*       : (assif: my homebrew runs at 2.456MHz, Dolo's at 2.68MHz
+;*                 13*256*0.407us = 1354us
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
 long_delay:
-	php
+	php ; 3*4=12 cycles
 	pha
 	phx
 	phy
 	
-	ldy #$00
+	ldy #$00 ; 2 cycles
+
 long_delay_1:
-	nop
-	nop
-	nop
-	nop
-	dey
-	bne long_delay_1
-	dex
-	bne long_delay_1
+	nop         ; 2 cycles
+	nop         ; 2
+	nop         ; 2
+	nop         ; 2
+	dey         ; 2 cycles
+	bne long_delay_1    ; 3 cycles
+; 256 * 13 = 3328 * 0.407us = 1.354ms
+	dex                 ; 2
+	bne long_delay_1    ; 3 cycles
 
 	ply
 	plx
@@ -146,10 +148,6 @@ init_sdcard:
 init_retry:
     LDA #'.'
     JSR acia_putc
-.ifdef PC2K
-                JSR KBSCAN
-                BNE init_return
-.endif
 
 	lda #SD_CS						; Unselect device
 	tsb SD_REG
@@ -157,10 +155,10 @@ init_retry:
 	trb SD_REG
 	lda #SD_MOSI					; DI/MOSI high
 	tsb SD_REG
-	ldx #3							; 3*0.335ms = 1ms
+	ldx #3							; 3*1.331ms = 4ms
 	jsr long_delay
 
-	ldx #8							; 10 bytes of $ff
+	ldx #8							; 8 bytes of $ff (startcmd sends another 2)
 	lda #$ff
 init_sd_pulse:
 	jsr sd_sendbyte					; Send the $ff byte
@@ -182,7 +180,19 @@ init_sd_pulse:
 init_cmd0:
 	jsr sd_sendcmd0					; GO_IDLE_STATE
 	cmp #$ff						; $ff is not a valid response
-	bne init_acmd41
+    beq init_retry
+	;bne init_acmd41
+; debug
+PHA
+ld16 R0, str_buf
+JSR fmt_hex_string
+JSR acia_puts
+LDA #' '
+JSR acia_putc
+PLA
+    beq init_acmd41 ; $00 is only valid response
+; debug end
+
     bra init_retry
 
 ; Send command 41 APP_SEND_OP_COND (Initiate initialisation process)
@@ -280,7 +290,7 @@ sd_shiftskiplo:
 ;* Output : None
 ;* Regs affected : None
 ;****************************************
-
+;FAST version
 sd_getbyte:
 	phy
 	phx
@@ -288,6 +298,7 @@ sd_getbyte:
 	lda SD_REG
 	ora #SD_MOSI					; Set MOSI high
 	sta SD_REG
+    and #$7F                         ; Assif: ensure MISO is zero in Y and X
 	tay								; Same as A with clock high
 	iny
 	tax								; Same as A with clock low
@@ -558,17 +569,17 @@ sd_sendcmd17:
 	phx
 	pha								; A is the page to write to
 	
-;    ld16 R0,sd_msg_readsector
-;	JSR acia_puts
-;    ld16 R0,str_buf
-;    LDX #3
-;@loop:
-;    LDA sd_sect,X
-;    JSR fmt_hex_string
-;    JSR acia_puts
-;    DEX
-;    BNE @loop
-;    JSR acia_put_newline
+    ld16 R0,sd_msg_readsector
+	JSR acia_puts
+    ld16 R0,str_buf
+    LDX #3
+@loop:
+    LDA sd_sect,X
+    JSR fmt_hex_string
+    JSR acia_puts
+    DEX
+    BNE @loop
+    JSR acia_put_newline
 
 	jsr sd_startcmd
 
@@ -715,10 +726,10 @@ sd_getrespR17block2:
 ;            JSR acia_put_newline
 
 ; Debug print of 1st page of SD buffer
-;            LDA #SD_BUF
-;            STA ZP_TMP0+1
-;            STZ ZP_TMP0
-;            JSR print_memory256
+            LDA #SD_BUF
+            STA ZP_TMP0+1
+            STZ ZP_TMP0
+            JSR print_memory256
 	ply
 	pla
 
@@ -913,6 +924,17 @@ init_fs_clr_boot:
 	stz fs_rootsect+2
 	stz fs_rootsect+3
 
+; debug
+    pha
+	ld16 R0, msg_rootsect
+	JSR acia_puts
+    lda fs_rootsect
+    sta RES
+    jsr print_addr
+    jsr acia_put_newline
+    pla
+; debug
+    
 	; Now add FAT offset
 	clc
 	ldx #$00
@@ -2298,6 +2320,15 @@ fs_delete_fin:
 ;	ply
 ;	rts	
 
+print_addr:
+    ld16 R0, str_buf
+    lda RES + 1
+    jsr fmt_hex_string
+    ld16 R0, str_buf + 2
+    lda RES
+    jsr fmt_hex_string
+    ld16 R0, str_buf
+    jsr acia_puts
 
 sd_msg_initialising:
 	.byte "Initialising SD Card ",$00
@@ -2338,4 +2369,6 @@ msg_initialising_fs:
 	.byte "Initialising filesystem",$0D,$0A,$00
 fs_msg_directory_listing:
 	.byte "SD Card Directory",$0D,$0A,$00
+msg_rootsect:
+	.byte "rootsect:",$00
 
