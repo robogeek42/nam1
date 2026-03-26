@@ -123,27 +123,27 @@ NUM_BIN		= $03
 ;* MBR is usually sector 0, but not always
 ;* however the card I am using does work ok.
 
-MBR_Code				=	$0000
-MBR_OEMName				=	$0003
+MBR_Code			=	$0000
+MBR_OEMName			=	$0003
 MBR_BytesPerSect		=	$000b
 MBR_SectPerClust		=	$000d
 MBR_ResvSect			=	$000e
 MBR_FATCopies			=	$0010
 MBR_RootEntries			=	$0011
-MBR_SmlSect				=	$0013
+MBR_SmlSect			=	$0013
 MBR_MediaDesc			=	$0015
 MBR_SectPerFAT			=	$0016
 MBR_SectPerTrk			=	$0018
 MBR_NumHeads			=	$001a
 MBR_NumHidSect			=	$001c
-MBR_NumSect				=	$0020
-MBR_DrvNum				=	$0024
-MBR_ExtSig				=	$0026
-MBR_SerNo				=	$0027
-MBR_VolName				=	$002b
-MBR_FATName				=	$0036
-MBR_ExeCode				=	$003e
-MBR_ExeMark				=	$01fe
+MBR_NumSect			=	$0020
+MBR_DrvNum			=	$0024
+MBR_ExtSig			=	$0026
+MBR_SerNo			=	$0027
+MBR_VolName			=	$002b
+MBR_FATName			=	$0036
+MBR_ExeCode			=	$003e
+MBR_ExeMark			=	$01fe
 
 ;* FAT16 definitions - these are offsets
 ;* in to a FAT table entry which is

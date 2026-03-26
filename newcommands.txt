@@ -49,6 +49,9 @@ DEL <"filename">
 CAT <"filename">
 	Cat (type out) file "filename"
 
+DISK <N>
+        Switch to Disk N (Partition) and re-init SD card and FS
+
 Sprite commands
 ---------------
 SPR H

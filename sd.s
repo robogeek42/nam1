@@ -91,16 +91,23 @@ charbuffer:
 fh_handle:	.tag FileHandle
 fh_dir:		.tag FileHandle
 
-.export fh_handle
-.export fh_dir
-.export str_buf
-
 ;filesize_32bit:
 ;  .res 4,0    ; 4 bytes for a 32-bit number (file size)
 str_buf:    .res 32,0
 
+.export fh_handle
+.export fh_dir
+.export str_buf
+
 ; ROM code
 .code
+
+num_parts = 4
+part_sect_start_table: 
+    .byte $01,$00,$00,$00
+    .byte $08,$20,$03,$00
+    .byte $08,$40,$06,$00
+    .byte $08,$60,$09,$00
 
 msg_EOF: .byte "EOF",$0D,$0A,$00
 
@@ -874,14 +881,21 @@ init_fs:
 	ld16 R0, msg_initialising_fs
 	JSR acia_puts
 
+    lda ZP_TMP0     ; 1 byte contains DISK number
+    sta ZP_TMP4
+    asl 
+    asl
+    clc
+    adc #3
+    tay
+
 	ldx #$03					
 init_fs_clr_sect:
-	stz sd_sect,x
+    lda part_sect_start_table,y
+	sta sd_sect,x
 	dex
+    dey
 	bpl init_fs_clr_sect
-    ; Boot record sector starts at 1
-    lda #$01
-    sta sd_sect
 
 	lda #SD_BUF				; Read in to the buffer
 	jsr sd_sendcmd17			; Call read block
@@ -890,14 +904,21 @@ init_fs_clr_sect:
     jsr dump_buffer_with_address
 .endif
 
+    lda ZP_TMP4     ; 1 byte contains DISK number
+    asl
+    asl
+    clc
+    adc #3
+    tay
+    
 	;Extract data from boot record
 	ldx #$03
 init_fs_clr_boot:
-	stz fs_bootsect,x
+    lda part_sect_start_table,y
+	sta fs_bootsect,x
 	dex
+    dey
 	bpl init_fs_clr_boot
-    lda #$01					; Assuming boot sector 0
-    sta fs_bootsect
 
 	; Calculate start of FAT tables
 	; Assuming there are about 64k clusters
@@ -910,14 +931,20 @@ init_fs_clr_boot:
 	lda fs_bootsect+1
 	adc sd_buf+MBR_ResvSect+1
 	sta fs_fatsect+1
-	stz fs_fatsect+2		; Store Zero 65C02 instruction
-	stz fs_fatsect+3
+	lda fs_bootsect+2
+	adc #0
+    sta fs_fatsect+2
+	lda fs_bootsect+3
+	adc #0
+	sta fs_fatsect+3
 	
 	; Calculate start of Root Directory
 	lda sd_buf+MBR_SectPerFAT	; Initialise to 1 * SectPerFAT
 	sta fs_rootsect
 	lda sd_buf+MBR_SectPerFAT+1
 	sta fs_rootsect+1
+	stz fs_rootsect+2
+	stz fs_rootsect+3
 	clc							; Add again = *2
 	lda sd_buf+MBR_SectPerFAT
 	adc fs_rootsect
@@ -925,8 +952,12 @@ init_fs_clr_boot:
 	lda sd_buf+MBR_SectPerFAT+1
 	adc fs_rootsect+1
 	sta fs_rootsect+1
-	stz fs_rootsect+2
-	stz fs_rootsect+3
+	lda #0
+	adc fs_rootsect+2
+	sta fs_rootsect+2
+	lda #0
+	adc fs_rootsect+3
+	sta fs_rootsect+3
 
 .ifdef DEBUG_PRINT
 ; debug

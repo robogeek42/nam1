@@ -1,4 +1,4 @@
-; vim: ts=6 sw=4 noexpandtab
+; vim: ts=6 sw=6 noexpandtab
 
 ; Enhanced BASIC to assemble under 6502 simulator, $ver 2.22
 
@@ -359,10 +359,11 @@ TK_LOADBIN  	= TK_PACMAN+1	; Binary load
 TK_PLAY  	= TK_LOADBIN+1	; Play sound file
 TK_DELAY  	= TK_PLAY+1		; Delay N ms
 TK_CURS  	= TK_DELAY+1	; Move Text Cursor
+TK_DISK  	= TK_CURS+1		; Select SD partition (disk)
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_CURS+1		; TAB token
+TK_TAB  	= TK_DISK+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -8050,7 +8051,7 @@ SPR_COLOUR:
 	STA  ZP_TMP0
 	JSR  vdp_set_sprite_col
 	RTS
-; Load spite pattern data from Address SPR_LOADP <Addr>,<P>
+; Load sprite pattern data from Address SPR_LOADP <Addr>,<P>
 SPR_LOADP:
 	;ld16	R0,MSG_SLDP
 	;jsr	acia_puts
@@ -8156,6 +8157,21 @@ LAB_CURS:
 	TAY
 	LDA  Itempl
 	JSR  vdp_set_pos
+	RTS
+
+; DISK N
+; Init SD to point to partition N
+LAB_DISK:
+.ifdef SDIO
+	JSR  LAB_EVNM		; evaluate expression and check is numeric,
+					; else do type mismatch
+	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA  Itempl			; Get value (N)
+	STA  ZP_TMP0		; Store N
+	; Call into SD init routine
+	jsr  init_sdcard
+	jsr  init_fs
+.endif
 	RTS
 
 ;----------------------------------------------------------
@@ -9012,6 +9028,7 @@ LAB_CTBL:
 	.word	LAB_PLAY-1		; PLAY 		sound command
 	.word	LAB_DELAY-1		; DELAY ms
 	.word	LAB_CURS-1		; move CURSor position
+	.word LAB_DISK-1        ; DISK 0	Load SD partition and init
 
 ; function pre process routine table
 
@@ -9290,6 +9307,8 @@ LBB_DIM:
 	.byte	"IM",TK_DIM  	; DIM
 LBB_DIR:
 	.byte	"IR",TK_DIR  	; DIR (SD Card)
+LBB_DISK:
+	.byte	"ISK",TK_DISK  	; DISK (SD Card)
 LBB_DOKE:
 	.byte	"OKE",TK_DOKE  ; DOKE note - "DOKE" must come before "DO"
 LBB_DO:
@@ -9634,6 +9653,8 @@ LAB_KEYT:
 	.word	LBB_DELAY  	; DELAY
 	.byte	4,'C'
 	.word	LBB_CURS  	; CURS
+	.byte	4,'D'
+	.word	LBB_DISK  	; DISK
 
 ; secondary commands (can't start a statement)
 

@@ -136,6 +136,7 @@ LAB_stlp:
                 
                 ; SD Card and filesystem
                 JSR init_sdcard
+                STZ ZP_TMP0         ; DISK 0
                 JSR init_fs
 skip_sdinit:
 .endif

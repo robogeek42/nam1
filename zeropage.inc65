@@ -27,6 +27,8 @@ KBD_FLAGS      = $38
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
 KBD_SPECIAL    = $39
 
+ZP_TMP4 = $3A ; 2 bytes
+
 ;KBD_ROW     = $3A
 ;KBD_COL     = $3B
 
