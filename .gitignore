@@ -7,3 +7,6 @@ old
 *tmp
 *save
 foo.sr
+homebrew.bin
+*.log
+*.s.*
