@@ -27,8 +27,8 @@ KBD_FLAGS      = $38
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
 KBD_SPECIAL    = $39
 
-KBD_ROW     = $3A
-KBD_COL     = $3B
+;KBD_ROW     = $3A
+;KBD_COL     = $3B
 
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0

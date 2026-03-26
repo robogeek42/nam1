@@ -85,18 +85,19 @@ LAB_stlp:
                 ;JSR print_16bit_hex_string      ; print it
                 ;JSR acia_put_newline
 
-                ; Initialise VIA1 for SD card and Sound and PC2K
-                ; Port A output data (all 1s), initialise to all 0s
+                ; SND is on PORTB
+                ; Port B output data (all 1s), initialise to all 0s
                 LDA #$FF
-                STA VIA1 + VIA_DDRA
+                STA VIA1 + VIA_DDRB
                 LDA #$00 
-                STA VIA1 + VIA_ORA
-                ; Port B SD is all output
-                ; PC2K is controlled by pckbd.s
-                LDA #(SD_CLK | SD_CS | SD_DI | SND_VIA_WE_CE | PS2K_CLK_DAT )    ; Set output pins
-                STA VIA1 + VIA_DDRB              ; SD card is attached to PortB of VIA1
-                LDA #(PS2K_CLK_DAT)
                 STA VIA1 + VIA_ORB
+                ; Initialise VIA1 for SD card and Sound control and PC2K
+                LDA #(SD_CLK | SD_CS | SD_DI | SND_VIA_WE_CE | PS2K_CLK_DAT )    ; Set output pins SD_DO (MISO) is an input
+                STA VIA1 + VIA_DDRA              ; SD card is attached to PortB of VIA1
+                LDA #(PS2K_CLK_DAT | SD_CLK | SD_CS | SD_DI )
+                STA VIA1 + VIA_ORA
+                LDA #0
+                STA VIA1 + VIA_ACR
 
 .ifdef SOUND
                 JSR snd_all_off

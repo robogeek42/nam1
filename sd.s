@@ -67,7 +67,10 @@
 		FH_FileMode .byte 1
 	.endstruct
 
+; sd_buf location is set in firmware.cfg
+; it is hardcoded to $7B00
 SD_BUF = $7B
+SD_BUFP2 = $7C
 
 .segment "SDBUF"
 sd_buf:
@@ -94,10 +97,11 @@ fh_dir:		.tag FileHandle
 
 ;filesize_32bit:
 ;  .res 4,0    ; 4 bytes for a 32-bit number (file size)
-str_buf:    .res 8,0
+str_buf:    .res 32,0
 
 ; ROM code
 .code
+
 msg_EOF: .byte "EOF",$0D,$0A,$00
 
 ;****************************************
@@ -158,7 +162,7 @@ init_retry:
 	ldx #3							; 3*1.331ms = 4ms
 	jsr long_delay
 
-	ldx #8							; 8 bytes of $ff (startcmd sends another 2)
+	ldx #10							; 8 bytes of $ff (startcmd sends another 2)
 	lda #$ff
 init_sd_pulse:
 	jsr sd_sendbyte					; Send the $ff byte
@@ -183,14 +187,9 @@ init_cmd0:
     beq init_retry
 	;bne init_acmd41
 ; debug
-PHA
-ld16 R0, str_buf
-JSR fmt_hex_string
-JSR acia_puts
-LDA #' '
-JSR acia_putc
-PLA
-    beq init_acmd41 ; $00 is only valid response
+    ;jsr print_byte_in_a
+    cmp #$01
+    beq init_acmd41 ; $01 is only valid response
 ; debug end
 
     bra init_retry
@@ -298,7 +297,6 @@ sd_getbyte:
 	lda SD_REG
 	ora #SD_MOSI					; Set MOSI high
 	sta SD_REG
-    and #$7F                         ; Assif: ensure MISO is zero in Y and X
 	tay								; Same as A with clock high
 	iny
 	tax								; Same as A with clock low
@@ -353,10 +351,10 @@ sd_getbyte:
 	cmp #SD_MISO					; Trial subtract A-MISO, C=1 if A >= MISO else C=0
 	rol ZP_TMP2						; Rotate carry state in to ZP_TMP2
 
-	lda ZP_TMP2						; Return response in A
-
 	plx
 	ply
+
+	lda ZP_TMP2						; Return response in A
 
 	rts
 
@@ -569,6 +567,7 @@ sd_sendcmd17:
 	phx
 	pha								; A is the page to write to
 	
+.ifdef DEBUG_PRINT
     ld16 R0,sd_msg_readsector
 	JSR acia_puts
     ld16 R0,str_buf
@@ -580,6 +579,7 @@ sd_sendcmd17:
     DEX
     BNE @loop
     JSR acia_put_newline
+.endif
 
 	jsr sd_startcmd
 
@@ -725,11 +725,6 @@ sd_getrespR17block2:
 ;            JSR acia_putc
 ;            JSR acia_put_newline
 
-; Debug print of 1st page of SD buffer
-            LDA #SD_BUF
-            STA ZP_TMP0+1
-            STZ ZP_TMP0
-            JSR print_memory256
 	ply
 	pla
 
@@ -879,24 +874,33 @@ init_fs:
 	ld16 R0, msg_initialising_fs
 	JSR acia_puts
 
-	ldx #$03					; Init sector to 0
+	ldx #$03					
 init_fs_clr_sect:
 	stz sd_sect,x
 	dex
 	bpl init_fs_clr_sect
+    ; Boot record sector starts at 1
+    lda #$01
+    sta sd_sect
 
 	lda #SD_BUF				; Read in to the buffer
 	jsr sd_sendcmd17			; Call read block
 
+.ifdef DEBUG_PRINT
+    jsr dump_buffer_with_address
+.endif
+
 	;Extract data from boot record
-	ldx #$03					; Assuming boot sector 0
+	ldx #$03
 init_fs_clr_boot:
 	stz fs_bootsect,x
 	dex
 	bpl init_fs_clr_boot
+    lda #$01					; Assuming boot sector 0
+    sta fs_bootsect
 
 	; Calculate start of FAT tables
-	; Assumeing there are about 64k clusters
+	; Assuming there are about 64k clusters
 	; Each cluster assumed to be 32k sectors
 	; Giving 64k x 32k x 0.5 ~ 1GB storage
 	clc
@@ -924,16 +928,38 @@ init_fs_clr_boot:
 	stz fs_rootsect+2
 	stz fs_rootsect+3
 
+.ifdef DEBUG_PRINT
 ; debug
     pha
+	ld16 R0, msg_fatsect
+	JSR acia_puts
+    lda fs_fatsect+2
+    sta RES
+    lda fs_fatsect+3
+    sta RES+1
+    jsr print_addr
+    lda fs_fatsect
+    sta RES
+    lda fs_fatsect+1
+    sta RES+1
+    jsr print_addr
+    jsr acia_put_newline
+
 	ld16 R0, msg_rootsect
 	JSR acia_puts
+    lda fs_rootsect+2
+    sta RES
+    lda fs_rootsect+3
+    sta RES+1
+    jsr print_addr
     lda fs_rootsect
     sta RES
+    lda fs_rootsect+1
+    sta RES+1
     jsr print_addr
     jsr acia_put_newline
     pla
-; debug
+.endif
     
 	; Now add FAT offset
 	clc
@@ -998,7 +1024,40 @@ fs_init_dir_sect:
 	sta fs_dirsect,x
 	dex
 	bpl fs_init_dir_sect
-	
+
+.ifdef DEBUG_PRINT
+; debug
+; print fs_datasect and fs_dirsect	
+    pha
+	ld16 R0, msg_datasect
+	JSR acia_puts
+    lda fs_datasect+2
+    sta RES
+    lda fs_datasect+3
+    sta RES+1
+    jsr print_addr
+    lda fs_datasect
+    sta RES
+    lda fs_datasect+1
+    sta RES+1
+    jsr print_addr
+    jsr acia_put_newline
+	ld16 R0, msg_dirsect
+	JSR acia_puts
+    lda fs_dirsect+2
+    sta RES
+    lda fs_dirsect+3
+    sta RES+1
+    jsr print_addr
+    lda fs_dirsect
+    sta RES
+    lda fs_dirsect+1
+    sta RES+1
+    jsr print_addr
+    jsr acia_put_newline
+    pla
+.endif
+    
 	rts
 
 ;****************************************
@@ -1125,6 +1184,10 @@ fs_dir_set_sd:
 	; Load up first sector in to SD buf
 	lda #SD_BUF
 	jsr sd_sendcmd17
+
+.ifdef DEBUG_PRINT
+    ;jsr dump_buffer_with_address
+.endif
 
 	plx
 	pla
@@ -1992,6 +2055,7 @@ fs_open_read:
 	phx
 	phy
 
+.ifdef DEBUG_PRINT
             ; debug - print name from filehandle
             ld16 R0,sd_msg_find_file
             JSR acia_puts
@@ -2001,6 +2065,7 @@ fs_open_read:
             STA R0+1
             JSR acia_puts
             JSR acia_put_newline
+.endif
 
 	jsr fs_dir_root_start		; Start at root
 fs_open_find:
@@ -2008,6 +2073,7 @@ fs_open_find:
 	jsr fs_dir_find_entry		; Find a valid entry
 	bcs	fs_open_not_found		; If C then no more entries
 
+.ifdef DEBUG_PRINT
             ; Debug - print dir entry name
             LDA #<fh_dir
             STA R0
@@ -2015,6 +2081,7 @@ fs_open_find:
             STA R0+1
             JSR acia_puts
             JSR acia_put_newline
+.endif
             
 	ldx #0						; Check name matches
 fs_open_check_name:
@@ -2035,10 +2102,12 @@ fs_open_check_name:
 fs_open_found:
 	jsr fs_copy_dir_to_fh		; Put entry in to fh_handle
 
+.ifdef DEBUG_PRINT
             ; Debug
             ld16 R0, sd_msg_found_entry
             JSR acia_puts
             JSR acia_put_newline
+.endif
 
 	lda #$20					; 32 sector per cluster countdown			
 	sta fh_handle+FileHandle::FH_SectCounter
@@ -2329,6 +2398,58 @@ print_addr:
     jsr fmt_hex_string
     ld16 R0, str_buf
     jsr acia_puts
+    rts
+
+print_byte_in_a:
+    PHA
+    ld16 R0, str_buf
+    JSR fmt_hex_string
+    JSR acia_puts
+    LDA #' '
+    JSR acia_putc
+    PLA
+    RTS
+
+.ifdef DEBUG_PRINT
+; Debug print SD buffer
+; Expect ZP_TMP2 to have virtual address
+; SD_BUF location is physical address
+dump_sd_buffer:
+    pha
+    LDA #SD_BUF
+    STA ZP_TMP0+1
+    STZ ZP_TMP0
+    JSR print_memory256virt
+    LDA #SD_BUFP2
+    STA ZP_TMP0+1
+    STZ ZP_TMP0
+    JSR print_memory256virt
+    pla
+    rts
+
+dump_buffer_with_address:
+	ld16 R0, sd_msg_readsector
+	JSR acia_puts
+    lda sd_sect+2
+    sta RES
+    lda sd_sect+3
+    sta RES+1
+    jsr print_addr
+    lda sd_sect
+    sta RES
+    lda sd_sect+1
+    sta RES+1
+    jsr print_addr
+    jsr acia_put_newline
+
+    lda #0
+    sta ZP_TMP2
+    lda sd_sect
+    asl                 ; address to print is sector *256
+    sta ZP_TMP2+1
+    jsr dump_sd_buffer
+    rts
+.endif
 
 sd_msg_initialising:
 	.byte "Initialising SD Card ",$00
@@ -2355,7 +2476,7 @@ sd_msg_find_file:
 sd_msg_found_entry:
         .byte "found file",$0D,$0A,$00
 sd_msg_readsector:
-    .byte "Sector:",$00
+    .byte "Read Sector:",$00
 
 sd_cmd55:
 	.byte ($40+55), $00, $00, $00, $00, $95
@@ -2371,4 +2492,10 @@ fs_msg_directory_listing:
 	.byte "SD Card Directory",$0D,$0A,$00
 msg_rootsect:
 	.byte "rootsect:",$00
+msg_fatsect:
+	.byte "fatsect:",$00
+msg_datasect:
+	.byte "datasect:",$00
+msg_dirsect:
+	.byte "dirsect:",$00
 

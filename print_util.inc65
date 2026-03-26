@@ -1,3 +1,4 @@
 .import print_memory16
 .import print_memory256
+.import print_memory256virt
 

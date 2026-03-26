@@ -103,7 +103,7 @@ SD_DO		= $80	; bit 7  - MISO has to be in MSB
 
 SD_MOSI		= SD_DI
 SD_MISO		= SD_DO
-SD_REG		= VIA1 + VIA_ORB
+SD_REG		= VIA1 + VIA_ORA
 
 CMD_ERR_NOERROR			= $00
 CMD_ERR_NOTFOUND		= $01
@@ -122,6 +122,7 @@ NUM_BIN		= $03
 ;* needed to access the data on the card
 ;* MBR is usually sector 0, but not always
 ;* however the card I am using does work ok.
+
 MBR_Code				=	$0000
 MBR_OEMName				=	$0003
 MBR_BytesPerSect		=	$000b
@@ -170,12 +171,12 @@ FS_ERR_EOF				=	$01
 ;*********************************************************
 
 ; Sound Chip SN76489
-SND_VIA_DATA		= VIA1 + VIA_ORA
-SND_VIA_CTL		= VIA1 + VIA_ORB
-SND_VIA_WE		= %10000000
-SND_VIA_CE		= %01000000
-SND_VIA_WE_CE           = %11000000
-SND_VIA_NOT_WE_CE       = %00111111
+SND_VIA_DATA		= VIA1 + VIA_ORB
+SND_VIA_CTL		= VIA1 + VIA_ORA
+SND_VIA_WE		= %00001000
+SND_VIA_CE		= %00000100
+SND_VIA_WE_CE           = %00001100
+SND_VIA_NOT_WE_CE       = %11110011
 
 ; PS2 Keyboard
 PS2K_CLK               = %00010000 ; bit 4 = $10
@@ -185,7 +186,7 @@ PS2K_NOT_CLK_DAT       = %11001111 ;         $CF
 PS2K_NOT_CLK           = %11101111 ;         $EF
 PS2K_NOT_DAT           = %11011111 ;         $DF
 ;
-; VIA1 PORT B
+; VIA1 PORT A
 ;  B0 SD CLK
 ;  B1 SD CS
 ;  B2 SD MOSI

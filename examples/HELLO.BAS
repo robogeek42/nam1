@@ -1,0 +1,9 @@
+10 N=0
+20 S$="Hello World"
+30 FOR I=0 TO 20
+40 FOR J=0 TO N
+50 PRINT " ";
+60 NEXT J
+70 PRINT S$
+80 N=N+1
+90 NEXT I

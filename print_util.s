@@ -8,6 +8,7 @@
 
         .export print_memory16
         .export print_memory256
+        .export print_memory256virt
 
 .bss
                 BUFFER_LENGTH = 8
@@ -103,6 +104,41 @@ print_memory256:
 				LDA ZP_TMP0+1
 				ADC #0
 				STA ZP_TMP0+1
+				DEX
+				BNE @pmloop
+				plaxy
+				RTS
+
+; dump a page. ZP_TMP0/1 has starting address
+; ZP_TMP2/3 has print addr
+print_memory256virt:
+				phaxy
+				LDX #16
+@pmloop:		LDA ZP_TMP0 
+				STA RES
+                LDA ZP_TMP2
+				STA R1
+				LDA ZP_TMP0+1
+				STA RES+1
+                LDA ZP_TMP2+1
+				STA R1+1
+				JSR print_memory16
+				CLC
+				LDA ZP_TMP0
+				ADC #16
+				STA ZP_TMP0
+				LDA ZP_TMP0+1
+				ADC #0
+				STA ZP_TMP0+1
+
+				CLC
+				LDA ZP_TMP2
+				ADC #16
+				STA ZP_TMP2
+				LDA ZP_TMP2+1
+				ADC #0
+				STA ZP_TMP2+1
+
 				DEX
 				BNE @pmloop
 				plaxy

@@ -152,24 +152,24 @@
 ;
 ; I/O Port definitions
 
-kbportreg      =  VIA1 + VIA_IRB       ; 6522 IO port register B
-kbportddr      =  VIA1 + VIA_DDRB      ; 6522 IO data direction register B
+kbportreg      =  VIA1 + VIA_IRA       ; 6522 IO port register B
+kbportddr      =  VIA1 + VIA_DDRA      ; 6522 IO data direction register B
 clk            =  PS2K_CLK             ; 6522 IO port clock bit mask io.inc65
 data           =  PS2K_DAT             ; 6522 IO port data bit mask  io.inc65
 
-portAreg = VIA1 + VIA_ORA
-portAdir = VIA1 + VIA_DDRA
+;portAreg = VIA1 + VIA_ORA
+;portAdir = VIA1 + VIA_DDRA
 
-.macro DBG_MARK
+;.macro DBG_MARK
 ;    inc portAreg
 ;    dec portAreg
-    PHA
-    LDA #$01
-    STA portAreg    ; set bit 0
-    LDA #$00
-    STA portAreg    ; unset bit 0
-    PLA
-.endmacro
+;    PHA
+;    LDA #$01
+;    STA portAreg    ; set bit 0
+;    LDA #$00
+;    STA portAreg    ; unset bit 0
+;    PLA
+;.endmacro
 
 ; NOTE: some locations use the inverse of the bit masks to change the state of 
 ; bit.  You will have to find them and change them in the code acordingly.
@@ -659,8 +659,8 @@ kbflush:        lda   #$f4              ; flush buffer command - fall through to
 ; 12) Wait for the device to release Data and Clock
 ;
 kbsend:         sta   byte              ; save byte to send
-    lda #0
-    sta portAreg
+    ;lda #0
+    ;sta portAreg
                phx                     ; save registers
                phy                     ; 
                sta   lastbyte          ; keep just in case the send fails
