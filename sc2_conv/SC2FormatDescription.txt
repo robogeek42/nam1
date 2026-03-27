@@ -1,0 +1,6 @@
+scr2 are a vram dump. 
+After the 7 bytes of header there are 3*256*8 bytes of shapes of 8x8 characters.
+After there are 3*256 bytes of pattern name table, usually to be ignored as characters are ordered from 0 to 255 for 3 times
+After, at 8192+7 there are 3*256*8 bytes of colors
+Each byte gives color to a 8x1 strip of pixels in the corresponding character, the upper nibble to 1s,the lower nibble to 0s
+

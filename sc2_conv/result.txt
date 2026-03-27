@@ -1,0 +1,18 @@
+InFile : 80SCLASS.SC2 OutFile : 80sClassic_COMP.inc65
+Size: Original 12288 Compressed 5747 : 53.23%
+InFile : ALIEN_TO.SC2 OutFile : alien_COMP.inc65
+Size: Original 12288 Compressed 8175 : 33.47%
+InFile : FLOWERS1.SC2 OutFile : flowers1_COMP.inc65
+Size: Original 12288 Compressed 8540 : 30.50%
+InFile : FLOWERS2.SC2 OutFile : flowers2_COMP.inc65
+Size: Original 12288 Compressed 9982 : 18.77%
+InFile : SMASHMAR.SC2 OutFile : smashmario_COMP.inc65
+Size: Original 12288 Compressed 7080 : 42.38%
+InFile : STOURHEA.SC2 OutFile : stourbridge_COMP.inc65
+Size: Original 12288 Compressed 11284 : 8.17%
+InFile : SUZANNE.SC2 OutFile : suzanne_COMP.inc65
+Size: Original 12288 Compressed 8749 : 28.80%
+InFile : VP03.SC2 OutFile : VP03_COMP.inc65
+Size: Original 12288 Compressed 8324 : 32.26%
+
+
