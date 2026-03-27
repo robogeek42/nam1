@@ -347,8 +347,8 @@ TK_NMI  	= TK_IRQ+1		; NMI token
 TK_MON  	= TK_NMI+1		; MON token
 TK_MODE  	= TK_MON+1		; VDP MODE token
 TK_CLS  	= TK_MODE+1		; VDP CLS token
-TK_COL  	= TK_CLS+1		; VDP COL token
-TK_DEL  	= TK_COL+1		; SD DEL
+TK_SCOL  	= TK_CLS+1		; VDP SCOL token (screen text cols)
+TK_DEL  	= TK_SCOL+1		; SD DEL
 TK_DIR  	= TK_DEL+1		; SD DIR
 TK_CAT  	= TK_DIR+1		; SD CAT
 TK_SPR  	= TK_CAT+1		; Sprite commands
@@ -2706,7 +2706,8 @@ LAB_1934:
 	BNE  LAB_1953		; branch if not null input
 
 	CLC  			; was null input so clear carry to exit program
-	JMP  LAB_1647		; go do BREAK exit
+	;JMP  LAB_1647		; go do BREAK exit
+	JMP LAB_1934		; try again
 
 ; perform READ
 
@@ -7652,8 +7653,9 @@ LAB_CLS:
 	JSR vdp_clear_screen
 	RTS
 
-; perform COL <FGCol>,<BGCol> (affects Text)
-LAB_COL:
+; perform SCOL <FGCol>,<BGCol> 
+; Changes whole screen text colours 
+LAB_SCOL:
 	JSR LAB_GADB  	; get 2 integers seperated by comma
 						; 1st integer (FGCol) in Itempl/h, 2nd in X
 	STX Itemph			; put X (BGCol) int hi byte of temp integer for now
@@ -9014,7 +9016,7 @@ LAB_CTBL:
 	.word	LAB_MON-1		; MON  		monitor
 	.word	LAB_MODE-1		; MODE  	VDP command
 	.word	LAB_CLS-1		; CLS  		VDP command
-	.word	LAB_COL-1		; COL  		VDP command
+	.word	LAB_SCOL-1		; SCOL  		VDP command
 ;	.word	LAB_LOAD-1		; LOAD  	SD command
 ;	.word	LAB_SAVE-1		; SAVE  	SD command
 	.word	LAB_DEL-1		; DEL  		SD command
@@ -9281,8 +9283,6 @@ LBB_CHRS:
 	.byte	"HR$(",TK_CHRS  ; CHR$(
 LBB_CLEAR:
 	.byte	"LEAR",TK_CLEAR  ; CLEAR
-LBB_COL:
-	.byte	"OL",TK_COL 	; COL
 LBB_CONT:
 	.byte	"ONT",TK_CONT  ; CONT
 LBB_COS:
@@ -9464,6 +9464,8 @@ LBB_SADD:
 	.byte	"ADD(",TK_SADD  ; SADD(
 LBB_SAVE:
 	.byte	"AVE",TK_SAVE  ; SAVE (SD Card)
+LBB_SCOL:
+	.byte	"COL",TK_SCOL 	; SCOL
 LBB_SGN:
 	.byte	"GN(",TK_SGN  ; SGN(
 LBB_SIN:
@@ -9626,7 +9628,7 @@ LAB_KEYT:
 	.byte	3,'C'
 	.word	LBB_CLS  	; VDP CLS
 	.byte	3,'C'
-	.word	LBB_COL  	; VDP COL
+	.word	LBB_SCOL  	; VDP SCOL (screen text cols)
 ;	.byte	4,'L'
 ;	.word	LBB_LOAD  	; LOAD
 ;	.byte	4,'S'

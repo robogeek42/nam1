@@ -1,2 +1,2 @@
-DISK
-Disk number 1
+This is DISK 0
+BASIC

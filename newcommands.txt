@@ -11,9 +11,9 @@ MODE <mode>
 		2 = Graphics Mode II with 32x24 text
 		3 = Multicolor graphics mode
 
-COL <FG>,<BG>
+SCOL <FG>,<BG>
 	Change foreground and background colours of a text
-	based screen (modes 0,1,2)
+	based screen (modes 0,1,2) (whole screen)
 	FG and BG are integers 0-15
 
 PRINT SSTATUS
