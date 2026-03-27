@@ -360,10 +360,11 @@ TK_PLAY  	= TK_LOADBIN+1	; Play sound file
 TK_DELAY  	= TK_PLAY+1		; Delay N ms
 TK_CURS  	= TK_DELAY+1	; Move Text Cursor
 TK_DISK  	= TK_CURS+1		; Select SD partition (disk)
+TK_HELP  	= TK_DISK+1		; Help
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_DISK+1		; TAB token
+TK_TAB  	= TK_HELP+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -8176,6 +8177,38 @@ LAB_DISK:
 .endif
 	RTS
 
+MSG_HELP1:  
+.byte "New commands:",$0D,$0A
+.byte " CLS           Clear screen",$0D,$0A
+.byte " MODE M        Screen mode (0-3)",$0D,$0A
+.byte " SCOL Fg,Bg    Screen colour Fg, Bg",$0D,$0A
+.byte " CURS X,Y      Move text curs to X,Y",$0D,$0A 
+.byte " A = GETKEY    Wait for KEY (ASCII)",$0D,$0A
+.byte " DELAY T       Sleep (busy) T ms",$0D,$0A,$00
+MSG_HELP2:  
+.byte " PRINT SSTATUS Get VDP status reg",$0D,$0A
+.byte " SPR H         Sprite help",$0D,$0A
+.byte " DIR           SD: Disk Dir",$0D,$0A
+.byte " LOAD 'file'   SD: LOAD BASIC prog",$0D,$0A
+.byte " SAVE 'file'   SD: SAVE BASIC prog",$0D,$0A
+.byte " DEL 'file'    SD: DELETE file",$0D,$0A,$00
+MSG_HELP3:  
+.byte " CAT <fn>      SD: type file to output",$0D,$0A
+.byte " DISK <N>      SD: Switch to disk N",$0D,$0A,$00
+LAB_HELP:
+	LDA #<MSG_HELP1
+	LDY #>MSG_HELP1
+	JSR LAB_18C3
+	LDA #<MSG_HELP2
+	LDY #>MSG_HELP2
+	JSR LAB_18C3
+	LDA #<MSG_HELP3
+	LDY #>MSG_HELP3
+	JSR LAB_18C3
+	LDX   #$2A
+	JMP   LAB_XERR
+	RTS
+
 ;----------------------------------------------------------
 ; Send a command as though it was typed
 ; ZP_TMP2 (word) contains address of 0 term string
@@ -8730,6 +8763,10 @@ LAB_GETKEY:
 LAB_ISKEY:
 	RTS
 LAB_GETKEY:
+	JSR KBINPUT 	; return keypress into A
+	TAY 			; Low byte into A
+	LDA #0		; Zero out High byte
+	JMP LAB_AYFC	; Convert to Integer in FAC1
 	RTS
 
 .endif ; KEYB
@@ -9031,6 +9068,7 @@ LAB_CTBL:
 	.word	LAB_DELAY-1		; DELAY ms
 	.word	LAB_CURS-1		; move CURSor position
 	.word LAB_DISK-1        ; DISK 0	Load SD partition and init
+	.word LAB_HELP-1		; Print new commands
 
 ; function pre process routine table
 
@@ -9347,6 +9385,8 @@ LBB_HEXS:
 	.byte	"EX$(",TK_HEXS  ; HEX$(
 LBB_HIMEM:
 	.byte	"IMEM",TK_HIMEM  ; HIMEM
+LBB_HELP:
+	.byte "ELP",TK_HELP
 	.byte	$00
 TAB_ASCI:
 LBB_IF:
@@ -9657,6 +9697,8 @@ LAB_KEYT:
 	.word	LBB_CURS  	; CURS
 	.byte	4,'D'
 	.word	LBB_DISK  	; DISK
+	.byte	4,'H'
+	.word	LBB_HELP  	; HELP
 
 ; secondary commands (can't start a statement)
 

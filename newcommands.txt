@@ -1,5 +1,7 @@
 VDP General Commands
 --------------------
+HELP
+        Print new commands
 CLS
 	Clear current screen
 
@@ -21,6 +23,10 @@ PRINT SSTATUS
 
 CURS <X>,<Y>
 	move the text cursor to screen position X,Y
+
+<int_var> = GETKEY
+        FUNCTION - no brackets
+        Wait for a Key Press and return ASCII value
 
 General Commands
 ----------------
