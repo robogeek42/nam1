@@ -5,7 +5,7 @@
 
 CUPL(WM)        5.0a Serial# MW-10400000
 Device          g16v8s  Library DLIB-h-40-9
-Created         Sun Mar 08 12:34:21 2026
+Created         Sun Mar 29 17:45:49 2026
 Name            nam1
 Partno          nam1
 Revision        01
@@ -35,7 +35,6 @@ ram_oe =>
 
 ram_rwb =>
     rwb
-  # !phi2
 
 vdp =>
     !phi2
@@ -78,7 +77,7 @@ Pol   Name              Ext     Pin     Type     Used   Pterms  Level
     phi2                        1        V        -       -       -     
     ram_cs                      14       V        2       8       1     
     ram_oe                      13       V        2       8       1     
-    ram_rwb                     15       V        2       8       1     
+    ram_rwb                     15       V        1       8       1     
     rwb                         3        V        -       -       -     
     vdp                         17       V        5       8       1     
     via1                        18       V        4       8       1     

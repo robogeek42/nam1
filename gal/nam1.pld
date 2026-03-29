@@ -44,4 +44,4 @@ via2 = iocs # a7 # !a6 # !a5;  /* 7F60 - 7F7F */
 
 ram_cs = a15 # !iocs;
 ram_oe = !rwb # !phi2;
-ram_rwb = rwb # !phi2;
+ram_rwb = rwb;
