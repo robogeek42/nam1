@@ -8270,6 +8270,12 @@ sdout_off:
 	JSR fs_close 		; Program saved, now close file
 .endif
 	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
+
+	lda DISK_NO_SD
+	sta ZP_TMP0
+.ifdef SDIO
+	jsr init_fs			; re-read the directory
+.endif
 	RTS
 
 ;msg_Restore: .byte "Restore",$0D,$0A,$00
@@ -8657,9 +8663,14 @@ LAB_LOADIMG:
 	BCC @over
 	JMP LAB_FILENOTFOUND
 @over:
+	; Check mode
+	LDA VDP_MODE
+	CMP #2
+	BEQ limg_get
 	; switch to mode 2 (Screen2)
 	LDA #2
 	JSR vdp_set_mode
+limg_get:
 	LDA #1				; set input from SD
 	STA OUT_LIST_SD
 	; load image
@@ -8763,6 +8774,9 @@ LAB_GETKEY:
 LAB_ISKEY:
 	RTS
 LAB_GETKEY:
+.ifdef PS2K
+	JSR KBFLUSH
+.endif
 	JSR KBINPUT 	; return keypress into A
 	TAY 			; Low byte into A
 	LDA #0		; Zero out High byte

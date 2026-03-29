@@ -36,6 +36,7 @@ ZP_TMP4 = $3A ; 2 bytes
 ; Output LIST to SD card if !=0
 ;
 OUT_LIST_SD = $3C
+DISK_NO_SD = $3D
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver

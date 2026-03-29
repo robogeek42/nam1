@@ -78,6 +78,7 @@
 
 .export KBTMON
 .export KBTMOFF
+.export KBFLUSH
 ;
 ;****************************************************************************
 ;
@@ -639,6 +640,7 @@ kbscan2:        jsr   kbdis             ; disable the receiver so other routines
 ; ---------------------------------------------------------------------
 KBINIT:          JMP kbinit
 
+KBFLUSH:
 kbflush:        lda   #$f4              ; flush buffer command - fall through to kbsend
 ; ---------------------------------------------------------------------
 ;
@@ -1261,6 +1263,7 @@ kbi_done:
 KBINIT:  ; nothing in virtual keyboard
 KBTMOFF:
 KBTMON:
+KBFLUSH:
     RTS
 ; KBGET   - wait for a key press and return with its unprocessed scancode in A.
 KBGET:

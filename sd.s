@@ -107,7 +107,7 @@ part_sect_start_table:
     .byte $01,$00,$00,$00
     .byte $08,$20,$03,$00
     .byte $08,$40,$06,$00
-    .byte $08,$60,$09,$00
+    .byte $08,$60,$09,$00,$00,$00,$00,$00
 
 msg_EOF: .byte "EOF",$0D,$0A,$00
 
@@ -882,7 +882,7 @@ init_fs:
 	JSR acia_puts
 
     lda ZP_TMP0     ; 1 byte contains DISK number
-    sta ZP_TMP4
+    sta DISK_NO_SD
     asl 
     asl
     clc
@@ -904,7 +904,7 @@ init_fs_clr_sect:
     jsr dump_buffer_with_address
 .endif
 
-    lda ZP_TMP4     ; 1 byte contains DISK number
+    lda DISK_NO_SD     ; 1 byte contains DISK number
     asl
     asl
     clc

@@ -25,16 +25,16 @@ snd_write:
         PHX
         PHA
 		; Set control signals to off
-		LDA VIA2 + VIA_ORB
+		LDA SND_VIA_CTL
 		ORA #SND_VIA_WE_CE
-        STA VIA2 + VIA_ORB
+        STA SND_VIA_CTL
 		; Latch output data
         PLA
-        STA VIA2 + VIA_ORA
+        STA SND_VIA_DATA
 		; Set write enable/chip enable
-		LDA VIA2 + VIA_ORB
+		LDA SND_VIA_CTL
         AND #SND_VIA_NOT_WE_CE
-        STA VIA2 + VIA_ORB
+        STA SND_VIA_CTL
 		; wait for at least 32 cycles of sound clock
         ; Delay used to ensure data is latched for 32 cycles of sound clock
         ; @ 4MHz this is 8us, @3.64MHz this is 9us
@@ -42,9 +42,9 @@ snd_write:
         LDX #2
         JSR snd_delay
 		; Set control signals to off
-		LDA VIA2 + VIA_ORB
+		LDA SND_VIA_CTL
 		ORA #SND_VIA_WE_CE
-        STA VIA2 + VIA_ORB
+        STA SND_VIA_CTL
         PLX
 		RTS
 

@@ -73,18 +73,6 @@ LAB_stlp:
                 ; initialise ACIA serial comms
                 JSR acia_init
 
-.ifdef KEYB
-                ld16 R0,msg_init_keyboard
-                JSR acia_puts
-                JSR kbd_init
-.endif
-                ;ld16 R0,buffer
-                ;JSR acia_put_newline
-                ;LDX #<VDP_REGS
-                ;LDA #>VDP_REGS
-                ;JSR print_16bit_hex_string      ; print it
-                ;JSR acia_put_newline
-
                 ; SND is on PORTB
                 ; Port B output data (all 1s), initialise to all 0s
                 LDA #$FF
@@ -103,12 +91,6 @@ LAB_stlp:
                 JSR snd_all_off
 .endif ; SOUND
 
-.if .def(PS2K) || .def(VKEYB)
-                ld16 R0,msg_init_ps2k
-                JSR acia_puts
-                JSR KBINIT
-.endif
-                
                 ; display welcome message in the Serial Console
                 ld16 R0, msg_welcome
                 JSR acia_puts
@@ -123,22 +105,22 @@ LAB_stlp:
                 JSR vdp_write_text
 .endif
 
+.if .def(PS2K) || .def(VKEYB)
+                ld16 R0,msg_init_ps2k
+                JSR acia_puts
+                JSR vdp_write_text
+                JSR KBINIT
+.endif
+                
 .ifdef SDIO
-.ifdef KEYB
-                ; Skip SD init if key is pressed
-                JSR kbd_scan
-                BCS skip_sdinit
-.endif
-.ifdef PC2K
-                JSR KBSCAN
-                BNE skip_sdinit
-.endif
+                ld16 R0, msg_init_sd
+                JSR acia_puts
+                JSR vdp_write_text
                 
                 ; SD Card and filesystem
                 JSR init_sdcard
                 STZ ZP_TMP0         ; DISK 0
                 JSR init_fs
-skip_sdinit:
 .endif
 
 .ifdef SOUND
@@ -396,6 +378,8 @@ msg_init_ps2k:
 
 msg_init_keyboard:
                 .byte "Init keyboard",$0d,$0a,$00
+msg_init_sd:
+                .byte "Init SD card",$0d,$0a,$00
 
 ; ---------------------------------------------------------
 ; -- execute commands
