@@ -361,10 +361,11 @@ TK_DELAY  	= TK_PLAY+1		; Delay N ms
 TK_CURS  	= TK_DELAY+1	; Move Text Cursor
 TK_DISK  	= TK_CURS+1		; Select SD partition (disk)
 TK_HELP  	= TK_DISK+1		; Help
+TK_COL  	= TK_HELP+1		; Set text colour
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_HELP+1		; TAB token
+TK_TAB  	= TK_COL+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -7657,16 +7658,7 @@ LAB_CLS:
 ; perform SCOL <FGCol>,<BGCol> 
 ; Changes whole screen text colours 
 LAB_SCOL:
-	JSR LAB_GADB  	; get 2 integers seperated by comma
-						; 1st integer (FGCol) in Itempl/h, 2nd in X
-	STX Itemph			; put X (BGCol) int hi byte of temp integer for now
-	LDA Itempl			; FG Col (put int upper nibble)
-	CLC
-	ASL
-	ASL
-	ASL
-	ASL
-	ORA Itemph			; A now has FGCol|BGCol
+	JSR LAB_COL
 	JSR vdp_set_base_colors
 	RTS
 
@@ -7889,6 +7881,23 @@ LAB_PACMAN:
 	JSR snd_all_off
 .endif
 .endif
+	RTS
+
+; COL <FGCol>,<BGCol> 
+; Set colour to use under new printed chars
+; stored in ZP var TXT_COL
+LAB_COL:
+	JSR LAB_GADB  	; get 2 integers seperated by comma
+						; 1st integer (FGCol) in Itempl/h, 2nd in X
+	STX Itemph			; put X (BGCol) int hi byte of temp integer for now
+	LDA Itempl			; FG Col (put int upper nibble)
+	CLC
+	ASL
+	ASL
+	ASL
+	ASL
+	ORA Itemph			; A now has FGCol|BGCol
+	STA TXT_COL			; in zero page
 	RTS
 
 ;------------------------------------------------------
@@ -8159,6 +8168,7 @@ LAB_CURS:
 	TXA
 	TAY
 	LDA  Itempl
+	;STA TPos		; I think TPos holds position in X for LAB_PRNA function
 	JSR  vdp_set_pos
 	RTS
 
@@ -9047,6 +9057,7 @@ LAB_CTBL:
 	.word	LAB_CURS-1		; move CURSor position
 	.word LAB_DISK-1        ; DISK 0	Load SD partition and init
 	.word LAB_HELP-1		; Print new commands
+	.word LAB_COL-1		; Set new text colour (FG,BG)
 
 ; function pre process routine table
 
@@ -9299,6 +9310,8 @@ LBB_CHRS:
 	.byte	"HR$(",TK_CHRS  ; CHR$(
 LBB_CLEAR:
 	.byte	"LEAR",TK_CLEAR  ; CLEAR
+LBB_COL:
+	.byte	"OL",TK_COL  ; COL
 LBB_CONT:
 	.byte	"ONT",TK_CONT  ; CONT
 LBB_COS:
@@ -9677,6 +9690,8 @@ LAB_KEYT:
 	.word	LBB_DISK  	; DISK
 	.byte	4,'H'
 	.word	LBB_HELP  	; HELP
+	.byte	3,'C'
+	.word	LBB_COL  	; COL
 
 ; secondary commands (can't start a statement)
 

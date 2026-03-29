@@ -537,6 +537,47 @@ vdp_move_back_char:
 @at_top_stop:	PLA
 				RTS
 
+;---------------------------------------------
+; MODE 2 only
+; Set colour for character at position VDP_XPOS,VDP_YPOS TXT_COL
+vdp_set_mode2_char_col_w:
+        ; First set address to colour table at pos X,Y
+				phay
+                ;; hard-code here Colour table is always $2000
+                ; Get Cursor pos * 8
+                LDA VDP_CURS    ; * 2
+                ASL
+                STA ZP_TMP2
+                ASL VDP_CURS+1
+                STA ZP_TMP2+1
+
+                LDA ZP_TMP2    ; * 4
+                ASL
+                STA ZP_TMP2
+                ASL ZP_TMP2+1
+                STA ZP_TMP2+1
+
+                LDA ZP_TMP2    ; * 8
+                ASL
+                STA ZP_TMP2
+                ASL ZP_TMP2+1
+                STA ZP_TMP2+1
+                
+                CLC
+                ADC #$20        ; Add start of colour table
+                LDY ZP_TMP2
+				JSR vdp_set_addr_w  
+
+        ; write colour TXT_COL 8 times
+                LDA TXT_COL
+                LDY #8
+vsmcc_loop1:
+                JSR vdp_write
+                DEY
+                BNE vsmcc_loop1
+				play
+				RTS
+
 ;===============================================================================
 ; Entry point for write char in Acc (used by basic)
 ; should sheck for BELL ($07) too
@@ -566,8 +607,20 @@ vdp_backspace:
 				JSR vdp_draw_cursor
 				RTS
 vwc_write_char: 
+                ;; Write char to name table
 				JSR vdp_start_str_w ;; set position to VDP_CURS
 				STA VDP_WR_VRAM		;; write the char
+                PHA
+                ;; if we are in MODE 2, also set colour
+                LDA VDP_MODE
+                CMP #2
+                BNE vwc_skip_col
+                ;; set colour
+				JSR vdp_set_mode2_char_col_w ;; set position to VDP_CURS in Pattern colour table
+                                             ;; and write colour TXT_COL
+vwc_skip_col:
+                PLA
+                ;; move to next position
 				JSR vdp_inc_pos
 				JSR vdp_draw_cursor
 				RTS

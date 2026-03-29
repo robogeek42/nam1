@@ -27,7 +27,10 @@ KBD_FLAGS      = $38
 ; Other keys (Function, Return, Del, Cursor) as a bit-mask
 KBD_SPECIAL    = $39
 
-ZP_TMP4 = $3A ; 2 bytes
+;-----------------------------------------------------------
+; Store current text COL to write under any new text
+; FG is in top nibble, BG in bottom
+TXT_COL = $3A 
 
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0
