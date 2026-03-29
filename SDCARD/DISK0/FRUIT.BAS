@@ -1,22 +1,21 @@
+
 5 REM visual sort
 10 N=10
-20 MODE 2 : SCOL 7,1
+20 MODE 2 : SCOL 15,1
 30 DIM S$(N): DIM X(N) : DIM CO(N)
 40 REM load name, colour and index
 50 FOR I=0 TO N-1
 60 READ S$(I): X(I)=I
 70 READ CO(I)
 80 NEXT I
-
 100 GOSUB 200 : REM print
-110 INPUT Q$
-115 IF Q$="q" THEN END
+110 Q=GETKEY:Q$=CHR$(Q):PRINT Q$
+115 IF Q$="q" OR Q$="Q" THEN END
 120 GOSUB 500 : REM sort
 130 IF NS=1 THEN GOTO 150
 140 GOTO 100
 150 PRINT "Done!"
 199 END
-
 200 REM print 
 210 CLS
 220 FORI=0 TO N-1
@@ -25,16 +24,13 @@
 250 PRINT S$(X(I))
 260 NEXT I
 290 RETURN
-
 300 REM swap positions A B in X()
 302 REM PRINT "swap ";A;" ";B
 310 TMP=X(B)
 320 X(B)=X(A)
 330 X(A)=TMP
 390 RETURN
-
 400 REM compare strings at pos A B in X()
-402 REM PRINT "comp ";A;"(";S$(X(A));") to ";B;"(";S$(X(B));")"
 405 C=0 : REM same, C=1 A after B, C=-1 A before B
 410 S1$=S$(X(A)) : S2$=S$(X(B))
 420 L=MIN(LEN(S1$), LEN(S2$))
@@ -43,7 +39,6 @@
 450 IF ASC(MID$(S1$,I,1)) < ASC(MID$(S2$,I,1)) THEN C=-1 : GOTO 490
 460 I=I+1: IF I <= L GOTO 440
 490 RETURN
-
 500 REM sort
 505 NS=1
 510 FOR J=0 TO N-2
@@ -51,11 +46,9 @@
 530 IF C=1 THEN NS=0 : GOSUB 300 : REM swap
 540 NEXT J
 590 RETURN
-
 1995 REM Fruit Data
 2000 DATA "KIWI",1,"ORANGE",2
 2010 DATA "GRAPE",3,"PINEAPPLE",4
 2020 DATA "PLUM",5,"PASSION",6
 2030 DATA "APPLE",7,"PEAR",8,
 2040 DATA "BANANA",9,"CLEMENTINE",10
-
