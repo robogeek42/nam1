@@ -365,9 +365,7 @@ gl_get_input:
 			STA PM_INTERRUPT		; reset interrupt flag
 
 			JSR pm_get_input_serial
-.ifdef KEYB
-			JSR pm_get_input_keyboard
-.endif
+
 .if .def(PS2K) || .def(VKEYB)
 			JSR pm_get_input_ps2k
 .endif

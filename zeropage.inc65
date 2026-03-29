@@ -29,9 +29,6 @@ KBD_SPECIAL    = $39
 
 ZP_TMP4 = $3A ; 2 bytes
 
-;KBD_ROW     = $3A
-;KBD_COL     = $3B
-
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0
 ;

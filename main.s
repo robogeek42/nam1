@@ -812,12 +812,6 @@ CHARin:
 @nobyw:
         CLC                 ; flag no byte received
 
-.ifdef KEYB
-        JSR kbd_scan
-        BCC aciain_end
-        LDA KBD_CHAR
-        JMP aciain_end
-.endif
 .if .def(PS2K) || .def(VKEYB)
         jsr KBSCAN
         bcc aciain_nothing_waiting  ; C=0 means nothing waiting

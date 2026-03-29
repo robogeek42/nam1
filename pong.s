@@ -298,9 +298,6 @@ check_irq_count:
 
 		JSR sound_vol	   ; reduce sound vol after a note
 
-.ifdef KEYB
-		JSR get_input_keyboard
-.endif
 .if .def(PS2K) || .def(VKEYB)
 		JSR check_key_flags
 .endif
@@ -451,68 +448,6 @@ pp_clear_message:
 		JSR vdp_write_text
 		JSR pp_draw_central_line
 		RTS
-
-.ifdef KEYB
-;---------------------------------------
-; Get input from KEYBOARD
-get_input_keyboard:
-		JSR kbd_getkey			  ; result in KBD_COL, KBD_ROW (zero-page)
-		BCC gik_done
-
-gik_got_key:
-		; "spc" q in row 0 col 4, 6
-		; azs are in row 1 cols 2,4,5
-		; ":" ";" row 2,3
-
-		LDX #0
-		LDA scan_buffer,X
-		AND #%00010000			  ; ROW0 COL4 = "spc"
-		BEQ @check_q
-
-		JSR pp_clear_message
-		LDA #$01					; game state = playing
-		STA pp_game
-@check_q:
-		LDA scan_buffer,X
-		AND #%01000000			  ; ROW0 COL6 = "q"
-		BEQ gik_test_row1
-		LDA #$FF					; else mark end-of-game
-		STA pp_game				 ; in game state variable
-
-gik_test_row1:
-		LDX #1
-		LDA scan_buffer,X
-		AND #%00000100			; ROW1 COL2 = "a"
-		BEQ @check_z
-		JSR gi_movelup
-@check_z:
-		LDA scan_buffer,X
-		AND #%00010000			; ROW1 COL4 = "z"
-		BEQ @check_s
-		JSR gi_moveldown
-@check_s:
-		LDA scan_buffer,X
-		AND #%00100000			; ROW1 COL5 = "s"
-		BEQ gik_test_row6
-		LDA #$01
-		STA pp_game
-		JSR pp_clear_message
-
-gik_test_row6:
-		LDX #6
-		LDA scan_buffer,X
-		AND #%00000100			; ROW6 COL2 = ";"
-		BEQ @check_m
-		JSR gi_moverup
-@check_m:
-		LDA scan_buffer,X
-		AND #%00001000			; ROW6 COL3 = "\"
-		BEQ gik_done
-		JSR gi_moverdown
-
-gik_done:
-		RTS
-.endif
 
 .if .def(PS2K) || .def(VKEYB)
 check_key_flags:

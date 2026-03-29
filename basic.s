@@ -8737,40 +8737,6 @@ LAB_PLAY:
 .endif ; SOUND
 	RTS
 
-.ifdef KEYB
-FAR_LAB_AYFC:
-	JMP LAB_AYFC
-;-----------------------------------------------------------------
-; Function : ISKEY(keycode)   Is key with code keycode pressed currently?
-; Parameter: keycode
-; Returns  : 1 if key is pressed
-LAB_ISKEY:
-;	JSR  LAB_EVBY		; evaluate byte expression, result in X
-;	JSR kbd_iskey
-;	BCC @notpressed
-;	LDY #1
-;	LDA #0
-;	JMP @pressed
-;@notpressed:
-;	LDY #0
-;	LDA #0
-;@pressed:
-;	JMP LAB_AYFC  	; always save and convert integer AY to FAC1 and return
-	RTS
-
-;-----------------------------------------------------------------
-; Function : GETKEY           Get keycode of currently pressed key, or 0
-; Parameter: none
-; Returns  : Keycode in X
-LAB_GETKEY:
-;	LDY #14
-;	LDA #0
-;	JMP LAB_AYFC
-	RTS
-
-
-.else ; KEYB not defined 
-
 LAB_ISKEY:
 	RTS
 LAB_GETKEY:
@@ -8782,8 +8748,6 @@ LAB_GETKEY:
 	LDA #0		; Zero out High byte
 	JMP LAB_AYFC	; Convert to Integer in FAC1
 	RTS
-
-.endif ; KEYB
 
 LAB_LOMEM:
 	LDY Smeml

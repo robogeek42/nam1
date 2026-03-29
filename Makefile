@@ -13,11 +13,8 @@ else
 endif
 
 # Compile with physical keyboard by default as the SIM now supports it
-# comodore keyboard now not available
-#KEYB ?= 0
-
-DEFINES = $(DEBUG_PRINT_DEF) $(SDIO_DEF) $(KEYB_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(VKEYB_DEF) $(UC_DEF) $(PM_DEF) $(PONG_DEF) $(IT_DEF) $(BREAKOUT_DEF) $(VDP_DEF)
-ASMDEFINES = $(SDIO_DEFA) $(KEYB_DEFA) $(FASTCPU_DEFA) $(SOUND_DEFA) $(PS2K_DEFA) $(VKEYB_DEFA) $(UC_DEFA) $(PM_DEFA) $(PONG_DEFA) $(IT_DEFA) $(BREAKOUT_DEFA) $(VDP_DEFA)
+DEFINES = $(DEBUG_PRINT_DEF) $(SDIO_DEF) $(FASTCPU_DEF) $(SOUND_DEF) $(PS2K_DEF) $(VKEYB_DEF) $(UC_DEF) $(PM_DEF) $(PONG_DEF) $(IT_DEF) $(BREAKOUT_DEF) $(VDP_DEF)
+ASMDEFINES = $(SDIO_DEFA) $(FASTCPU_DEFA) $(SOUND_DEFA) $(PS2K_DEFA) $(VKEYB_DEFA) $(UC_DEFA) $(PM_DEFA) $(PONG_DEFA) $(IT_DEFA) $(BREAKOUT_DEFA) $(VDP_DEFA)
 ifdef DEBUG_PRINT
 $(info ** DEBUG_PRINT **)
 	DEBUG_PRINT_DEF = -D DEBUG_PRINT=$(DEBUG_PRINT)
@@ -28,16 +25,6 @@ $(info ** Compile with SD card support **)
 	SOURCES += sd.s
 	SDIO_DEF = -D SDIO=$(SDIO)
 	SDIO_DEFA = --asm-define SDIO=$(SDIO)
-endif
-
-ifdef KEYB
-ifdef PS2K
-$(error !!! Error cant have both keyboards enabled !!!)
-endif
-$(info ** Compile with VIA Keyboard support **)
-	SOURCES += kbdvia.s
-	KEYB_DEF = -D KEYB=$(KEYB)
-	KEYB_DEFA = --asm-define KEYB=$(KEYB)
 endif
 
 ifdef PS2K
