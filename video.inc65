@@ -1,12 +1,15 @@
 .import vdp_dump_page
 .import vdp_set_mode
 .import vdp_clear_screen
+.import vdp_clear_screen_m4
 .import vdp_load_chars
 .import vdp_load_g1_col
 .import vdp_set_pos
 .import vdp_write_char
+.import vdp_write_char_m4
 .import vdp_write_text
 .import vdp_backspace
+.import vdp_backspace_m4
 .import vdp_load_flat_colors
 .import vdp_set_base_colors
 .import vdp_load_number_name_table

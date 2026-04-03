@@ -7644,6 +7644,7 @@ LAB_MODE:
 	;JSR LAB_295E	; Print number in X[lo]A[hi]
 	;JSR LAB_CRLF
 	TXA
+	JSR reinstate_ouput_vector
 	JSR vdp_set_mode
 .ifdef SOUND
 	JSR snd_all_off
@@ -7652,7 +7653,13 @@ LAB_MODE:
 
 ; perform CLS (VDP Clear Screen)
 LAB_CLS:
+	LDA VDP_MODE
+	CMP #4
+	BEQ lab_cls_m4
 	JSR vdp_clear_screen
+	RTS
+lab_cls_m4:
+	JSR vdp_clear_screen_m4
 	RTS
 
 ; perform SCOL <FGCol>,<BGCol> 
@@ -8272,10 +8279,7 @@ sdout_off:
 	LDA OUT_LIST_SD		; Was this called during a SAVE?
 	BEQ soo_done		; no, exit
 	STZ ccflag			; restore CTRL-C behaviour
-	LDA #<CHARout		; resttore normal output device
-	STA VEC_OUT
-	LDA #>CHARout
-	STA VEC_OUT+1
+	JSR reinstate_ouput_vector
 .ifdef SDIO
 	JSR fs_close 		; Program saved, now close file
 .endif
@@ -8388,10 +8392,7 @@ load_eof:
 	STA VEC_IN
 	LDA #>CHARin
 	STA VEC_IN+1
-	LDA #<CHARout		; resttore normal output device
-	STA VEC_OUT
-	LDA #>CHARout
-	STA VEC_OUT+1
+	JSR reinstate_ouput_vector
 	STZ ccflag			; reenable ctrl-c
 
 	ply
@@ -8778,6 +8779,27 @@ LAB_SSTATUS:
 	TAY
 	LDA  #0
 	JMP  LAB_AYFC
+
+;-----------------------------------------------------------------
+reinstate_ouput_vector:
+	PHA
+	CMP #4
+	BEQ rov_m4
+	; Set output vector to standard CHARout
+	LDA #<CHARout
+	STA VEC_OUT
+	LDA #>CHARout
+	STA VEC_OUT+1
+	PLA
+	RTS
+rov_m4:
+	; Set output vector to special MODE4 one
+	LDA #<CHARoutM4
+	STA VEC_OUT
+	LDA #>CHARoutM4
+	STA VEC_OUT+1
+	PLA
+	RTS
 
 ;-----------------------------------------------------------------
 

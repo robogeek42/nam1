@@ -16,12 +16,15 @@
 		.export vdp_dump_page
 		.export vdp_set_mode
 		.export vdp_clear_screen
+		.export vdp_clear_screen_m4
 		.export vdp_load_chars
 		.export vdp_load_g1_col
 		.export vdp_set_pos
 		.export vdp_write_char
+		.export vdp_write_char_m4
 		.export vdp_write_text
 		.export vdp_backspace
+		.export vdp_backspace_m4
 		.export vdp_load_flat_colors
 		.export vdp_set_base_colors
 		.export vdp_load_number_name_table
@@ -48,9 +51,19 @@ page_buffer:	.res 256, 0
 .code
 .include "vdp_mem_map.inc65"
 
+msg_invalid_mode: .byte "Invalid mode",$0d,$0a,$00
 ;================================================================
 ; VDP Set Mode - mode passed in Acc
-vdp_set_mode:	STA VDP_MODE
+; MODE 4 is same as MODE 2 in VDP layout but char printing is
+; handled differently
+vdp_set_mode:	CMP #5
+                BCC vsp_do_mode ; == Branch if less than
+                ld16 R0,msg_invalid_mode
+                JSR acia_puts
+                JSR vdp_write_text 
+                RTS
+vsp_do_mode:
+                STA VDP_MODE
 				ASL ; Multiply Acc by 8 to give offset into mode reg table
 				ASL 
 				ASL
@@ -68,7 +81,7 @@ vdp_set_mode:	STA VDP_MODE
 				LDY #0
 vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				STA VDP_WR_REG			; set registers directly as subroutine uses X for reg num
-				STA VDP_REGS,Y			; Save it in zero page
+				STA VDP_REGS,Y			; Save 
 .ifdef FASTCPU
 				NOP
 				NOP
@@ -92,6 +105,9 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				LDA VDP_MODE
 				CMP #0
 				BEQ vdp_sm_text_mode
+                CMP #4
+                BEQ vdp_sm_mode4
+
 				LDA #32
 				STA VDP_CHAR_WIDTH
 
@@ -101,6 +117,7 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				JSR vdp_load_flat_colors
 				JSR vdp_clear_screen
 
+vdp_sm_set_sprites:
 				;; store the sprite table address
 				;; it will be frequently used and is slow to derive
 				;; SAB = REG5 * 0x80 (makes upper 7 bits of 14 bit address)
@@ -122,6 +139,65 @@ vdp_sm_text_mode:
 				JSR vdp_load_chars  
 				JSR vdp_clear_screen
 				RTS
+
+;================================================================
+; MODE 4 - special Gii mode with colour graphic layout
+vdp_sm_mode4:
+                LDA #32
+                STA VDP_CHAR_WIDTH
+                                    ;; Pattern Table : Reg4 * $800 = $0000
+                LDA #0              ;; hard code
+                STA VDP_PTM4        ;; Store Pattern Table high byte for mode 4
+                                    ;; Colour Table : Reg3 * $40
+                LDA #$20            ;; hard code
+                STA VDP_CTM4        ;; Store Colour Table high byte for mode 4
+
+                JSR vdp_m4_init_pattern_table
+
+                LDA VDP_REGS+7
+                STA TXT_COL
+                JSR vdp_load_g2_col
+                ; load name table to consective names
+                JSR vdp_load_number_name_table
+                JSR cs_reset_cursor
+                JSR vdp_sm_set_sprites
+                RTS
+
+; Mode 4 patterns will be blank ( == spaces)
+vdp_m4_init_pattern_table:
+                phaxy
+                ;; Set address of pattern table
+                LDA VDP_PTM4
+                LDY #00          
+                JSR vdp_set_addr_w
+                LDA #0
+				LDX #$18				;; write 24 blocks of 256
+				LDY #$00
+@loop1: 		JSR vdp_write
+				INY
+				BNE @loop1
+				DEX
+				BNE @loop1
+                plaxy
+                RTS
+
+; Offset is in TMP1,TMP1+1
+vdp_setaddr_pattern_table_m4:
+                LDA VDP_PTM4
+                CLC                 ;; offset
+                ADC TMP1+1
+                LDY TMP1          
+                JSR vdp_set_addr_w
+                RTS
+
+; Offset is in TMP1,TMP1+1
+vdp_setaddr_color_table_m4:
+                LDA VDP_CTM4
+                CLC                 ;; offset
+                ADC TMP1+1
+                LDY TMP1          
+                JSR vdp_set_addr_w
+                RTS
 
 ;================================================================
 ; Load Character Table subroutine
@@ -316,6 +392,13 @@ cs_loop1:		JSR vdp_write
 				DEX
 				BNE cs_loop1
 				JMP cs_reset_cursor
+
+vdp_clear_screen_m4:
+                JSR vdp_m4_init_pattern_table
+                LDA TXT_COL
+                JSR vdp_load_g2_col
+                JMP cs_reset_cursor
+
 ;----------------------------------------------------------------
 
 ;================================================================
@@ -404,7 +487,7 @@ vsp_loop:		CLC					; otherwise add screen width * Y
 				DEY
 				BNE vsp_loop
 vsp_done:
-				JSR vdp_start_str_w
+				;JSR vdp_start_str_w
 				RTS
 				 
 ;------------------------------------------------
@@ -537,47 +620,6 @@ vdp_move_back_char:
 @at_top_stop:	PLA
 				RTS
 
-;---------------------------------------------
-; MODE 2 only
-; Set colour for character at position VDP_XPOS,VDP_YPOS TXT_COL
-vdp_set_mode2_char_col_w:
-        ; First set address to colour table at pos X,Y
-				phay
-                ;; hard-code here Colour table is always $2000
-                ; Get Cursor pos * 8
-                LDA VDP_CURS    ; * 2
-                ASL
-                STA ZP_TMP2
-                ASL VDP_CURS+1
-                STA ZP_TMP2+1
-
-                LDA ZP_TMP2    ; * 4
-                ASL
-                STA ZP_TMP2
-                ASL ZP_TMP2+1
-                STA ZP_TMP2+1
-
-                LDA ZP_TMP2    ; * 8
-                ASL
-                STA ZP_TMP2
-                ASL ZP_TMP2+1
-                STA ZP_TMP2+1
-                
-                CLC
-                ADC #$20        ; Add start of colour table
-                LDY ZP_TMP2
-				JSR vdp_set_addr_w  
-
-        ; write colour TXT_COL 8 times
-                LDA TXT_COL
-                LDY #8
-vsmcc_loop1:
-                JSR vdp_write
-                DEY
-                BNE vsmcc_loop1
-				play
-				RTS
-
 ;===============================================================================
 ; Entry point for write char in Acc (used by basic)
 ; should sheck for BELL ($07) too
@@ -610,16 +652,6 @@ vwc_write_char:
                 ;; Write char to name table
 				JSR vdp_start_str_w ;; set position to VDP_CURS
 				STA VDP_WR_VRAM		;; write the char
-                PHA
-                ;; if we are in MODE 2, also set colour
-                LDA VDP_MODE
-                CMP #2
-                BNE vwc_skip_col
-                ;; set colour
-				JSR vdp_set_mode2_char_col_w ;; set position to VDP_CURS in Pattern colour table
-                                             ;; and write colour TXT_COL
-vwc_skip_col:
-                PLA
                 ;; move to next position
 				JSR vdp_inc_pos
 				JSR vdp_draw_cursor
@@ -644,6 +676,117 @@ vdp_clear_cursor:
 				STA VDP_WR_VRAM
 @nocursor2:		pla
 				RTS
+
+;---------------------------------------------
+; MODE 4 write char
+vdp_write_char_m4:
+				CMP #$0A				;; Line feed
+				BNE @check_cr_m4
+				JSR vdp_clear_cursor_m4
+				JSR vdp_move_line_down_m4
+				JSR vdp_cursor_off
+				RTS
+@check_cr_m4:	CMP #$0D				;; Carriage return
+				BNE @check_bksp_m4
+				JSR vdp_clear_cursor_m4
+				JSR vdp_move_to_start_line
+				JSR vdp_cursor_off
+				RTS
+@check_bksp_m4:	CMP #$08				;; Backspace
+                ; Call M4 write char
+                BNE vwc_write_char_and_move_m4
+vdp_backspace_m4:  
+				JSR vdp_clear_cursor_m4
+				JSR vdp_move_back_char ;; move back
+				LDA #$20				;; and write a space
+                JSR vwc_write_char_m4
+				JSR vdp_draw_cursor_m4
+				RTS
+
+vwc_write_char_and_move_m4:
+                JSR vwc_write_char_m4
+                ;; move to next position
+				JSR vdp_inc_pos_m4
+				JSR vdp_draw_cursor_m4
+                RTS
+
+; ---- write char ----
+vwc_write_char_m4: 
+                phay
+                ;; Write char pattern to pattern table
+
+                 ; Get char ascii value * 8
+                STA TMP1
+                STZ TMP1+1
+                ASL TMP1
+                ROL TMP1+1
+                ASL TMP1
+                ROL TMP1+1
+                ASL TMP1
+                ROL TMP1+1
+                ;; Get address of pattern for this character
+                ld16 TMP0,CHAR_TAB
+                 ; add Char*8 to CHAR_TAB - result in TMP0
+                CLC
+                LDA TMP0
+                ADC TMP1
+                STA TMP0
+                LDA TMP0+1
+                ADC TMP1+1
+                STA TMP0+1
+
+                ;; Get address of Pattern at this position
+                 ; lines are 32*8 wide = 256, so add Y to high byte
+                 ; X*8 goes in low byte
+                LDA VDP_YPOS 
+                STA TMP1+1
+                LDA VDP_XPOS 
+                ASL
+                ASL
+                ASL
+                STA TMP1
+                JSR vdp_setaddr_pattern_table_m4
+
+                ;; Copy the pattern data
+                LDY #0
+@wc_loop:
+                LDA (TMP0),Y
+                JSR vdp_write
+                INY
+                CPY #8
+                BNE @wc_loop
+
+                ;; Colour data
+                JSR vdp_setaddr_color_table_m4
+                LDA TXT_COL
+                LDY #0
+@wc_loop1:
+                JSR vdp_write
+                INY
+                CPY #8
+                BNE @wc_loop1
+                
+                play
+				RTS
+; --------------------
+
+vdp_draw_cursor_m4:
+				pha
+				LDA ZP_CURSOR
+				BEQ @nocursor
+                JSR vwc_write_char_m4
+@nocursor:		pla
+				RTS
+
+vdp_clear_cursor_m4:
+				pha
+				LDA ZP_CURSOR
+				BEQ @nocursor2
+				LDA #$20
+                JSR vwc_write_char_m4
+@nocursor2:		pla
+				RTS
+
 vdp_cursor_on:
 				pha
 				LDA #$1D
@@ -656,6 +799,88 @@ vdp_cursor_off:
 				STA ZP_CURSOR
 				pla
 				RTS
+
+; increment line (preserve A and Y)
+vdp_move_line_down_m4:
+				phay
+				LDA VDP_YPOS			;; first check if we are on bottom row
+				CMP #23
+				BEQ @bottom_row_m4
+
+				;; normal move down
+				LDA VDP_CHAR_WIDTH ;; add line width to cusror position
+				CLC
+				ADC VDP_CURS		
+				STA VDP_CURS
+				LDA #0
+				ADC VDP_CURS+1
+				STA VDP_CURS+1
+				INC VDP_YPOS		 ;; increment Y pos
+
+                ; Clear line (colour)
+                JSR vdp_clear_line_m4
+
+				;; copy cursor
+				add8To16 VDP_CHAR_WIDTH,ZP_COPY_CURS
+
+				play
+				RTS
+				
+@bottom_row_m4:	;; scroll screen
+				JSR vdp_scroll_up_line_m4
+				;; move to begining of row
+				JSR vdp_move_to_start_line
+				;; clear line at VDP_YPOS
+                JSR vdp_clear_line_m4
+				play
+				RTS
+
+; increment screen position (preserve A)
+;	wraps line
+vdp_inc_pos_m4:	PHA
+				;; screen pos
+				INC VDP_CURS
+				BNE @nowrap_m4
+				INC VDP_CURS+1
+@nowrap_m4:		INC VDP_XPOS
+				LDA VDP_XPOS
+				CMP VDP_CHAR_WIDTH	;; check end of line
+				BEQ inc_pos_eol_m4
+				PLA
+				RTS
+inc_pos_eol_m4:	JSR vdp_move_to_start_line	;; CR
+				JSR vdp_move_line_down_m4	;; LF
+				PLA
+				RTS
+
+; Clear entire line at VDP_YPOS
+vdp_clear_line_m4:
+                phay
+                ;; pattern data
+                ; Get pointer to " " char in TMP0
+                LDA VDP_YPOS
+                STA TMP1+1  ; (32*8)*YPos
+                STZ TMP1
+                JSR vdp_setaddr_pattern_table_m4
+                LDY #0  ; 256 = 1 line of 32 chars (8bytes)
+                LDA #0
+@wc_loop_m4:
+                JSR vdp_write
+                INY
+                BNE @wc_loop_m4
+
+                ;; Colour data
+                JSR vdp_setaddr_color_table_m4
+                LDA TXT_COL
+                LDY #0
+@wc_loop1_m4:
+                JSR vdp_write
+                INY
+                BNE @wc_loop1_m4
+                play
+                RTS
+                
+
 ;===============================================================================
 
 ;------------------------------------------------------
@@ -713,6 +938,44 @@ vdp_scroll_up_line:
 				play
 				RTS
 
+;------------------------------------------------------
+; Scroll MODE 4
+vdp_scroll_up_line_m4:
+                phaxy
+                ; Patterns first
+                LDA VDP_PTM4
+                JSR vdp_scroll_table_up_m4
+                ; Then colour table
+                LDA VDP_CTM4
+                JSR vdp_scroll_table_up_m4
+                plaxy
+                RTS
+
+; Acc has base address
+vdp_scroll_table_up_m4:
+                STA ZP_TMP2+1   ; dest address
+                CLC
+                ADC #1          ; 1 line down
+                STA ZP_TMP0+1   ; source address
+                STZ ZP_TMP0
+                STZ ZP_TMP2
+				LDX #$17		; copy 23 blocks of 256
+                STZ TMP2        ; count = 0 == 256
+@loop1: 		JSR vdp_copy
+                ; increment source/dest addr by 1 page
+                LDA ZP_TMP0+1
+                CLC
+                ADC #1
+                STA ZP_TMP0+1
+                LDA ZP_TMP2+1
+                CLC
+                ADC #1
+                STA ZP_TMP2+1
+				DEX
+				BNE @loop1
+                RTS
+
+
 ;================================================================
 ; write consective names to name table
 ; works for text and both graphics modes
@@ -720,13 +983,9 @@ vdp_scroll_up_line:
 vdp_load_number_name_table:
 				JSR vdp_setaddr_name_table
 
-				LDA #$00			;; name to start
-				STA TMP0			
 				LDY #3
 				LDX #00
-gt1_loop:		JSR vdp_write
-				INC TMP0
-				LDA TMP0
+gt1_loop:		JSR vdp_writex
 				INX
 				BNE gt1_loop
 				DEY
@@ -827,6 +1086,7 @@ vlsnt_loop1:	STX VDP_WR_VRAM
 ;	SSSS in ZP_TMP0/1 DDDD in ZP_TMP2/3 NN in TMP2
 ;
 vdp_copy:		
+                phaxy
 				; read to CPU memory
 				ld16 RES, page_buffer	;; set CPU address
 				LDY ZP_TMP0				;; set VDP VRAM read address
@@ -850,7 +1110,7 @@ vdp_copy:
 				INY
 				CPY TMP2				;; number of bytes (0=256)
 				BNE @loop2
-
+                plaxy
 				RTS
 
 ;================================================================

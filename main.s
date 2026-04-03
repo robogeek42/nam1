@@ -794,7 +794,13 @@ CHARout:
         BEQ DObell
         JSR acia_putc
         JSR vdp_write_char
-;jsr acia_put_newline
+        RTS
+
+CHARoutM4:
+        CMP #$07
+        BEQ DObell
+        JSR acia_putc
+        JSR vdp_write_char_m4
         RTS
 
 ACIAout:
@@ -858,7 +864,13 @@ DObackspace:
         PHA
         JSR ANSI_BKSP
         PLA
+        LDA VDP_MODE
+        CMP #4
+        BEQ DObackspace_m4
         JSR vdp_backspace
+        RTS
+DObackspace_m4:
+        JSR vdp_backspace_m4
         RTS
     
 ANSI_BKSP:

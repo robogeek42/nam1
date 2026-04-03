@@ -50,7 +50,7 @@
 
 .bss
 VDP_REGS:   .res  8,0
-VDP_VARS:   .res  9,0
+VDP_VARS:   .res  16,0
 buff:       .res 12,0
 
 .export VDP_REGS

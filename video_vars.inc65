@@ -1,5 +1,5 @@
 ;-----------------------------------------------------------
-; VDP - 9 bytes
+; VDP - 11 bytes
 VDP_MODE = VDP_VARS+0
 VDP_CHAR_WIDTH = VDP_VARS+1
 VDP_SAB  = VDP_VARS+2 ;; Sprite Attribute table Base addr (2 bytes)
@@ -12,3 +12,5 @@ VDP_YPOS = VDP_VARS+7
 VDP_STATUS  = VDP_VARS+8
 
 
+VDP_PTM4 = VDP_VARS+9       ; Hi part of Page Table address
+VDP_CTM4 = VDP_VARS+10      ; Hi part of Color Table address
