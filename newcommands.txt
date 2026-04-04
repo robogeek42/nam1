@@ -114,3 +114,25 @@ MON
 	Drop out of BASIC into machine code monitor program
 	Type "b" in monitor to return to BASIC (cold-start). For a warm-start enter "bw"
 	In monitor enter "h" to get help
+
+
+Colours
+------------------------
+
+0  Transparent
+1  Black
+2  Medium Green
+3  Light Green
+4  Dark Blue
+5  Light Blue
+6  Dark Red
+7  Cyan
+8  Medium Red
+9  Light Red
+10 Dark Yellow
+11 Light Yellow
+12 Dark Green
+13 Magenta
+14 Gray
+15 White
+
