@@ -68,14 +68,8 @@ vdp_set_mode:	STA VDP_MODE
 				LDY #0
 vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				STA VDP_WR_REG			; set registers directly as subroutine uses X for reg num
-				STA VDP_REGS,Y			; Save it in zero page
-.ifdef FASTCPU
-				NOP
-.endif
+				STA VDP_REGS,Y			; Save 
 				STX VDP_WR_REG
-.ifdef FASTCPU
-				NOP
-.endif
 				INY
 				INX
 				CPY #8
@@ -745,8 +739,6 @@ vlsnt_loop3:	LDA #4
 vlsnt_loop2:	LDY #$20			;; count 32 chars per row
 				LDX TMP0			;; starting name value for this row
 vlsnt_loop1:	STX VDP_WR_VRAM
-				NOP
-				NOP
 				INX
 				DEY
 				BNE vlsnt_loop1

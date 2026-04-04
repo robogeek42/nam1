@@ -82,15 +82,7 @@ vgs_end:
 ; Data is in Acc, Register number+$80 is in Y
 vdp_regwrite:   
                 STA VDP_WR_REG        ; Data
-.ifdef FASTCPU
-                NOP
-.endif
-                NOP
                 STY VDP_WR_REG        ; Register 80...87
-.ifdef FASTCPU
-                NOP
-.endif
-                NOP
                 RTS
 
 ; 3. Write Address
@@ -98,31 +90,17 @@ vdp_regwrite:
 ; This should be followed by a series of writes to VDP_WR_VRAM
 vdp_set_addr_w: 
                 STY VDP_WR_REG      ; Address lo byte
-.ifdef FASTCPU
-                NOP
-.endif
                 AND #$3F
                 ORA #$40
                 STA VDP_WR_REG      ; Address hi byte
-.ifdef FASTCPU
-                NOP
-.endif
-                NOP
                 RTS
 ; 3. Read Address
 ; Set an address in VRAM. Low byte in Y, High byte in A
 ; This should be followed by a series of reads from VDP_RD_VRAM
 vdp_set_addr_r: 
                 STY VDP_WR_REG      ; Address lo byte
-.ifdef FASTCPU
-                NOP
-.endif
                 AND #$3F
                 STA VDP_WR_REG      ; Address hi byte
-.ifdef FASTCPU
-                NOP
-.endif
-                NOP
                 RTS
 ;----------------------------------------------------------------
 
@@ -191,25 +169,13 @@ vdp_setaddr_color_table_g2:
 ; VDP Write VRAM
 vdp_write:
                 STA VDP_WR_VRAM
-                NOP
-.ifdef FASTCPU
-                NOP
-.endif
                 RTS
 vdp_writex:
                 STX VDP_WR_VRAM
-                NOP
-.ifdef FASTCPU
-                NOP
-.endif
                 RTS
 ;----------------------------------------------------------------
 ; VDP Read VRAM
 vdp_read:
-                NOP
-.ifdef FASTCPU
-                NOP
-.endif
                 LDA VDP_RD_VRAM
 
                 RTS
