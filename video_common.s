@@ -84,12 +84,10 @@ vdp_regwrite:
                 STA VDP_WR_REG        ; Data
 .ifdef FASTCPU
                 NOP
-                NOP
 .endif
                 NOP
                 STY VDP_WR_REG        ; Register 80...87
 .ifdef FASTCPU
-                NOP
                 NOP
 .endif
                 NOP
@@ -102,13 +100,11 @@ vdp_set_addr_w:
                 STY VDP_WR_REG      ; Address lo byte
 .ifdef FASTCPU
                 NOP
-                NOP
 .endif
                 AND #$3F
                 ORA #$40
                 STA VDP_WR_REG      ; Address hi byte
 .ifdef FASTCPU
-                NOP
                 NOP
 .endif
                 NOP
@@ -120,12 +116,10 @@ vdp_set_addr_r:
                 STY VDP_WR_REG      ; Address lo byte
 .ifdef FASTCPU
                 NOP
-                NOP
 .endif
                 AND #$3F
                 STA VDP_WR_REG      ; Address hi byte
 .ifdef FASTCPU
-                NOP
                 NOP
 .endif
                 NOP
@@ -198,20 +192,14 @@ vdp_setaddr_color_table_g2:
 vdp_write:
                 STA VDP_WR_VRAM
                 NOP
-                NOP
 .ifdef FASTCPU
-                NOP
-                NOP
                 NOP
 .endif
                 RTS
 vdp_writex:
                 STX VDP_WR_VRAM
                 NOP
-                NOP
 .ifdef FASTCPU
-                NOP
-                NOP
                 NOP
 .endif
                 RTS
