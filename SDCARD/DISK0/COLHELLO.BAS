@@ -1,0 +1,6 @@
+10 MODE 4
+20 FOR I=1 TO 15
+30 COL 1,I
+40 PRINT "Hello World"
+50 NEXT I
+

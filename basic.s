@@ -834,6 +834,12 @@ LAB_1274:
 WAIT_CMD:
 	JSR vdp_cursor_on
 
+	LDA  VDP_MODE
+	CMP  #4
+	BNE  LAB_WRITE_PROMPT
+	JSR  vdp_clear_line_m4	; Mode 4 clear next line to TXT_COL colour
+
+LAB_WRITE_PROMPT:
 	LDA #<LAB_PROMPT
 	LDY #>LAB_PROMPT
 	JSR  LAB_18C3		; go do print string

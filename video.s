@@ -22,6 +22,7 @@
 		.export vdp_set_pos
 		.export vdp_write_char
 		.export vdp_write_char_m4
+        .export vdp_clear_line_m4
 		.export vdp_write_text
 		.export vdp_backspace
 		.export vdp_backspace_m4
@@ -818,7 +819,7 @@ vdp_move_line_down_m4:
 				INC VDP_YPOS		 ;; increment Y pos
 
                 ; Clear line (colour)
-                JSR vdp_clear_line_m4
+                ;JSR vdp_clear_line_m4
 
 				;; copy cursor
 				add8To16 VDP_CHAR_WIDTH,ZP_COPY_CURS
