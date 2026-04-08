@@ -119,7 +119,7 @@ LAB_stlp:
                 
                 ; SD Card and filesystem
                 JSR init_sdcard
-                STZ ZP_TMP0         ; DISK 0
+                STZ DISK_NUM_SD        ; DISK 0
                 JSR init_fs
 .endif
 

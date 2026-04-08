@@ -7938,7 +7938,8 @@ MSG_SHELP:  .byte "sprite help:",$0D,$0A
 .byte " SPR N <N>     enable N spr",$0D,$0A
 .byte " SPR L <Addr>,<P>  load pat",$0D,$0A
 .byte " SPR P <S>,<P>     set pat",$0D,$0A
-.byte " SPR X <S>,<X>,<Y> pos X,Y",$0D,$0A,$00
+.byte " SPR X <S>,<X>,<Y> pos X,Y",$0D,$0A
+.byte " SSTATUS       VDP status reg",$0D,$0A,$00
 MSG_SPR: .byte "SPR ", $00
 SPR_HELP:
 	;ld16	R0,MSG_SHELP
@@ -8193,7 +8194,7 @@ LAB_DISK:
 					; else do type mismatch
 	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
 	LDA  Itempl			; Get value (N)
-	STA  ZP_TMP0		; Store N
+	STA  DISK_NUM_SD		; Store N
 	; Call into SD init routine
 	jsr  init_sdcard
 	jsr  init_fs
@@ -8201,23 +8202,26 @@ LAB_DISK:
 	RTS
 
 MSG_HELP1:  
-.byte "New commands:",$0D,$0A
-.byte " CLS           Clear screen",$0D,$0A
-.byte " MODE M        Screen mode (0-3)",$0D,$0A
-.byte " SCOL Fg,Bg    Screen colour Fg, Bg",$0D,$0A
-.byte " CURS X,Y      Move text curs to X,Y",$0D,$0A 
-.byte " A = GETKEY    Wait for KEY (ASCII)",$0D,$0A
-.byte " DELAY T       Sleep (busy) T ms",$0D,$0A,$00
+;.byte "New commands:",$0D,$0A
+.byte "MODE M        Screen mode (0-4)",$0D,$0A
+.byte "CLS           Clear screen",$0D,$0A
+.byte "SCOL Fg,Bg    Screen col",$0D,$0A
+.byte "COL Fg,Bg     Mode4 col",$0D,$0A
+.byte "CURS X,Y      Move text curs",$0D,$0A,$00
 MSG_HELP2:  
-.byte " PRINT SSTATUS Get VDP status reg",$0D,$0A
-.byte " SPR H         Sprite help",$0D,$0A
-.byte " DIR           SD: Disk Dir",$0D,$0A
-.byte " LOAD 'file'   SD: LOAD BASIC prog",$0D,$0A
-.byte " SAVE 'file'   SD: SAVE BASIC prog",$0D,$0A
-.byte " DEL 'file'    SD: DELETE file",$0D,$0A,$00
+.byte "A = GETKEY    Wait for KEY",$0D,$0A
+.byte "              Return ASCII code",$0D,$0A
+.byte "DELAY T       Sleep (busy) T ms",$0D,$0A
+.byte "SPR H         Sprite help",$0D,$0A
+.byte "DIR           Disk Dir",$0D,$0A
+.byte "DISK <N>      Switch to disk N",$0D,$0A
+.byte "DEL <fn>      DELETE file",$0D,$0A,$00
 MSG_HELP3:  
-.byte " CAT <fn>      SD: type file to output",$0D,$0A
-.byte " DISK <N>      SD: Switch to disk N",$0D,$0A,$00
+.byte "CAT <fn>      Type to output",$0D,$0A
+.byte "LOAD|SAVE <fn> Basic prog",$0D,$0A
+.byte "LOADIMG <fn>   Load Gii Image",$0D,$0A
+.byte "LOADBIN <fn>,A Load to addr A",$0D,$0A
+.byte "PLAY Addr      Play Sound",$0D,$0A,$00
 LAB_HELP:
 	LDA #<MSG_HELP1
 	LDY #>MSG_HELP1
@@ -8253,7 +8257,11 @@ SEND_CMD:
 	LDA ZP_TMP0+1			; set flags correctly
 	SEC                 ; flag we have char
 	RTS
-sdcmd_end:
+sdcmd_end:	
+	; debug
+	ld16 R0,msg_vec_in_restore	
+	JSR acia_puts
+
 	LDA #<CHARin
 	STA VEC_IN
 	LDA #>CHARin
@@ -8275,30 +8283,50 @@ sdout_on:
 	BEQ soo_done		; no, exit
 	LDA #1
 	STA ccflag			; disable Ctrl-C or it will eat our chars
+
+	; debug
+	ld16 R0,msg_vec_out_sd	
+	JSR acia_puts
+
 	LDA #<SDWRITE 		; Set output vector to SDWRITE
 	STA VEC_OUT
 	LDA #>SDWRITE
 	STA VEC_OUT+1
+	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 soo_done:
 	RTS
 sdout_off:
 	LDA OUT_LIST_SD		; Was this called during a SAVE?
 	BEQ soo_done		; no, exit
 	STZ ccflag			; restore CTRL-C behaviour
+	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 	JSR reinstate_ouput_vector
 .ifdef SDIO
 	JSR fs_close 		; Program saved, now close file
 .endif
-	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 
-	lda DISK_NO_SD
-	sta ZP_TMP0
 .ifdef SDIO
 	jsr init_fs			; re-read the directory
 .endif
 	RTS
 
+;------------------------------------------------------
+msg_vec_out_sd:
+.byte "VEC_OUT to SD",$0D,$0A,$00
+msg_vec_out_off:
+.byte "VEC_OUT off",$0D,$0A,$00
+msg_vec_out_restore:
+.byte "VEC_OUT restore",$0D,$0A,$00
+msg_vec_out_restore_m4:
+.byte "VEC_OUT restore m4",$0D,$0A,$00
+msg_vec_in_sd:
+.byte "VEC_IN from SD",$0D,$0A,$00
+msg_vec_in_restore:
+.byte "VEC_IN restore",$0D,$0A,$00
+msg_vec_in_send:
+.byte "VEC_IN SEND_CMD",$0D,$0A,$00
 ;msg_Restore: .byte "Restore",$0D,$0A,$00
+
 
 ;------------------------------------------------------
 .ifdef SDIO  ; REAL SD Card configured
@@ -8320,6 +8348,10 @@ LAB_SAVE:
 	LDA #1
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 	STA OUT_LIST_SD		; flag LIST to output to SD card
+
+	; debug
+	ld16 R0,msg_vec_in_send	
+	JSR acia_puts
 
 	; Send a LIST command
 	STZ ZP_TMP0				; string index
@@ -8343,6 +8375,14 @@ LAB_FSER:
 	JMP  LAB_XERR		; do error #X, then warm start
 
 ;------------------------------------------------------
+; perform DEL <filename>
+LAB_DEL:
+	JSR SD_GETFILENAME
+	JSR fs_delete
+	BCS LAB_FILENOTFOUND
+	RTS
+
+;------------------------------------------------------
 ; LOAD "filename"
 ; 	Load from an SD file
 ;
@@ -8350,6 +8390,8 @@ LAB_FSER:
 ; perform SD LOAD <filename>
 LAB_LOAD:
 	JSR SD_GETFILENAME  ; read filename param as a file handle
+	JSR LAB_1463
+
 	JSR fs_open_read	; open file
 	BCC ll_over 
 LAB_FILENOTFOUND:
@@ -8358,6 +8400,12 @@ LAB_FILENOTFOUND:
 ll_over:
 	LDA #1
 	STA ccflag			; disable Ctrl-C or it will eat our chars
+
+	; debug
+	ld16 R0,msg_vec_in_sd	
+	JSR acia_puts
+	ld16 R0,msg_vec_out_off
+	JSR acia_puts
 	
 	; Set input vector to SDREAD and let it take over input
 	LDA #<SDREAD
@@ -8394,6 +8442,10 @@ load_eof:
 	ld16 R0,msg_EOF
 	JSR acia_puts       ; debug
 
+	; debug
+	ld16 R0,msg_vec_in_restore	
+	JSR acia_puts
+
 	LDA #<CHARin		; restore normal input device
 	STA VEC_IN
 	LDA #>CHARin
@@ -8407,14 +8459,6 @@ load_eof:
 	SEC                 ; flag we have char
 	RTS
 
-
-;------------------------------------------------------
-; perform DEL <filename>
-LAB_DEL:
-	JSR SD_GETFILENAME
-	JSR fs_delete
-	BCS LAB_FILENOTFOUND
-	RTS
 
 ; Print string pointed to by X(lo)&A(Hi)
 ; Y has number of chars printed
@@ -8510,15 +8554,54 @@ LAB_DO_FSER:
 ;
 msg_dir_header: .byte "Filename      Size",$0d,$0a,"------------------",$0d,$0a,$00
 msg_pause: .byte "--- Press any key ---",$00
+msg_disk_num: .byte "Disk ",$00
+msg_newline: .byte $0D,$0A,$00
 LAB_DIR:
 	pha
 	phx
 	phy
 
+	LDA VDP_MODE
+	CMP#4
+	BEQ dir_header_m4
+
+	; Write Disk Num
+	ld16 R0, msg_disk_num
+	JSR vdp_write_text
+	JSR acia_puts
+	LDA DISK_NUM_SD
+	JSR fmt_hex_char
+	JSR acia_putc
+	JSR vdp_write_char
+	JSR acia_put_newline
+	ld16 R0, msg_newline
+	JSR vdp_write_text
+
+	; write header
 	ld16 R0, msg_dir_header
 	JSR vdp_write_text
 	JSR acia_puts
+	JMP lab_dir_continue
 
+dir_header_m4:
+	; Write Disk Num
+	ld16 R0, msg_disk_num
+	JSR vdp_write_text_m4
+	JSR acia_puts
+	LDA DISK_NUM_SD
+	JSR fmt_hex_char
+	JSR acia_putc
+	JSR vdp_write_char_m4
+	JSR acia_put_newline
+	ld16 R0, msg_newline
+	JSR vdp_write_text_m4
+
+	; write header
+	ld16 R0, msg_dir_header
+	JSR vdp_write_text_m4
+	JSR acia_puts
+
+lab_dir_continue:
 	STZ PAGECNT
 
 	JSR fs_dir_root_start		; Start at root
@@ -8545,8 +8628,14 @@ dir_pad:
 	BNE dir_skip_pause
    
 	ld16 R0, msg_pause
-	JSR vdp_write_text
 	JSR acia_puts
+	LDA VDP_MODE
+	CMP #4
+	BEQ @pause_msg_m4
+	JSR vdp_write_text
+	JMP @loop
+@pause_msg_m4:
+	JSR vdp_write_text_m4
 @loop:
 	; wait for key press
 	JSR V_INPT
@@ -8662,7 +8751,7 @@ LAB_DEL:
 LAB_CAT:
 	RTS
 
-.endif
+.endif  ; no SD card
 
 .ifdef SDIO
 ; return a Filesystem error and do warm start
@@ -8791,6 +8880,11 @@ reinstate_ouput_vector:
 	PHA
 	CMP #4
 	BEQ rov_m4
+
+	; debug
+	ld16 R0,msg_vec_out_restore	
+	JSR acia_puts
+
 	; Set output vector to standard CHARout
 	LDA #<CHARout
 	STA VEC_OUT
@@ -8799,6 +8893,10 @@ reinstate_ouput_vector:
 	PLA
 	RTS
 rov_m4:
+	; debug
+	ld16 R0,msg_vec_out_restore_m4
+	JSR acia_puts
+
 	; Set output vector to special MODE4 one
 	LDA #<CHARoutM4
 	STA VEC_OUT

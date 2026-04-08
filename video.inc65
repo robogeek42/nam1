@@ -9,6 +9,7 @@
 .import vdp_write_char_m4
 .import vdp_clear_line_m4
 .import vdp_write_text
+.import vdp_write_text_m4
 .import vdp_backspace
 .import vdp_backspace_m4
 .import vdp_load_flat_colors

@@ -24,6 +24,7 @@
 		.export vdp_write_char_m4
         .export vdp_clear_line_m4
 		.export vdp_write_text
+		.export vdp_write_text_m4
 		.export vdp_backspace
 		.export vdp_backspace_m4
 		.export vdp_load_flat_colors
@@ -511,6 +512,18 @@ vps_cr:		 ;; return to start of current line
 				JSR vdp_move_to_start_line
 				JSR vdp_start_str_w
 				JMP vps_get_next
+
+; Mode 4 version
+vdp_write_text_m4: 
+				LDY #0				;; max 255 chars, in case not zero term
+vps_next_char_m4:  
+				LDA (R0),Y
+				BEQ vps_done_m4		;; found zero in string
+				JSR vdp_write_char_m4		;; otherwise write the char
+            	INY
+				BNE vps_next_char_m4
+vps_done_m4:	RTS
+
 
 ;---------------------------------------------
 ; Screen movement - handle vars for cursor pos

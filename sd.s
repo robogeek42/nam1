@@ -107,7 +107,7 @@ part_sect_start_table:
     .byte $01,$00,$00,$00
     .byte $08,$20,$03,$00
     .byte $08,$40,$06,$00
-    .byte $08,$60,$09,$00,$00,$00,$00,$00
+    .byte $08,$60,$09,$00
 
 msg_EOF: .byte "EOF",$0D,$0A,$00
 
@@ -574,7 +574,7 @@ sd_sendcmd17:
 	phx
 	pha								; A is the page to write to
 	
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
     ld16 R0,sd_msg_readsector
 	JSR acia_puts
     ld16 R0,str_buf
@@ -870,6 +870,27 @@ sdfs_set_dir_filesize_ptr:
 	RTS
 ;-----------------------------------------
 
+; Disk (partition no) in Acc
+; fill sd_sect and fs_bootsect with data from table
+; part_sect_start_table. 4 records with 4 bytes
+
+fs_get_sect_start:
+    asl 
+    asl
+    clc
+    adc #3
+    tay
+	ldx #$03					
+@getsectloop:
+    lda part_sect_start_table,y
+	sta sd_sect,x
+	sta fs_bootsect,x
+    dey
+	dex
+	bpl @getsectloop
+    rts
+    
+
 ;****************************************
 ;* init_fs
 ;* Initialise filesystem - after sd card!
@@ -881,44 +902,23 @@ init_fs:
 	ld16 R0, msg_initialising_fs
 	JSR acia_puts
 
-    lda ZP_TMP0     ; 1 byte contains DISK number
-    sta DISK_NO_SD
-    asl 
-    asl
-    clc
-    adc #3
-    tay
+	; Write Disk Num
+	ld16 R0, msg_disk_num
+	JSR acia_puts
+	LDA DISK_NUM_SD
+	JSR fmt_hex_char
+	JSR acia_putc
+	JSR acia_put_newline
 
-	ldx #$03					
-init_fs_clr_sect:
-    lda part_sect_start_table,y
-	sta sd_sect,x
-	dex
-    dey
-	bpl init_fs_clr_sect
+    lda DISK_NUM_SD     ; 1 byte contains DISK number
+    jsr fs_get_sect_start
 
 	lda #SD_BUF				; Read in to the buffer
 	jsr sd_sendcmd17			; Call read block
 
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
     jsr dump_buffer_with_address
 .endif
-
-    lda DISK_NO_SD     ; 1 byte contains DISK number
-    asl
-    asl
-    clc
-    adc #3
-    tay
-    
-	;Extract data from boot record
-	ldx #$03
-init_fs_clr_boot:
-    lda part_sect_start_table,y
-	sta fs_bootsect,x
-	dex
-    dey
-	bpl init_fs_clr_boot
 
 	; Calculate start of FAT tables
 	; Assuming there are about 64k clusters
@@ -959,7 +959,9 @@ init_fs_clr_boot:
 	adc fs_rootsect+3
 	sta fs_rootsect+3
 
-.ifdef DEBUG_PRINT
+    jsr print_out_list_sd
+
+.ifdef DEBUG_PRINT_SD
 ; debug
     pha
 	ld16 R0, msg_fatsect
@@ -1012,6 +1014,8 @@ fs_init_add_fat:
 	stz fs_datasect+2
 	stz fs_datasect+3
 	
+    jsr print_out_list_sd
+
 	ldy #5						; Multiply by 32 to get root dir size in sectors
 fs_rootmult1:
 	clc
@@ -1056,7 +1060,9 @@ fs_init_dir_sect:
 	dex
 	bpl fs_init_dir_sect
 
-.ifdef DEBUG_PRINT
+    jsr print_out_list_sd
+
+.ifdef DEBUG_PRINT_SD
 ; debug
 ; print fs_datasect and fs_dirsect	
     pha
@@ -1088,8 +1094,21 @@ fs_init_dir_sect:
     jsr acia_put_newline
     pla
 .endif
-    
+  
 	rts
+
+
+msg_debug_out_sd: .byte "OUT_LIST_SD ",$00
+print_out_list_sd:
+    pha 
+    ld16 R0,msg_debug_out_sd 
+    jsr acia_puts
+    lda OUT_LIST_SD
+	JSR fmt_hex_char
+	JSR acia_putc
+	JSR acia_put_newline
+    pla
+    rts
 
 ;****************************************
 ;* fs_getbyte_sd_buf
@@ -1216,7 +1235,7 @@ fs_dir_set_sd:
 	lda #SD_BUF
 	jsr sd_sendcmd17
 
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
     ;jsr dump_buffer_with_address
 .endif
 
@@ -2086,7 +2105,7 @@ fs_open_read:
 	phx
 	phy
 
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
             ; debug - print name from filehandle
             ld16 R0,sd_msg_find_file
             JSR acia_puts
@@ -2104,7 +2123,7 @@ fs_open_find:
 	jsr fs_dir_find_entry		; Find a valid entry
 	bcs	fs_open_not_found		; If C then no more entries
 
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
             ; Debug - print dir entry name
             LDA #<fh_dir
             STA R0
@@ -2133,7 +2152,7 @@ fs_open_check_name:
 fs_open_found:
 	jsr fs_copy_dir_to_fh		; Put entry in to fh_handle
 
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
             ; Debug
             ld16 R0, sd_msg_found_entry
             JSR acia_puts
@@ -2441,7 +2460,7 @@ print_byte_in_a:
     PLA
     RTS
 
-.ifdef DEBUG_PRINT
+.ifdef DEBUG_PRINT_SD
 ; Debug print SD buffer
 ; Expect ZP_TMP2 to have virtual address
 ; SD_BUF location is physical address
@@ -2529,4 +2548,6 @@ msg_datasect:
 	.byte "datasect:",$00
 msg_dirsect:
 	.byte "dirsect:",$00
+msg_disk_num:
+    .byte "Disk ",$00
 

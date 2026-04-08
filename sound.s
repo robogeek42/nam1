@@ -15,7 +15,7 @@
 .export snd_beep
 
 .bss
-strbuf: .res 4, 0
+strbuf: .res 16, 0
 
 .code
 
@@ -31,6 +31,16 @@ snd_write:
 		; Latch output data
         PLA
         STA SND_VIA_DATA
+.ifdef DEBUG_PRINT_SOUND
+        ; print Binary of SND data to serial
+        ld16 R0, snd_data_msg
+        JSR acia_puts
+        ld16 R0,strbuf
+        ;JSR fmt_bin_string
+        JSR fmt_hex_string
+        JSR acia_puts
+        JSR acia_put_newline
+.endif
 		; Set write enable/chip enable
 		LDA SND_VIA_CTL
         AND #SND_VIA_NOT_WE_CE
@@ -39,7 +49,7 @@ snd_write:
         ; Delay used to ensure data is latched for 32 cycles of sound clock
         ; @ 4MHz this is 8us, @3.64MHz this is 9us
         ; At system clock of 2.45MHz 9us is 22 cycles
-        LDX #2
+        LDX #3
         JSR snd_delay
 		; Set control signals to off
 		LDA SND_VIA_CTL
@@ -55,8 +65,14 @@ snd_write:
 ;--------------------------------------------------------------
 ; Delay : delay length (X*6 + 12 including JSR and RTS)
 ;   	to get 24 cycles need X=2
+;       : delay length (X*4+12).
+;         x=1:16 x=2:20 x=3:24 x=4:30 x=256:1036
 snd_delay:
 @loop:  NOP 		; 2 cycles
+        NOP
+        NOP
+        NOP
+        NOP
 		DEX			; 2 cycles
 		BNE @loop	; 2 cycles (probably)
 		RTS			; 6 cycles
@@ -326,5 +342,5 @@ spv_end:
 		plx
 		RTS
 
-
+snd_data_msg: .byte "SND:",$00
 
