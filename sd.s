@@ -959,8 +959,6 @@ init_fs:
 	adc fs_rootsect+3
 	sta fs_rootsect+3
 
-    jsr print_out_list_sd
-
 .ifdef DEBUG_PRINT_SD
 ; debug
     pha
@@ -1014,8 +1012,6 @@ fs_init_add_fat:
 	stz fs_datasect+2
 	stz fs_datasect+3
 	
-    jsr print_out_list_sd
-
 	ldy #5						; Multiply by 32 to get root dir size in sectors
 fs_rootmult1:
 	clc
@@ -1060,8 +1056,6 @@ fs_init_dir_sect:
 	dex
 	bpl fs_init_dir_sect
 
-    jsr print_out_list_sd
-
 .ifdef DEBUG_PRINT_SD
 ; debug
 ; print fs_datasect and fs_dirsect	
@@ -1097,18 +1091,6 @@ fs_init_dir_sect:
   
 	rts
 
-
-msg_debug_out_sd: .byte "OUT_LIST_SD ",$00
-print_out_list_sd:
-    pha 
-    ld16 R0,msg_debug_out_sd 
-    jsr acia_puts
-    lda OUT_LIST_SD
-	JSR fmt_hex_char
-	JSR acia_putc
-	JSR acia_put_newline
-    pla
-    rts
 
 ;****************************************
 ;* fs_getbyte_sd_buf
