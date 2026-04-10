@@ -19,6 +19,9 @@
 .import vdp_copy
 .import vdp_cursor_on
 .import vdp_cursor_off
+.import vdp_setaddr_pattern_table_m4
+.import vdp_setaddr_color_table_m4
+.import vdp_setaddr_pattern_table_read_m4
 ; copy cursor
 .import vdp_cc_enable
 .import vdp_cc_disable

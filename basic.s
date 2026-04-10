@@ -365,10 +365,11 @@ TK_DISK  	= TK_CURS+1		; Select SD partition (disk)
 TK_HELP  	= TK_DISK+1		; Help
 TK_COL  	= TK_HELP+1		; Set text colour
 TK_PLOT  	= TK_COL+1		; Plot X,Y (Mode 4 only)
+TK_GCOL  	= TK_PLOT+1		; Graphics Colour (Mode 4 only)
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_PLOT+1		; TAB token
+TK_TAB  	= TK_GCOL+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -7920,59 +7921,69 @@ LAB_COL:
 	;JSR LAB_296E	; convert FAC1 to string
 	;JSR LAB_20AE	; print " terminated string to Sutill/Sutilh
 
+; GCOL <FGCol>,<BGCol> 
+; Set colour to use for plot command
+; stored in ZP var GRA_COL
+LAB_GCOL:
+	JSR LAB_GADB  	; get 2 integers seperated by comma
+						; 1st integer (FGCol) in Itempl/h, 2nd in X
+	STX Itemph			; put X (BGCol) int hi byte of temp integer for now
+	LDA Itempl			; FG Col (put int upper nibble)
+	CLC
+	ASL
+	ASL
+	ASL
+	ASL
+	ORA Itemph			; A now has FGCol|BGCol
+	STA GRA_COL			; in zero page
+	RTS
+;---------------------------------------------------------
 plot_end_exit:	
 	RTS
 msg_plot: .byte "plot ",$00
 ; Mode 4 Plot command
 ; Takes 2 params X,Y : Screen size is 256x192 - (0-255)x(0-191)
+; will wrap
 LAB_PLOT:
-	JSR  LAB_GTBY  	; get integer (max 255)
-	STX  plotX
-	JSR  LAB_SCGB	; get , and next integer
-	STX  plotY
+	JSR  LAB_EVNM		; evaluate expression and check is numeric,
+					; else do type mismatch
+	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA  Itempl			; Get value (X)
+	STA  plotX			; store
+	; scan for "," and get byte, else do Syntax error then warm start
+	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
+	JSR  LAB_EVNM		; evaluate expression and check is numeric,
+					; else do type mismatch
+	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA  Itempl			; Get value (Y)
+	STA  plotY			; Store 
 
 	LDA  VDP_MODE	
 	CMP  #4
 	BNE  plot_end_exit
-
-; debug Print X,Y
-;	ld16 R0,msg_plot
-;	jsr  acia_puts
-;	ld16 R0,buffer
-;	lda  plotX
-;	jsr  fmt_hex_string
-;	jsr  acia_puts
-;	LDA  #','
-;	JSR  acia_putc
-;	ld16 R0,buffer
-;	lda  plotY
-;	jsr  fmt_hex_string
-;	jsr  acia_puts
-;	JSR  acia_put_newline
-; end debug
 
 	; Calclate the pixel address (from base of pattern)
 	; byte addr = Yc * 256 + Xc*8 + Yr
 	; Xc = X/8, Yc = Y/8 (char addr). Xc*8=X&$F8
 	; Yr = Y mod 8, Xr = X mod 8
 	;
-	; ZP_TMP0 to hold addr
+	; TMP1 to hold addr
 	LDA plotY
 	LSR
 	LSR
 	LSR			; Yc=Y/8
-	STA  ZP_TMP0+1	; Yc*256
+	STA  TMP1+1		; Yc*256
 	LDA  plotX
 	AND  #$F8
-	STA  ZP_TMP0	; Xc*8
+	STA  TMP1		; Xc*8
 	LDA  plotY
 	AND  #$07		; Yr
 	CLC			; add Yr to tmp
-	ADC  ZP_TMP0
-	STA  ZP_TMP0
-	LDA  ZP_TMP0+1
+	ADC  TMP1
+	STA  TMP1
+	LDA  TMP1+1
 	ADC  #0
-	STA  ZP_TMP0+1
+	STA  TMP1+1
 	
 ; debug Print addr
 ;	ld16 R0,buffer
@@ -7987,9 +7998,7 @@ LAB_PLOT:
 ; end debug
 
 	; get current byte at this location
-	LDY  ZP_TMP0
-	LDA  ZP_TMP0+1
-	JSR  vdp_set_addr_r
+	JSR  vdp_setaddr_pattern_table_read_m4
 	JSR  vdp_read
 	STA  TMPBYTE
 
@@ -7999,7 +8008,7 @@ LAB_PLOT:
 	; get byte value by right shift Xr times
 	LDA  plotX
 	AND  #$07		; X mod 8 (Xr)
-	BEQ  plot_do_write
+	BEQ  plot_do_write ; Xr is 0, no need to shift
 	TAX			; Xr = number of times to shift
 	PLA			; value to shift
 @loop:
@@ -8011,11 +8020,12 @@ LAB_PLOT:
 	PHA
 
 plot_do_write:
-	LDY  ZP_TMP0
-	LDA  ZP_TMP0+1
-	JSR  vdp_set_addr_w
+	JSR  vdp_setaddr_pattern_table_m4
 	PLA
 	ORA  TMPBYTE
+	JSR  vdp_write
+	JSR  vdp_setaddr_color_table_m4
+	LDA  GRA_COL
 	JSR  vdp_write
 	
 plot_end:	
@@ -9296,6 +9306,7 @@ LAB_CTBL:
 	.word LAB_HELP-1		; Print new commands
 	.word LAB_COL-1		; Set new text colour (FG,BG)
 	.word LAB_PLOT-1		; Plot X,Y in Mode 4
+	.word LAB_GCOL-1		; Set new plot colour (FG,BG)
 
 ; function pre process routine table
 
@@ -9600,6 +9611,8 @@ LBB_FRE:
 	.byte	"RE(",TK_FRE  ; FRE(
 	.byte	$00
 TAB_ASCG:
+LBB_GCOL:
+	.byte	"COL",TK_GCOL  ; GCOL
 LBB_GETKEY:
 	.byte	"ETKEY",TK_GETKEY  	; GETKEY
 LBB_GET:
@@ -9934,6 +9947,8 @@ LAB_KEYT:
 	.word	LBB_COL  	; COL
 	.byte	4,'P'
 	.word	LBB_PLOT  	; 
+	.byte	4,'G'
+	.word	LBB_GCOL  	; 
 
 ; secondary commands (can't start a statement)
 

@@ -34,6 +34,9 @@
 		.export vdp_copy
 		.export vdp_cursor_on
 		.export vdp_cursor_off
+        .export vdp_setaddr_pattern_table_m4
+        .export vdp_setaddr_color_table_m4
+        .export vdp_setaddr_pattern_table_read_m4
 		; copy cursor
 		.export vdp_cc_enable
 		.export vdp_cc_disable
@@ -148,6 +151,7 @@ vdp_sm_mode4:
 
                 LDA VDP_REGS+7
                 STA TXT_COL
+                STA GRA_COL
                 JSR vdp_load_g2_col
                 ; load name table to consective names
                 JSR vdp_load_number_name_table
@@ -189,6 +193,14 @@ vdp_setaddr_color_table_m4:
                 ADC TMP1+1
                 LDY TMP1          
                 JSR vdp_set_addr_w
+                RTS
+
+vdp_setaddr_pattern_table_read_m4:
+                LDA VDP_PTM4
+                CLC                 ;; offset
+                ADC TMP1+1
+                LDY TMP1          
+                JSR vdp_set_addr_r
                 RTS
 
 ;================================================================

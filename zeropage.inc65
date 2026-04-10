@@ -31,7 +31,7 @@ KBD_SPECIAL    = $39
 ; Store current text COL to write under any new text
 ; FG is in top nibble, BG in bottom
 TXT_COL = $3A 
-TMPBYTE = $3B
+GRA_COL = $3B 
 
 ;-----------------------------------------------------------
 ; Output LIST to SD card if !=0
@@ -54,5 +54,7 @@ sd_shi         = $E1        ; 1 Sector pointer high
 sd_sect        = $E2        ; 4 SD Card sector address
 sd_addr        = $E6        ; 4 SD Card byte address
 ;-----------------------------------------------------------
+
+TMPBYTE = $EA
 
 ; max $5A
