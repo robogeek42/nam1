@@ -8377,8 +8377,8 @@ SEND_CMD:
 	RTS
 sdcmd_end:	
 	; debug
-	;ld16 R0,msg_vec_in_restore	
-	;JSR acia_puts
+	ld16 R0,msg_vec_in_restore	
+	JSR acia_puts
 
 	LDA #<CHARin
 	STA VEC_IN
@@ -8403,25 +8403,26 @@ sdout_on:
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 
 	; debug
-	;ld16 R0,msg_vec_out_sd	
-	;JSR acia_puts
+	ld16 R0,msg_vec_out_sd	
+	JSR acia_puts
 
 	LDA #<SDWRITE 		; Set output vector to SDWRITE
 	STA VEC_OUT
 	LDA #>SDWRITE
 	STA VEC_OUT+1
-	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
+	;STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 soo_done:
 	RTS
 sdout_off:
 	LDA OUT_LIST_SD		; Was this called during a SAVE?
 	BEQ soo_done		; no, exit
 	STZ ccflag			; restore CTRL-C behaviour
-	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
+	;STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 	JSR reinstate_ouput_vector
 .ifdef SDIO
 	JSR fs_close 		; Program saved, now close file
 .endif
+	STZ OUT_LIST_SD		; turn off SAVE Output switch flag
 
 .ifdef SDIO
 	jsr init_fs			; re-read the directory
@@ -8429,21 +8430,21 @@ sdout_off:
 	RTS
 
 ;------------------------------------------------------
-;msg_vec_out_sd:
-;.byte "VEC_OUT to SD",$0D,$0A,$00
-;msg_vec_out_off:
-;.byte "VEC_OUT off",$0D,$0A,$00
-;msg_vec_out_restore:
-;.byte "VEC_OUT restore",$0D,$0A,$00
-;msg_vec_out_restore_m4:
-;.byte "VEC_OUT restore m4",$0D,$0A,$00
-;msg_vec_in_sd:
-;.byte "VEC_IN from SD",$0D,$0A,$00
-;msg_vec_in_restore:
-;.byte "VEC_IN restore",$0D,$0A,$00
-;msg_vec_in_send:
-;.byte "VEC_IN SEND_CMD",$0D,$0A,$00
-;msg_Restore: .byte "Restore",$0D,$0A,$00
+msg_vec_out_sd:
+.byte "VEC_OUT to SD",$0D,$0A,$00
+msg_vec_out_off:
+.byte "VEC_OUT off",$0D,$0A,$00
+msg_vec_out_restore:
+.byte "VEC_OUT restore",$0D,$0A,$00
+msg_vec_out_restore_m4:
+.byte "VEC_OUT restore m4",$0D,$0A,$00
+msg_vec_in_sd:
+.byte "VEC_IN from SD",$0D,$0A,$00
+msg_vec_in_restore:
+.byte "VEC_IN restore",$0D,$0A,$00
+msg_vec_in_send:
+.byte "VEC_IN SEND_CMD",$0D,$0A,$00
+msg_Restore: .byte "Restore",$0D,$0A,$00
 
 
 ;------------------------------------------------------
@@ -8468,8 +8469,8 @@ LAB_SAVE:
 	STA OUT_LIST_SD		; flag LIST to output to SD card
 
 	; debug
-	;ld16 R0,msg_vec_in_send	
-	;JSR acia_puts
+	ld16 R0,msg_vec_in_send	
+	JSR acia_puts
 
 	; Send a LIST command
 	STZ ZP_TMP0				; string index
@@ -8520,10 +8521,10 @@ ll_over:
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 
 	; debug
-	;ld16 R0,msg_vec_in_sd	
-	;JSR acia_puts
-	;ld16 R0,msg_vec_out_off
-	;JSR acia_puts
+	ld16 R0,msg_vec_in_sd	
+	JSR acia_puts
+	ld16 R0,msg_vec_out_off
+	JSR acia_puts
 	
 	; Set input vector to SDREAD and let it take over input
 	LDA #<SDREAD
@@ -8561,8 +8562,8 @@ load_eof:
 	JSR acia_puts       ; debug
 
 	; debug
-	;ld16 R0,msg_vec_in_restore	
-	;JSR acia_puts
+	ld16 R0,msg_vec_in_restore	
+	JSR acia_puts
 
 	LDA #<CHARin		; restore normal input device
 	STA VEC_IN
@@ -9003,8 +9004,8 @@ reinstate_ouput_vector:
 	BEQ rov_m4
 
 	; debug
-	;ld16 R0,msg_vec_out_restore	
-	;JSR acia_puts
+	ld16 R0,msg_vec_out_restore	
+	JSR acia_puts
 
 	; Set output vector to standard CHARout
 	LDA #<CHARout
@@ -9015,8 +9016,8 @@ reinstate_ouput_vector:
 	RTS
 rov_m4:
 	; debug
-	;ld16 R0,msg_vec_out_restore_m4
-	;JSR acia_puts
+	ld16 R0,msg_vec_out_restore_m4
+	JSR acia_puts
 
 	; Set output vector to special MODE4 one
 	LDA #<CHARoutM4
