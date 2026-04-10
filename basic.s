@@ -40,7 +40,9 @@ nums_1		= Itempl	; number to bin/hex string convert MSB
 nums_2		= nums_1+1	; number to bin/hex string convert
 nums_3		= nums_1+2	; number to bin/hex string convert LSB
 
-NAMTMP1		= $14		; not used yet
+plotX			= $14		; Plot X
+plotY			= $15		; Plot Y
+plotX8            = $16       ; Plot X*8
 
 ;-----------------------------------------
 ; Keep $20 - $5A free for my monitor, sd-card and video
@@ -362,10 +364,11 @@ TK_CURS  	= TK_DELAY+1	; Move Text Cursor
 TK_DISK  	= TK_CURS+1		; Select SD partition (disk)
 TK_HELP  	= TK_DISK+1		; Help
 TK_COL  	= TK_HELP+1		; Set text colour
+TK_PLOT  	= TK_COL+1		; Plot X,Y (Mode 4 only)
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_COL+1		; TAB token
+TK_TAB  	= TK_PLOT+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -7913,6 +7916,111 @@ LAB_COL:
 	STA TXT_COL			; in zero page
 	RTS
 
+	;JSR LAB_1FD0	; Convert byte in Y to integer in FAC1
+	;JSR LAB_296E	; convert FAC1 to string
+	;JSR LAB_20AE	; print " terminated string to Sutill/Sutilh
+
+plot_end_exit:	
+	RTS
+msg_plot: .byte "plot ",$00
+; Mode 4 Plot command
+; Takes 2 params X,Y : Screen size is 256x192 - (0-255)x(0-191)
+LAB_PLOT:
+	JSR  LAB_GTBY  	; get integer (max 255)
+	STX  plotX
+	JSR  LAB_SCGB	; get , and next integer
+	STX  plotY
+
+	LDA  VDP_MODE	
+	CMP  #4
+	BNE  plot_end_exit
+
+; debug Print X,Y
+;	ld16 R0,msg_plot
+;	jsr  acia_puts
+;	ld16 R0,buffer
+;	lda  plotX
+;	jsr  fmt_hex_string
+;	jsr  acia_puts
+;	LDA  #','
+;	JSR  acia_putc
+;	ld16 R0,buffer
+;	lda  plotY
+;	jsr  fmt_hex_string
+;	jsr  acia_puts
+;	JSR  acia_put_newline
+; end debug
+
+	; Calclate the pixel address (from base of pattern)
+	; byte addr = Yc * 256 + Xc*8 + Yr
+	; Xc = X/8, Yc = Y/8 (char addr). Xc*8=X&$F8
+	; Yr = Y mod 8, Xr = X mod 8
+	;
+	; ZP_TMP0 to hold addr
+	LDA plotY
+	LSR
+	LSR
+	LSR			; Yc=Y/8
+	STA  ZP_TMP0+1	; Yc*256
+	LDA  plotX
+	AND  #$F8
+	STA  ZP_TMP0	; Xc*8
+	LDA  plotY
+	AND  #$07		; Yr
+	CLC			; add Yr to tmp
+	ADC  ZP_TMP0
+	STA  ZP_TMP0
+	LDA  ZP_TMP0+1
+	ADC  #0
+	STA  ZP_TMP0+1
+	
+; debug Print addr
+;	ld16 R0,buffer
+;	LDA  ZP_TMP0+1
+;	JSR  fmt_hex_string
+;	ld16 R0,buffer + 2
+;	LDA  ZP_TMP0
+;	JSR  fmt_hex_string
+;	ld16 R0, buffer
+;	jsr  acia_puts
+;	JSR  acia_put_newline
+; end debug
+
+	; get current byte at this location
+	LDY  ZP_TMP0
+	LDA  ZP_TMP0+1
+	JSR  vdp_set_addr_r
+	JSR  vdp_read
+	STA  TMPBYTE
+
+	; get byte with pixel value set
+	LDA  #$80 		; byte value for Xr=0
+	PHA
+	; get byte value by right shift Xr times
+	LDA  plotX
+	AND  #$07		; X mod 8 (Xr)
+	BEQ  plot_do_write
+	TAX			; Xr = number of times to shift
+	PLA			; value to shift
+@loop:
+	LSR
+	DEX
+	BNE  @loop
+
+	; write pixel
+	PHA
+
+plot_do_write:
+	LDY  ZP_TMP0
+	LDA  ZP_TMP0+1
+	JSR  vdp_set_addr_w
+	PLA
+	ORA  TMPBYTE
+	JSR  vdp_write
+	
+plot_end:	
+	RTS
+
 ;------------------------------------------------------
 ; Sprite commands:
 ;------------------------------------------------------
@@ -9187,6 +9295,7 @@ LAB_CTBL:
 	.word LAB_DISK-1        ; DISK 0	Load SD partition and init
 	.word LAB_HELP-1		; Print new commands
 	.word LAB_COL-1		; Set new text colour (FG,BG)
+	.word LAB_PLOT-1		; Plot X,Y in Mode 4
 
 ; function pre process routine table
 
@@ -9588,6 +9697,8 @@ LBB_PI:
 	.byte	"I",TK_PI		; PI
 LBB_PLAY:
 	.byte	"LAY",TK_PLAY  ; PLAY
+LBB_PLOT:
+	.byte	"LOT",TK_PLOT  ; PLOT
 LBB_POKE:
 	.byte	"OKE",TK_POKE  ; POKE
 LBB_PONG:
@@ -9821,6 +9932,8 @@ LAB_KEYT:
 	.word	LBB_HELP  	; HELP
 	.byte	3,'C'
 	.word	LBB_COL  	; COL
+	.byte	4,'P'
+	.word	LBB_PLOT  	; 
 
 ; secondary commands (can't start a statement)
 
