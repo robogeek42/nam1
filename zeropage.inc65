@@ -1,3 +1,4 @@
+; vim: ts=4 et sw=4
 ; Zeropage variables
 RES      = $20	; 2 bytes
 R0       = $22	; 2 bytes
@@ -38,6 +39,7 @@ GRA_COL = $3B
 ;
 OUT_LIST_SD = $3C
 DISK_NUM_SD = $3D
+TMPBYTE     = $3E
 
 ;-----------------------------------------------------------
 ; for Dolo Miah's SD card and FAT16 driver
@@ -49,12 +51,24 @@ fs_rootsect    = $4C        ; 4 Start of Root Directory
 fs_datasect    = $50        ; 4 Start of Data Area
 fs_dirsect     = $54        ; 4 Current directory
 
+; max $5A
+
 sd_slo         = $E0        ; 1 Sector pointer low
 sd_shi         = $E1        ; 1 Sector pointer high
 sd_sect        = $E2        ; 4 SD Card sector address
 sd_addr        = $E6        ; 4 SD Card byte address
+; max $EE
 ;-----------------------------------------------------------
 
-TMPBYTE = $EA
+plotX   = $14		; Plot X or X1
+plotY   = $15		; Plot Y or X2
 
-; max $5A
+LINE_X1 = $16
+LINE_Y1 = $17
+LINE_X2 = $18
+LINE_Y2 = $19
+LINE_Xd = $58
+LINE_Yd = $59
+
+LINE_M  = $40  ; 2 bytes : Bresenham slope
+LINE_SE = $42  ; 2 bytes : Bresenham slope error

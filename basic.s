@@ -40,12 +40,9 @@ nums_1		= Itempl	; number to bin/hex string convert MSB
 nums_2		= nums_1+1	; number to bin/hex string convert
 nums_3		= nums_1+2	; number to bin/hex string convert LSB
 
-plotX			= $14		; Plot X
-plotY			= $15		; Plot Y
-plotX8            = $16       ; Plot X*8
-
 ;-----------------------------------------
 ; Keep $20 - $5A free for my monitor, sd-card and video
+; see zeropage.inc65
 ;-----------------------------------------
 
 Srchc			= $5B		; search character
@@ -276,8 +273,7 @@ IrqBase		= $DF		; IRQ handler enabled/setup/triggered flags
 ;			= $E0		; IRQ handler addr low byte
 ;			= $E1		; IRQ handler addr high byte
 
-;			= $DE		; unused
-;			= $DF		; unused
+; see zeropage.inc65 for these declarations
 ;			= $E0		; sd card sd_slo
 ;			= $E1		; sd card sd_shi
 ;			= $E2		; sd card sd_sect
@@ -288,11 +284,11 @@ IrqBase		= $DF		; IRQ handler enabled/setup/triggered flags
 ;			= $E7		; sd card
 ;			= $E8		; sd card
 ;			= $E9		; sd card
-;    		   	= $EA		; keyboard
-;       		= $EB		; keyboard
-;    		   	= $EC		; keyboard
-;       		= $ED		; keyboard
-;			= $EE		; keyboard
+;    		   	= $EA		; ?
+;       		= $EB		; ?
+;    		   	= $EC		; ?
+;       		= $ED		; ?
+;			= $EE		; ?
 
 Decss			= $EF		; number to decimal string start
 Decssp1		= Decss+1	; number to decimal string start
@@ -354,10 +350,9 @@ TK_DEL  	= TK_SCOL+1		; SD DEL
 TK_DIR  	= TK_DEL+1		; SD DIR
 TK_CAT  	= TK_DIR+1		; SD CAT
 TK_SPR  	= TK_CAT+1		; Sprite commands
-TK_LOADIMG  	= TK_SPR+1     	; LOADIMG
-TK_PONG  	= TK_LOADIMG+1	; PONG token
-TK_PACMAN  	= TK_PONG+1		; PACMAN token
-TK_LOADBIN  	= TK_PACMAN+1	; Binary load
+TK_LOADIMG  = TK_SPR+1     	; LOADIMG
+TK_PACMAN  	= TK_LOADIMG+1	; PACMAN token
+TK_LOADBIN  = TK_PACMAN+1	; Binary load
 TK_PLAY  	= TK_LOADBIN+1	; Play sound file
 TK_DELAY  	= TK_PLAY+1		; Delay N ms
 TK_CURS  	= TK_DELAY+1	; Move Text Cursor
@@ -366,10 +361,11 @@ TK_HELP  	= TK_DISK+1		; Help
 TK_COL  	= TK_HELP+1		; Set text colour
 TK_PLOT  	= TK_COL+1		; Plot X,Y (Mode 4 only)
 TK_GCOL  	= TK_PLOT+1		; Graphics Colour (Mode 4 only)
+TK_LINE  	= TK_GCOL+1		; Line drawing (Mode 4 only)
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_GCOL+1		; TAB token
+TK_TAB  	= TK_LINE+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -7884,13 +7880,6 @@ LAB_TWOPI:
 	LDY  #>LAB_2C7C		; set (2*pi) pointer high byte
 	JMP  LAB_UFAC		; unpack memory (AY) into FAC1 and return
 
-LAB_PONG:
-.ifdef PONG
-	JSR pong
-	JSR snd_all_off
-.endif
-	RTS
-
 LAB_PACMAN:
 .ifdef PACMAN
 	JSR pacman
@@ -7968,6 +7957,7 @@ LAB_PLOT:
 	; Yr = Y mod 8, Xr = X mod 8
 	;
 	; TMP1 to hold addr
+plot_calc_addr:
 	LDA plotY
 	LSR
 	LSR
@@ -7997,6 +7987,7 @@ LAB_PLOT:
 ;	JSR  acia_put_newline
 ; end debug
 
+plot_do_read:
 	; get current byte at this location
 	JSR  vdp_setaddr_pattern_table_read_m4
 	JSR  vdp_read
@@ -9028,7 +9019,333 @@ rov_m4:
 	RTS
 
 ;-----------------------------------------------------------------
+; LINE X1,Y1,X2,Y2
+LAB_LINE:
+	; X1
+	JSR  LAB_EVNM		; evaluate expression and check is numeric, else mismatch
+	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
+	LDA  Itempl			; Get value (X1)
+	STA  LINE_X1		; store
+	; ","
+	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
+	; Y1
+	JSR  LAB_EVNM
+	JSR  LAB_F2FX
+	LDA  Itempl			; Get value (Y1)
+	STA  LINE_Y1
+	; "," 
+	JSR  LAB_1C01
+	; X2
+	JSR  LAB_EVNM
+	JSR  LAB_F2FX
+	LDA  Itempl			; Get value (X2)
+	STA  LINE_X2
+	; "," 
+	JSR  LAB_1C01
+	; Y2
+	JSR  LAB_EVNM
+	JSR  LAB_F2FX
+	LDA  Itempl			; Get value (Y2)
+	STA  LINE_Y2	
+	
+	JMP bresenham
 
+bresenham:
+	; Choose 1 of 4 options (noting other 4 are same line in opp direction)
+
+	;       -Y
+	;     \ 6|7 /
+	;    5 \ | / 8
+	;       \|/
+	;-X -----+----- +X
+	;    4  /|\  1
+	;      / | \
+	;     / 3|2 \
+	;       +Y
+ 
+	; Oct 1 & 5 : Xd +ve Yd +ve Xd > Yd
+	; Oct 2 & 6 : Xd +ve Yd +ve Xd < Yd
+	; Oct 3 & 7 : Xd -ve Yd +ve Xd < Yd
+	; Oct 4 & 8 : Xd -ve Yd +ve Xd > Yd
+
+bres_choose:
+	; Check if Yd is -ve
+	LDA  LINE_Y2
+	SEC
+	SBC  LINE_Y1
+	BMI  bres_choose_yd_neg
+	STA  LINE_Yd
+
+	; Yd is +ve, check if Xd is -ve
+	LDA  LINE_X2
+	SEC
+	SBC  LINE_X1
+	BMI  bres_choose_swap
+	STA  LINE_Xd
+
+	; Xd and Yd are both +ve
+	; Check if Xd is bigger
+	LDA  LINE_Xd
+	SEC 
+	SBC  LINE_Yd
+	BMI  jmp_bres_xd_yd_pos_yd_big
+	BRA  jmp_bres_xd_yd_pos_xd_big
+
+; Yd is negative, check Xd
+bres_choose_yd_neg:
+	STA  LINE_Yd
+	; Check if Xd is also -ve
+	LDA  LINE_X2
+	SEC
+	SBC  LINE_X1
+	BMI  bres_choose_swap	; both are negative
+	STA  LINE_Xd
+
+	; Xd +ve, Yd -ve
+	; Check if Xd is bigger
+	LDA  LINE_Xd
+	CLC 
+	ADC  LINE_Yd
+	BMI  jmp_bres_xd_pos_yd_neg_yd_big
+	JMP  jmp_bres_xd_pos_yd_neg_xd_big
+
+bres_choose_swap:
+	; debug
+	ld16 R0,msg_bres_choose_swap
+	JSR  acia_puts
+	JSR  bres_swap_p1_p2
+	BRA  bres_choose	; do it again with points swapped
+
+jmp_bres_xd_yd_pos_xd_big:
+	JMP bres_xd_yd_pos_xd_big
+jmp_bres_xd_yd_pos_yd_big:
+	JMP bres_xd_yd_pos_yd_big
+jmp_bres_xd_pos_yd_neg_xd_big:	
+	JMP bres_xd_pos_yd_neg_xd_big
+jmp_bres_xd_pos_yd_neg_yd_big:	
+	JMP bres_xd_pos_yd_neg_yd_big
+
+bres_swap_p1_p2:
+	; swap (X1,Y1) with (X2,Y2)
+	LDX LINE_X1
+	LDA LINE_X2
+	STA LINE_X1
+	STX LINE_X2
+	LDX LINE_Y1
+	LDA LINE_Y2
+	STA LINE_Y1
+	STX LINE_Y2
+RTS
+
+;------------------------------------
+; Oct 1 & 5 : Xd +ve Yd +ve Xd > Yd
+; Should come in with correct Xd,Yd
+bres_xd_yd_pos_xd_big:	
+	; debug
+	ld16 R0,msg_bres_xd_yd_pos_xd_big
+	JSR  acia_puts
+
+	; Store X1,Y1 in plot coords
+	LDA  LINE_X1
+	STA  plotX	
+	LDA  LINE_Y1
+	STA  plotY
+
+	; Calc slope mult by 2*Yd
+	STZ  LINE_M+1
+	LDA  LINE_Yd
+	ASL			; 2*Yd
+	STA  LINE_M
+	ROL  LINE_M+1	; 16 byte multiply
+
+	; save 2*Xd for later
+	STZ  ZP_TMP2+1
+	LDA  LINE_Xd
+	ASL
+	STA  ZP_TMP2
+	ROL  ZP_TMP2+1
+	
+	; Start value of slope error = M-Xd
+	sub8From16To16 LINE_Xd, LINE_M, LINE_SE	; order of params is B - A -> C
+
+@loop1:
+	LDA LINE_SE+1		; check Hi byte to see if error is negative
+	BMI @over1
+
+	; reset error and increase Y1
+	INC    plotY
+	sub16  LINE_SE, ZP_TMP2, LINE_SE	; order of params is A - B -> C
+	
+@over1:
+	; plot 
+	JSR  plot_calc_addr
+	; loop
+	add16 LINE_M, LINE_SE, LINE_SE	; increase error
+	INC  plotX
+	LDA  plotX
+	CMP  LINE_X2
+	BNE  @loop1		; misses X2  
+
+	;LDA  LINE_X2	; plot X2
+	;STA  plotX
+	;LDA  LINE_Y2
+	;STA  plotY
+	;JSR  plot_calc_addr
+	RTS
+;------------------------------------
+
+;print_plotXY_SE:
+;	LDA plotX
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;	LDA #','
+;	JSR acia_putc
+;	LDA plotY
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;
+;	LDA #' '
+;	JSR acia_putc
+;
+;	LDA LINE_SE			; low byte only
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;	
+;	JSR acia_put_newline
+;	RTS
+	
+;------------------------------------
+; Oct 2 & 6 : Xd +ve Yd +ve Xd < Yd
+bres_xd_yd_pos_yd_big:	
+	; debug
+	ld16 R0,msg_bres_xd_yd_pos_yd_big
+	JSR  acia_puts
+
+	; Store X1,Y1 in plot coords
+	LDA  LINE_X1
+	STA  plotX	
+	LDA  LINE_Y1
+	STA  plotY
+
+	; Calc slope mult by 2*Xd
+	STZ  LINE_M+1
+	LDA  LINE_Xd
+	ASL			; 2*Xd
+	STA  LINE_M
+	ROL  LINE_M+1	; 16 byte multiply
+
+	; save 2*Yd for later
+	STZ  ZP_TMP2+1
+	LDA  LINE_Yd
+	ASL
+	STA  ZP_TMP2
+	ROL  ZP_TMP2+1
+	
+	; Start value of slope error = M-Yd
+	sub8From16To16 LINE_Yd, LINE_M, LINE_SE	; order of params is B - A -> C
+
+@loop1:
+	LDA LINE_SE+1		; check Hi byte to see if error is negative
+	BMI @over1
+
+	; reset error and increase Y1
+	INC    plotX
+	sub16  LINE_SE, ZP_TMP2, LINE_SE	; order of params is A - B -> C
+	
+@over1:
+	; plot 
+	JSR  plot_calc_addr
+	; loop
+	add16 LINE_M, LINE_SE, LINE_SE	; increase error
+	INC  plotY
+	LDA  plotY
+	CMP  LINE_Y2
+	BNE  @loop1		; misses X2  
+	RTS
+;------------------------------------
+
+;------------------------------------
+; Oct 3 & 7 : Xd -ve Yd +ve Xd < Yd
+bres_xd_pos_yd_neg_xd_big:	
+	; debug
+	ld16 R0,msg_bres_xd_pos_yd_neg_xd_big
+	JSR  acia_puts
+
+	; Store X1,Y1 in plot coords
+	LDA  LINE_X1
+	STA  plotX	
+	LDA  LINE_Y1
+	STA  plotY
+
+	; Calc Xd Yd
+	LDA  LINE_X2
+	SEC
+	SBC  LINE_X1
+	STA  LINE_Xd
+	LDA  LINE_Y1
+	SEC
+	SBC  LINE_Y2
+	STA  LINE_Yd
+
+	; Calc slope mult by 2*Yd
+	STZ  LINE_M+1
+	LDA  LINE_Yd
+	ASL			; 2*Yd
+	STA  LINE_M
+	ROL  LINE_M+1	; 16 byte multiply
+
+	; save 2*Xd for later
+	STZ  ZP_TMP2+1
+	LDA  LINE_Xd
+	ASL
+	STA  ZP_TMP2
+	ROL  ZP_TMP2+1
+	
+	; Start value of slope error = M+Xd
+	add8To16To16 LINE_Xd, LINE_M, LINE_SE	; order of params is B + A -> C
+
+@loop1:
+	LDA LINE_SE+1		; check Hi byte to see if error is negative
+	BMI @over1
+
+	; reset error and increase Y1
+	INC    plotY
+	add16  LINE_SE, ZP_TMP2, LINE_SE	; order of params is A + B -> C
+	
+@over1:
+	; plot 
+	JSR  plot_calc_addr
+	; loop
+	sub16 LINE_SE, LINE_M, LINE_SE	; increase error
+	INC  plotX
+	LDA  plotX
+	CMP  LINE_X2
+	BNE  @loop1		; misses X2  
+	RTS
+;------------------------------------
+
+;------------------------------------
+; Oct 4 & 8 : Xd -ve Yd +ve Xd > Yd
+bres_xd_pos_yd_neg_yd_big:	
+	; debug
+	ld16 R0,msg_bres_xd_pos_yd_neg_yd_big
+	JSR  acia_puts
+	RTS
+;------------------------------------
+
+msg_bres_xd_yd_pos_xd_big:      .byte "Oct1 Xd+ Yd+ Xd>Yd",$0d,$0a,$00
+msg_bres_xd_yd_pos_yd_big:      .byte "Oct2 Xd+ Yd+ Xd<Yd",$0d,$0a,$00
+msg_bres_xd_pos_yd_neg_xd_big:  .byte "Oct3 Xd+ Yd- Xd>Yd",$0d,$0a,$00
+msg_bres_xd_pos_yd_neg_yd_big:  .byte "Oct4 Xd+ Yd- Xd<Yd",$0d,$0a,$00
+msg_bres_choose_swap:           .byte "swap",$0d,$0a,$00
+
+;=================================================================
 ; system dependant i/o vectors
 ; these are in RAM and are set by the monitor at start-up
 
@@ -9297,7 +9614,6 @@ LAB_CTBL:
 	.word	LAB_CAT-1		; CAT  		SD command
 	.word	LAB_SPR-1		; SPRite		VDP command
 	.word	LAB_LOADIMG-1	; LOADIMG  	VDP command
-	.word	LAB_PONG-1		; PONG  	Built-in Game
 	.word	LAB_PACMAN-1	; PACMAN  	Built-in Game
 	.word	LAB_LOADBIN-1	; LOADBIN  		SD file command
 	.word	LAB_PLAY-1		; PLAY 		sound command
@@ -9308,6 +9624,7 @@ LAB_CTBL:
 	.word LAB_COL-1		; Set new text colour (FG,BG)
 	.word LAB_PLOT-1		; Plot X,Y in Mode 4
 	.word LAB_GCOL-1		; Set new plot colour (FG,BG)
+	.word LAB_LINE-1		; Line drawing in Mode 4
 
 ; function pre process routine table
 
@@ -9655,6 +9972,8 @@ LBB_LEN:
 	.byte	"EN(",TK_LEN  ; LEN(
 LBB_LET:
 	.byte	"ET",TK_LET  	; LET
+LBB_LINE:
+	.byte	"INE",TK_LINE  ; LINE
 LBB_LIST:
 	.byte	"IST",TK_LIST  ; LIST
 LBB_LOADBIN:
@@ -9715,8 +10034,6 @@ LBB_PLOT:
 	.byte	"LOT",TK_PLOT  ; PLOT
 LBB_POKE:
 	.byte	"OKE",TK_POKE  ; POKE
-LBB_PONG:
-	.byte	"ONG",TK_PONG  ; PONG
 LBB_POS:
 	.byte	"OS(",TK_POS  ; POS(
 LBB_PRINT:
@@ -9928,8 +10245,6 @@ LAB_KEYT:
 	.word	LBB_SPR  	; SPR
 	.byte	7,'L'
 	.word	LBB_LOADIMG  	; LOADIMG
-	.byte	4,'P'
-	.word	LBB_PONG  	; PONG
 	.byte	6,'P'
 	.word	LBB_PACMAN  	; PACMAN
 	.byte	7,'L'
@@ -9950,6 +10265,8 @@ LAB_KEYT:
 	.word	LBB_PLOT  	; 
 	.byte	4,'G'
 	.word	LBB_GCOL  	; 
+	.byte	4,'L'
+	.word	LBB_LINE  	; 
 
 ; secondary commands (can't start a statement)
 
