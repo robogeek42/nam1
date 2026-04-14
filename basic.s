@@ -9054,19 +9054,19 @@ bresenham:
 	; Choose 1 of 4 options (noting other 4 are same line in opp direction)
 
 	;       -Y
-	;     \ 6|7 /
-	;    5 \ | / 8
+	;     \ 6|4 /
+	;    5 \ | / 3
 	;       \|/
 	;-X -----+----- +X
-	;    4  /|\  1
+	;    7  /|\  1
 	;      / | \
-	;     / 3|2 \
+	;     / 8|2 \
 	;       +Y
  
 	; Oct 1 & 5 : Xd +ve Yd +ve Xd > Yd
 	; Oct 2 & 6 : Xd +ve Yd +ve Xd < Yd
-	; Oct 3 & 7 : Xd -ve Yd +ve Xd < Yd
-	; Oct 4 & 8 : Xd -ve Yd +ve Xd > Yd
+	; Oct 3 & 7 : Xd +ve Yd -ve Xd < Yd
+	; Oct 4 & 8 : Xd +ve Yd -ve Xd > Yd
 
 bres_choose:
 	; Check if Yd is -ve
@@ -9194,31 +9194,31 @@ bres_xd_yd_pos_xd_big:
 	RTS
 ;------------------------------------
 
-;print_plotXY_SE:
-;	LDA plotX
-;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
-;	ld16 R0, buffer            ; output buffer
-;	JSR BCD2STR                ; convert BCD to string
-;	JSR acia_puts              ; print it
-;	LDA #','
-;	JSR acia_putc
-;	LDA plotY
-;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
-;	ld16 R0, buffer            ; output buffer
-;	JSR BCD2STR                ; convert BCD to string
-;	JSR acia_puts              ; print it
-;
-;	LDA #' '
-;	JSR acia_putc
-;
-;	LDA LINE_SE			; low byte only
-;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
-;	ld16 R0, buffer            ; output buffer
-;	JSR BCD2STR                ; convert BCD to string
-;	JSR acia_puts              ; print it
-;	
-;	JSR acia_put_newline
-;	RTS
+print_plotXY_SE:
+	LDA plotX
+	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+	ld16 R0, buffer            ; output buffer
+	JSR BCD2STR                ; convert BCD to string
+	JSR acia_puts              ; print it
+	LDA #','
+	JSR acia_putc
+	LDA plotY
+	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+	ld16 R0, buffer            ; output buffer
+	JSR BCD2STR                ; convert BCD to string
+	JSR acia_puts              ; print it
+
+	LDA #' '
+	JSR acia_putc
+
+	LDA LINE_SE			; low byte only
+	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+	ld16 R0, buffer            ; output buffer
+	JSR BCD2STR                ; convert BCD to string
+	JSR acia_puts              ; print it
+	
+	JSR acia_put_newline
+	RTS
 	
 ;------------------------------------
 ; Oct 2 & 6 : Xd +ve Yd +ve Xd < Yd
@@ -9271,7 +9271,7 @@ bres_xd_yd_pos_yd_big:
 ;------------------------------------
 
 ;------------------------------------
-; Oct 3 & 7 : Xd -ve Yd +ve Xd < Yd
+; Oct 3 & 7 : Xd +ve Yd -ve Xd > abs(Yd)
 bres_xd_pos_yd_neg_xd_big:	
 	; debug
 	ld16 R0,msg_bres_xd_pos_yd_neg_xd_big
@@ -9288,6 +9288,7 @@ bres_xd_pos_yd_neg_xd_big:
 	SEC
 	SBC  LINE_X1
 	STA  LINE_Xd
+
 	LDA  LINE_Y1
 	SEC
 	SBC  LINE_Y2
@@ -9311,12 +9312,13 @@ bres_xd_pos_yd_neg_xd_big:
 	add8To16To16 LINE_Xd, LINE_M, LINE_SE	; order of params is B + A -> C
 
 @loop1:
+	;jsr print_plotXY_SE
 	LDA LINE_SE+1		; check Hi byte to see if error is negative
-	BMI @over1
+	BPL @over1
 
-	; reset error and increase Y1
-	INC    plotY
-	add16  LINE_SE, ZP_TMP2, LINE_SE	; order of params is A + B -> C
+	; reset error and decrease Y1
+	DEC    plotY
+	add16  ZP_TMP2, LINE_SE, LINE_SE	; order of params is A + B -> C
 	
 @over1:
 	; plot 
@@ -9336,6 +9338,58 @@ bres_xd_pos_yd_neg_yd_big:
 	; debug
 	ld16 R0,msg_bres_xd_pos_yd_neg_yd_big
 	JSR  acia_puts
+	; Store X1,Y1 in plot coords
+	LDA  LINE_X1
+	STA  plotX	
+	LDA  LINE_Y1
+	STA  plotY
+
+	; Calc Xd Yd
+	LDA  LINE_X2
+	SEC
+	SBC  LINE_X1
+	STA  LINE_Xd
+
+	LDA  LINE_Y1
+	SEC
+	SBC  LINE_Y2
+	STA  LINE_Yd
+
+	; Calc slope 2*Xd
+	STZ  LINE_M+1
+	LDA  LINE_Xd
+	ASL			; 2*Xd
+	STA  LINE_M
+	ROL  LINE_M+1	; 16 byte multiply
+
+	; save 2*Yd for later
+	STZ  ZP_TMP2+1
+	LDA  LINE_Yd
+	ASL
+	STA  ZP_TMP2
+	ROL  ZP_TMP2+1
+	
+	; Start value of slope error = M+Yd
+	add8To16To16 LINE_Yd, LINE_M, LINE_SE	; order of params is B + A -> C
+
+@loop1:
+	;jsr print_plotXY_SE
+	LDA LINE_SE+1		; check Hi byte to see if error is negative
+	BPL @over1
+
+	; reset error and decrease Y1
+	INC    plotX
+	add16  ZP_TMP2, LINE_SE, LINE_SE	; order of params is A + B -> C
+	
+@over1:
+	; plot 
+	JSR  plot_calc_addr
+	; loop
+	sub16 LINE_SE, LINE_M, LINE_SE	; increase error
+	DEC  plotY
+	LDA  plotY
+	CMP  LINE_Y2
+	BNE  @loop1		; misses X2  
 	RTS
 ;------------------------------------
 
