@@ -3,21 +3,20 @@
 
 .setcpu "65C02"
 
-.include "macros.inc65"
-.include "zeropage.inc65"
-.include "acia.inc65"
-.include "io.inc65"
-.include "string.inc65"
-.include "video.inc65"
-.include "video_common.inc65"
-.include "video_registers.inc65"
-.include "sprite.inc65"
-.include "bcd.inc65"
-.include "kbdvia.inc65"
-.include "sound.inc65"
-.include "colors.inc65"
-.include "scancodes.inc65"
-.include "pckybd.inc65"
+.include "../macros.inc65"
+.include "../zeropage.inc65"
+.include "../acia.inc65"
+.include "../io.inc65"
+.include "../string.inc65"
+.include "../video.inc65"
+.include "../video_common.inc65"
+.include "../video_registers.inc65"
+.include "../sprite.inc65"
+.include "../bcd.inc65"
+.include "../sound.inc65"
+.include "../colors.inc65"
+.include "../scancodes.inc65"
+.include "../pckybd.inc65"
 
 .export pong
 .export PONG_IRQ
@@ -75,6 +74,7 @@ score_buffer:
 	.res 4,0
 
 .code
+        JMP pong
 
 ; Setup sprites for ball and bats
 pp_sprite_pattern_start:
@@ -325,10 +325,11 @@ gl_skip_update:
 ; Get input from ACIA
 get_input_serial:
 
-		LDA ACIA_STATUS
-		AND #ACIA_STATUS_RX_FULL
-		BEQ gi_done
-		LDA ACIA_DATA
+        LDA ACIA_CTRL_STATUS
+        AND #ACIA_STATUS_RDRF
+        BEQ gi_done
+        LDA ACIA_TX_RX
+
 gi_got_key:
 ;		CMP #'a'
 ;		BEQ gi_movelup

@@ -15,22 +15,17 @@
 ;
 .setcpu "65C02"
 
-;.include "macros.inc65"
-;.include "zeropage.inc65"
-;.include "acia.inc65"
-;.include "io.inc65"
-;.include "string.inc65"
+.include "../macros.inc65"
+.include "../zeropage.inc65"
+.include "../acia.inc65"
+.include "../io.inc65"
+.include "../string.inc65"
+.include "../acia.inc65"
 
 .export uchess2
 
-.import main
-
 ; 6551 I/O Port Addresses
 ;
-ACIADat	= 	$7F00
-ACIASta	=	$7F01
-ACIACmd	=	$7F02
-ACIACtl	=	$7F03
 ;
 ; page zero variables
 ;
@@ -82,10 +77,12 @@ temp    =       $FC
 ;
 ;		*=$1000			; load into RAM @ $1000-$15FF
 
+.code
+
 uchess2:
 		LDA     #$00		; REVERSE TOGGLE
 		STA     REV
-		;JSR     Init_6551
+		JSR     acia_init
 CHESS:   CLD             ; INITIALIZE
 		LDX	#$FF		; TWO STACKS
 		TXS	
@@ -139,7 +136,8 @@ NOGO:		CMP	#$0D	    ; [Enter]
 NOMV:		CMP     #$41		; [Q] ***Added to allow game exit***
 		BEQ     DONE		; quit the game, exit back to system.  
 		JMP	INPUT		; process move
-DONE:		JMP     main		; *** MUST set this to YOUR OS starting address
+DONE:
+		JMP     uchess2		; *** MUST set this to YOUR OS starting address
 ;		
 ;       THE ROUTINE JANUS DIRECTS THE
 ;       ANALYSIS BY DETERMINING WHAT
@@ -805,32 +803,19 @@ KIN:		LDA   	#'?'
 	    	AND   	#$4F	    ; MASK 0-7, AND ALPHA'S
 	    	RTS
 ;
-; 6551 I/O Support Routines
-;
-;
-Init_6551:      lda   #$1F	       ; 19.2K/8/1
-	       sta   ACIACtl	    ; control reg 
-	       lda   #$0B	       ; N parity/echo off/rx int off/ dtr active low
-	       sta   ACIACmd	    ; command reg 
-	       rts		      ; done
-;
-; input chr from ACIA1 (waiting)
-;
-syskin:	 lda   ACIASta	    ; Serial port status	     
-	       and   #$08	       ; is recvr full
-	       beq   syskin	     ; no char to get
-	       lda   ACIADat	    ; get chr
-	       RTS		      ;
-;
 ; output to OutPut Port
 ;
-syschout:       PHA		      ; save registers
-ACIA_Out1:      lda   ACIASta	    ; serial port status
-	       and   #$10	       ; is tx buffer empty
-	       beq   ACIA_Out1	  ; no
-	       PLA		      ; get chr
-	       sta   ACIADat	    ; put character to Port
+syschout:
+           PHA		      ; save registers
+	       JSR acia_putc
+           PLA
 	       RTS		      ; done
+
+syskin:
+        PHA
+        JSR acia_getc
+        PLA
+        RTS
 
 syshexout:      PHA		     ;  prints AA hex digits
 	       LSR		     ;  MOVE UPPER NIBBLE TO LOWER

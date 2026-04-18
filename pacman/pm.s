@@ -3,20 +3,19 @@
 
 .setcpu "65C02"
 
-.include "macros.inc65"
-.include "zeropage.inc65"
-.include "acia.inc65"
-.include "io.inc65"
-.include "string.inc65"
-.include "video.inc65"
-.include "video_common.inc65"
-.include "video_registers.inc65"
-.include "sprite.inc65"
-.include "bcd.inc65"
-.include "kbdvia.inc65"
-.include "scancodes.inc65"
-.include "pckybd.inc65"
-.include "colors.inc65"
+.include "../macros.inc65"
+.include "../zeropage.inc65"
+.include "../acia.inc65"
+.include "../io.inc65"
+.include "../string.inc65"
+.include "../video.inc65"
+.include "../video_common.inc65"
+.include "../video_registers.inc65"
+.include "../sprite.inc65"
+.include "../bcd.inc65"
+.include "../scancodes.inc65"
+.include "../pckybd.inc65"
+.include "../colors.inc65"
 
 .export pacman
 
@@ -118,7 +117,7 @@ PM_STR_BUFFER	= pm_local+8  ; 12 bytes
 IRQ_ADDR = $20A
 
 .code
-
+            JMP pacman
 ;------------------------------------------------------------------
 ; 1. Load chars to consecutive locations in 
 ; MODE 2 pattern table
