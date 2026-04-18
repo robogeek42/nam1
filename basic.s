@@ -7975,12 +7975,33 @@ plot_calc_addr:
 	ADC  #0
 	STA  TMP1+1
 	
-; debug Print addr
+;	LDA TMP1+1
+;	CMP #$18
+;	BCC plot_do_read
+;pca_print_plotXY:
+;	LDA plotX
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;	LDA #','
+;	JSR acia_putc
+;	LDA plotY
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;
+;	LDA #' '
+;	JSR acia_putc
+;
+;; debug Print addr
+;pca_printaddr:
 ;	ld16 R0,buffer
-;	LDA  ZP_TMP0+1
+;	LDA  TMP1+1
 ;	JSR  fmt_hex_string
 ;	ld16 R0,buffer + 2
-;	LDA  ZP_TMP0
+;	LDA  TMP1
 ;	JSR  fmt_hex_string
 ;	ld16 R0, buffer
 ;	jsr  acia_puts
@@ -7988,7 +8009,7 @@ plot_calc_addr:
 ; end debug
 
 plot_do_read:
-	; get current byte at this location
+	; get current byte at this location (Address in TMP1)
 	JSR  vdp_setaddr_pattern_table_read_m4
 	JSR  vdp_read
 	STA  TMPBYTE
@@ -8368,8 +8389,8 @@ SEND_CMD:
 	RTS
 sdcmd_end:	
 	; debug
-	ld16 R0,msg_vec_in_restore	
-	JSR acia_puts
+	;ld16 R0,msg_vec_in_restore	
+	;JSR acia_puts
 
 	LDA #<CHARin
 	STA VEC_IN
@@ -8394,8 +8415,8 @@ sdout_on:
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 
 	; debug
-	ld16 R0,msg_vec_out_sd	
-	JSR acia_puts
+	;ld16 R0,msg_vec_out_sd	
+	;JSR acia_puts
 
 	LDA #<SDWRITE 		; Set output vector to SDWRITE
 	STA VEC_OUT
@@ -8421,21 +8442,21 @@ sdout_off:
 	RTS
 
 ;------------------------------------------------------
-msg_vec_out_sd:
-.byte "VEC_OUT to SD",$0D,$0A,$00
-msg_vec_out_off:
-.byte "VEC_OUT off",$0D,$0A,$00
-msg_vec_out_restore:
-.byte "VEC_OUT restore",$0D,$0A,$00
-msg_vec_out_restore_m4:
-.byte "VEC_OUT restore m4",$0D,$0A,$00
-msg_vec_in_sd:
-.byte "VEC_IN from SD",$0D,$0A,$00
-msg_vec_in_restore:
-.byte "VEC_IN restore",$0D,$0A,$00
-msg_vec_in_send:
-.byte "VEC_IN SEND_CMD",$0D,$0A,$00
-msg_Restore: .byte "Restore",$0D,$0A,$00
+;msg_vec_out_sd:
+;.byte "VEC_OUT to SD",$0D,$0A,$00
+;msg_vec_out_off:
+;.byte "VEC_OUT off",$0D,$0A,$00
+;msg_vec_out_restore:
+;.byte "VEC_OUT restore",$0D,$0A,$00
+;msg_vec_out_restore_m4:
+;.byte "VEC_OUT restore m4",$0D,$0A,$00
+;msg_vec_in_sd:
+;.byte "VEC_IN from SD",$0D,$0A,$00
+;msg_vec_in_restore:
+;.byte "VEC_IN restore",$0D,$0A,$00
+;msg_vec_in_send:
+;.byte "VEC_IN SEND_CMD",$0D,$0A,$00
+;msg_Restore: .byte "Restore",$0D,$0A,$00
 
 
 ;------------------------------------------------------
@@ -8460,8 +8481,8 @@ LAB_SAVE:
 	STA OUT_LIST_SD		; flag LIST to output to SD card
 
 	; debug
-	ld16 R0,msg_vec_in_send	
-	JSR acia_puts
+	;ld16 R0,msg_vec_in_send	
+	;JSR acia_puts
 
 	; Send a LIST command
 	STZ ZP_TMP0				; string index
@@ -8512,10 +8533,10 @@ ll_over:
 	STA ccflag			; disable Ctrl-C or it will eat our chars
 
 	; debug
-	ld16 R0,msg_vec_in_sd	
-	JSR acia_puts
-	ld16 R0,msg_vec_out_off
-	JSR acia_puts
+	;ld16 R0,msg_vec_in_sd	
+	;JSR acia_puts
+	;ld16 R0,msg_vec_out_off
+	;JSR acia_puts
 	
 	; Set input vector to SDREAD and let it take over input
 	LDA #<SDREAD
@@ -8549,12 +8570,12 @@ SDREAD:
 
 load_eof:
 	; reset input vector
-	ld16 R0,msg_EOF
-	JSR acia_puts       ; debug
+	;ld16 R0,msg_EOF
+	;JSR acia_puts       ; debug
 
 	; debug
-	ld16 R0,msg_vec_in_restore	
-	JSR acia_puts
+	;ld16 R0,msg_vec_in_restore	
+	;JSR acia_puts
 
 	LDA #<CHARin		; restore normal input device
 	STA VEC_IN
@@ -8995,8 +9016,8 @@ reinstate_ouput_vector:
 	BEQ rov_m4
 
 	; debug
-	ld16 R0,msg_vec_out_restore	
-	JSR acia_puts
+	;ld16 R0,msg_vec_out_restore	
+	;JSR acia_puts
 
 	; Set output vector to standard CHARout
 	LDA #<CHARout
@@ -9007,8 +9028,8 @@ reinstate_ouput_vector:
 	RTS
 rov_m4:
 	; debug
-	ld16 R0,msg_vec_out_restore_m4
-	JSR acia_puts
+	;ld16 R0,msg_vec_out_restore_m4
+	;JSR acia_puts
 
 	; Set output vector to special MODE4 one
 	LDA #<CHARoutM4
@@ -9020,19 +9041,26 @@ rov_m4:
 
 ;-----------------------------------------------------------------
 ; LINE X1,Y1,X2,Y2
+
 LAB_LINE:
 	; X1
 	JSR  LAB_EVNM		; evaluate expression and check is numeric, else mismatch
 	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
 	LDA  Itempl			; Get value (X1)
 	STA  LINE_X1		; store
+	STZ  LINE_X1+1		; 16-bit but MAX 255
 	; ","
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
 	; Y1
 	JSR  LAB_EVNM
 	JSR  LAB_F2FX
 	LDA  Itempl			; Get value (Y1)
+	CMP #$BF			; Max Y = 191
+	BCC @check_y1
+	LDA #$BF			; truncate to max
+@check_y1:
 	STA  LINE_Y1
+	STZ  LINE_Y1+1		; 16-bit
 	; "," 
 	JSR  LAB_1C01
 	; X2
@@ -9040,13 +9068,19 @@ LAB_LINE:
 	JSR  LAB_F2FX
 	LDA  Itempl			; Get value (X2)
 	STA  LINE_X2
+	STZ  LINE_X2+1		; 16-bit but MAX 255
 	; "," 
 	JSR  LAB_1C01
 	; Y2
 	JSR  LAB_EVNM
 	JSR  LAB_F2FX
 	LDA  Itempl			; Get value (Y2)
+	CMP #$BF			; Max Y = 191
+	BCC @check_y2
+	LDA #$BF			; truncate to max
+@check_y2:
 	STA  LINE_Y2	
+	STZ  LINE_Y2+1		; 16-bit
 	
 	JMP bresenham
 
@@ -9070,49 +9104,40 @@ bresenham:
 
 bres_choose:
 	; Check if Yd is -ve
-	LDA  LINE_Y2
-	SEC
-	SBC  LINE_Y1
+	sub16 LINE_Y2, LINE_Y1, LINE_Yd	; order of params is A - B -> C
+	LDA  LINE_Yd+1
 	BMI  bres_choose_yd_neg
-	STA  LINE_Yd
 
 	; Yd is +ve, check if Xd is -ve
-	LDA  LINE_X2
-	SEC
-	SBC  LINE_X1
+	sub16 LINE_X2, LINE_X1, LINE_Xd	; order of params is A - B -> C
+	LDA  LINE_Xd+1
 	BMI  bres_choose_swap
-	STA  LINE_Xd
 
-	; Xd and Yd are both +ve
+	; Now Xd and Yd are both +ve
 	; Check if Xd is bigger
-	LDA  LINE_Xd
-	SEC 
-	SBC  LINE_Yd
+	sub16 LINE_Xd, LINE_Yd, ZP_TMP2	; order of params is A - B -> C
+	LDA  ZP_TMP2+1
 	BMI  jmp_bres_xd_yd_pos_yd_big
 	BRA  jmp_bres_xd_yd_pos_xd_big
 
 ; Yd is negative, check Xd
 bres_choose_yd_neg:
-	STA  LINE_Yd
 	; Check if Xd is also -ve
-	LDA  LINE_X2
-	SEC
-	SBC  LINE_X1
+	sub16 LINE_X2, LINE_X1, LINE_Xd	; order of params is A - B -> C
+	LDA  LINE_Xd+1
 	BMI  bres_choose_swap	; both are negative
-	STA  LINE_Xd
 
 	; Xd +ve, Yd -ve
 	; Check if Xd is bigger
-	LDA  LINE_Xd
-	CLC 
-	ADC  LINE_Yd
+	add16 LINE_Xd, LINE_Yd, ZP_TMP2	; order of params is A - B -> C
+	LDA  ZP_TMP2+1
 	BMI  jmp_bres_xd_pos_yd_neg_yd_big
 	JMP  jmp_bres_xd_pos_yd_neg_xd_big
 
 bres_choose_swap:
 	; debug
-	ld16 R0,msg_bres_choose_swap
-	JSR  acia_puts
+	;ld16 R0,msg_bres_choose_swap
+	;JSR  acia_puts
 	JSR  bres_swap_p1_p2
 	BRA  bres_choose	; do it again with points swapped
 
@@ -9127,6 +9152,7 @@ jmp_bres_xd_pos_yd_neg_yd_big:
 
 bres_swap_p1_p2:
 	; swap (X1,Y1) with (X2,Y2)
+	; MSB is zero
 	LDX LINE_X1
 	LDA LINE_X2
 	STA LINE_X1
@@ -9142,8 +9168,8 @@ RTS
 ; Should come in with correct Xd,Yd
 bres_xd_yd_pos_xd_big:	
 	; debug
-	ld16 R0,msg_bres_xd_yd_pos_xd_big
-	JSR  acia_puts
+	;ld16 R0,msg_bres_xd_yd_pos_xd_big
+	;JSR  acia_puts
 
 	; Store X1,Y1 in plot coords
 	LDA  LINE_X1
@@ -9194,38 +9220,38 @@ bres_xd_yd_pos_xd_big:
 	RTS
 ;------------------------------------
 
-print_plotXY_SE:
-	LDA plotX
-	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
-	ld16 R0, buffer            ; output buffer
-	JSR BCD2STR                ; convert BCD to string
-	JSR acia_puts              ; print it
-	LDA #','
-	JSR acia_putc
-	LDA plotY
-	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
-	ld16 R0, buffer            ; output buffer
-	JSR BCD2STR                ; convert BCD to string
-	JSR acia_puts              ; print it
-
-	LDA #' '
-	JSR acia_putc
-
-	LDA LINE_SE			; low byte only
-	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
-	ld16 R0, buffer            ; output buffer
-	JSR BCD2STR                ; convert BCD to string
-	JSR acia_puts              ; print it
-	
-	JSR acia_put_newline
-	RTS
+;print_plotXY_SE:
+;	LDA plotX
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;	LDA #','
+;	JSR acia_putc
+;	LDA plotY
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;
+;	LDA #' '
+;	JSR acia_putc
+;
+;	LDA LINE_SE			; low byte only
+;	JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+;	ld16 R0, buffer            ; output buffer
+;	JSR BCD2STR                ; convert BCD to string
+;	JSR acia_puts              ; print it
+;	
+;	JSR acia_put_newline
+;	RTS
 	
 ;------------------------------------
 ; Oct 2 & 6 : Xd +ve Yd +ve Xd < Yd
 bres_xd_yd_pos_yd_big:	
 	; debug
-	ld16 R0,msg_bres_xd_yd_pos_yd_big
-	JSR  acia_puts
+	;ld16 R0,msg_bres_xd_yd_pos_yd_big
+	;JSR  acia_puts
 
 	; Store X1,Y1 in plot coords
 	LDA  LINE_X1
@@ -9234,6 +9260,7 @@ bres_xd_yd_pos_yd_big:
 	STA  plotY
 
 	; Calc slope mult by 2*Xd
+	STZ  LINE_Xd+1
 	STZ  LINE_M+1
 	LDA  LINE_Xd
 	ASL			; 2*Xd
@@ -9254,13 +9281,14 @@ bres_xd_yd_pos_yd_big:
 	LDA LINE_SE+1		; check Hi byte to see if error is negative
 	BMI @over1
 
-	; reset error and increase Y1
+	; reset error and increase X1
 	INC    plotX
 	sub16  LINE_SE, ZP_TMP2, LINE_SE	; order of params is A - B -> C
 	
 @over1:
 	; plot 
 	JSR  plot_calc_addr
+	;JSR  print_plotXY_SE
 	; loop
 	add16 LINE_M, LINE_SE, LINE_SE	; increase error
 	INC  plotY
@@ -9274,8 +9302,8 @@ bres_xd_yd_pos_yd_big:
 ; Oct 3 & 7 : Xd +ve Yd -ve Xd > abs(Yd)
 bres_xd_pos_yd_neg_xd_big:	
 	; debug
-	ld16 R0,msg_bres_xd_pos_yd_neg_xd_big
-	JSR  acia_puts
+	;ld16 R0,msg_bres_xd_pos_yd_neg_xd_big
+	;JSR  acia_puts
 
 	; Store X1,Y1 in plot coords
 	LDA  LINE_X1
@@ -9336,8 +9364,9 @@ bres_xd_pos_yd_neg_xd_big:
 ; Oct 4 & 8 : Xd -ve Yd +ve Xd > Yd
 bres_xd_pos_yd_neg_yd_big:	
 	; debug
-	ld16 R0,msg_bres_xd_pos_yd_neg_yd_big
-	JSR  acia_puts
+	;ld16 R0,msg_bres_xd_pos_yd_neg_yd_big
+	;JSR  acia_puts
+
 	; Store X1,Y1 in plot coords
 	LDA  LINE_X1
 	STA  plotX	
@@ -9393,11 +9422,11 @@ bres_xd_pos_yd_neg_yd_big:
 	RTS
 ;------------------------------------
 
-msg_bres_xd_yd_pos_xd_big:      .byte "Oct1 Xd+ Yd+ Xd>Yd",$0d,$0a,$00
-msg_bres_xd_yd_pos_yd_big:      .byte "Oct2 Xd+ Yd+ Xd<Yd",$0d,$0a,$00
-msg_bres_xd_pos_yd_neg_xd_big:  .byte "Oct3 Xd+ Yd- Xd>Yd",$0d,$0a,$00
-msg_bres_xd_pos_yd_neg_yd_big:  .byte "Oct4 Xd+ Yd- Xd<Yd",$0d,$0a,$00
-msg_bres_choose_swap:           .byte "swap",$0d,$0a,$00
+;msg_bres_xd_yd_pos_xd_big:      .byte "Oct1 Xd+ Yd+ Xd>Yd",$0d,$0a,$00
+;msg_bres_xd_yd_pos_yd_big:      .byte "Oct2 Xd+ Yd+ Xd<Yd",$0d,$0a,$00
+;msg_bres_xd_pos_yd_neg_xd_big:  .byte "Oct3 Xd+ Yd- Xd>Yd",$0d,$0a,$00
+;msg_bres_xd_pos_yd_neg_yd_big:  .byte "Oct4 Xd+ Yd- Xd<Yd",$0d,$0a,$00
+;msg_bres_choose_swap:           .byte "swap",$0d,$0a,$00
 
 ;=================================================================
 ; system dependant i/o vectors

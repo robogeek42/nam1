@@ -63,12 +63,8 @@ sd_addr        = $E6        ; 4 SD Card byte address
 plotX   = $14		; Plot X or X1
 plotY   = $15		; Plot Y or X2
 
-LINE_X1 = $16
-LINE_Y1 = $17
-LINE_X2 = $18
-LINE_Y2 = $19
-LINE_Xd = $58
-LINE_Yd = $59
+LINE_Xd = $16
+LINE_Yd = $18
 
 LINE_M  = $40  ; 2 bytes : Bresenham slope
 LINE_SE = $42  ; 2 bytes : Bresenham slope error

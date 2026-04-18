@@ -53,6 +53,12 @@
 buffer:         .res BUFFER_LENGTH+1, 0
 basicvars:      .res 1,0
                 PAGECNT = basicvars+0
+bresenam_vars:  .res 8,0
+                LINE_X1 = bresenam_vars+0
+                LINE_Y1 = bresenam_vars+2
+                LINE_X2 = bresenam_vars+4
+                LINE_Y2 = bresenam_vars+6
+
 .code
 
 RES_vec:

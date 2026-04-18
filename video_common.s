@@ -51,7 +51,6 @@
 .bss
 VDP_REGS:   .res  8,0
 VDP_VARS:   .res  16,0
-buff:       .res 12,0
 
 .export VDP_REGS
 .export VDP_VARS
@@ -70,10 +69,6 @@ vdp_getstatus:   LDA VDP_RD_STATUS
 		 NOP
 		 LDA VDP_RD_STATUS
                  STA VDP_STATUS
-                 ;ld16 R0,buff
-                 ;JSR fmt_bin_string
-                 ;JSR acia_puts
-                 ;JSR acia_put_newline
 vgs_end:
                  RTS
 
@@ -82,6 +77,8 @@ vgs_end:
 ; Data is in Acc, Register number+$80 is in Y
 vdp_regwrite:   
                 STA VDP_WR_REG        ; Data
+                NOP
+                NOP
                 STY VDP_WR_REG        ; Register 80...87
                 RTS
 
@@ -90,17 +87,23 @@ vdp_regwrite:
 ; This should be followed by a series of writes to VDP_WR_VRAM
 vdp_set_addr_w: 
                 STY VDP_WR_REG      ; Address lo byte
+                NOP
                 AND #$3F
                 ORA #$40
                 STA VDP_WR_REG      ; Address hi byte
+                NOP
+                NOP
                 RTS
 ; 3. Read Address
 ; Set an address in VRAM. Low byte in Y, High byte in A
 ; This should be followed by a series of reads from VDP_RD_VRAM
 vdp_set_addr_r: 
                 STY VDP_WR_REG      ; Address lo byte
+                NOP
                 AND #$3F
                 STA VDP_WR_REG      ; Address hi byte
+                NOP
+                NOP
                 RTS
 ;----------------------------------------------------------------
 
@@ -169,13 +172,14 @@ vdp_setaddr_color_table_g2:
 ; VDP Write VRAM
 vdp_write:
                 STA VDP_WR_VRAM
+                NOP
                 RTS
 vdp_writex:
                 STX VDP_WR_VRAM
+                NOP
                 RTS
 ;----------------------------------------------------------------
 ; VDP Read VRAM
 vdp_read:
                 LDA VDP_RD_VRAM
-
                 RTS
