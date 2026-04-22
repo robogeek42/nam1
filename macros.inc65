@@ -71,12 +71,25 @@
             inc reg+1
 @_mlbl_done:
 .endmacro
+.macro inc16idx reg, idx
+            inc reg, idx
+            bne @_mlbl_done
+            inc reg+1, idx
+@_mlbl_done:
+.endmacro
 
 .macro dec16 reg
             lda reg
             bne @_mlbl_skip
             dec reg+1
 @_mlbl_skip: dec reg
+.endmacro
+
+.macro dec16idx reg,idx
+            lda reg,idx
+            bne @_mlbl_skip
+            dec reg+1,idx
+@_mlbl_skip: dec reg,idx
 .endmacro
 
 
@@ -109,6 +122,15 @@
 	adc #0
 	sta word+1
 .endmacro
+.macro add8To16idx val, word, idx
+	clc
+	lda word, idx
+	adc val
+	sta word, idx
+	lda word+1, idx
+	adc #0
+	sta word+1, idx
+.endmacro
 
 ; add a 8 bit value to a 16 bit word store result in a diff word
 ; destroys A
@@ -132,6 +154,15 @@
 	lda word+1
     sbc #0
 	sta word+1
+.endmacro
+.macro sub8From16idx val, word, idx
+    sec
+	lda word, idx
+    sbc val
+	sta word, idx
+	lda word+1, idx
+    sbc #0
+	sta word+1, idx
 .endmacro
 
 ; subtract a 8 bit value from a 16 bit word sore in another word

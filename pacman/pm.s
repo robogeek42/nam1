@@ -81,6 +81,11 @@ PM_ST_SPR2_X = pm_sprite_table+6
 PM_ST_SPR2_P = pm_sprite_table+7
 PM_ST_SPR2_C = pm_sprite_table+8
 
+G1_ST_SPR_Y = pm_sprite_table+5
+G1_ST_SPR_X = pm_sprite_table+6
+G1_ST_SPR_P = pm_sprite_table+7
+G1_ST_SPR_C = pm_sprite_table+8
+
 PM_ST_SPR3_Y = pm_sprite_table+9
 PM_ST_SPR3_X = pm_sprite_table+10
 PM_ST_SPR3_P = pm_sprite_table+11
@@ -241,9 +246,9 @@ pmdm_loop5: JSR vdp_write
 			STA PM_ST_SPR1_C
 
 			; Red Ghost
-			LDA #96
+			LDA #112
 			STA PM_ST_SPR2_X
-			LDA #88
+			LDA #72
 			STA PM_ST_SPR2_Y
 			LDA #9
 			STA PM_ST_SPR2_P
@@ -282,6 +287,19 @@ pmdm_loop5: JSR vdp_write
 			LDA #PM_DIR_L			  ; facing left
 			STA PM_DIR
 			JSR calc_pm_pos
+
+; Ghost 1 start (14,9) = (14+9*32)=302=$12E
+            LDA #14
+            STA G1_X
+            LDA #9
+            STA G1_Y
+			LDA #$2E
+			STA G1_NT_LO
+			LDA #$01
+			STA G1_NT_HI
+			LDA #PM_DIR_L			  ; facing left
+			STA G1_DIR
+
 
 ; Enable sprites
 			LDA PM_NUMPRITES		   ; enable sprites
@@ -348,6 +366,11 @@ pmih_save_old:
 ;	  
 game_loop:
 gl_dogame:
+			;JSR pm_get_input_serial
+.if .def(PS2K) || .def(VKEYB)
+			JSR pm_get_input_ps2k
+.endif
+
 			LDA PM_INTERRUPT		; check interrupt has happened
 			BNE gl_get_input
 			JMP game_loop
@@ -356,11 +379,6 @@ gl_get_input:
 			LDA #0
 			STA PM_INTERRUPT		; reset interrupt flag
 
-			JSR pm_get_input_serial
-
-.if .def(PS2K) || .def(VKEYB)
-			JSR pm_get_input_ps2k
-.endif
 			JSR get_pm_allowed
 			LDA #0
 			JSR get_ghost_allowed
@@ -1077,8 +1095,99 @@ get_ghost_allowed:
 ;------------------------------------------------------------------
 ;
 move_ghosts:
+            LDA #0
+            JSR gh_move_left
 			RTS
 
+gh_move_left:
+			ASL			; Ghost Number * 2
+			ASL         ; * 4
+            TAY
+			ASL 		; * 8
+			TAX
+			; if pos is at left of current square then move
+			; to next square of pos. Otherwise just move
+			LDA G1_ST_SPR_X,Y
+			AND #$07
+			BNE gml_decx		 ; not 0 (fully in square) so keep moving
+
+			; check allowed directions
+			LDA G1_ALLOWED,X
+			AND #PM_MAP_DIR_L_BIT
+			BEQ gml_skipx
+
+			; decrement Ghost pos (absolute)
+			dec16idx G1_NT_LO,X
+	gml_decx:
+			LDA G1_ST_SPR_X,Y
+            DEC
+			STA G1_ST_SPR_X,Y
+	gml_skipx:
+			RTS
+
+gh_move_right:
+			; if pos is at far right of current square then move
+			; to next square of pos. Otherwise just move
+			LDA G1_ST_SPR_X,Y
+			AND #$07
+			CMP #$07
+			BNE gml_incx		 ; not 7 so keep moving
+
+			; check allowed directions
+			LDA G1_ALLOWED,X
+			AND #PM_MAP_DIR_R_BIT
+			BEQ gml_skipx
+
+			; increment Ghost pos (absolute)
+			inc16idx G1_NT_LO,X
+	gml_incx:
+			LDA G1_ST_SPR_X,Y
+			INC
+			STA G1_ST_SPR_X,Y
+			RTS
+
+gh_move_up:
+			; if pos is at top of current square then move
+			; to next square of pos. Otherwise just move
+			LDA G1_ST_SPR_Y,Y
+			AND #$07
+			BNE gml_decy		 ; not 0 (fully in square) so keep moving
+
+			; check allowed directions
+			LDA G1_ALLOWED,X
+			AND #PM_MAP_DIR_U_BIT
+			BEQ gml_skipy
+
+			; subtract 32 from ghost pos (absolute)
+			sub8From16idx #32, G1_NT_LO, X
+	gml_decy:
+			LDA G1_ST_SPR_Y,Y
+			DEC
+			STA G1_ST_SPR_Y,Y
+    gml_skipy:
+			RTS
+
+gh_move_down:
+			; if pos is at bottom right of current square then move
+			; to next square of pos. Otherwise just move
+			LDA G1_ST_SPR_Y,Y
+			AND #$07
+			CMP #$07
+			BNE gml_incy		 ; not 7 so keep moving
+
+			; check allowed directions
+			LDA G1_ALLOWED,X
+			AND #PM_MAP_DIR_D_BIT
+			BEQ gml_skipy
+
+			; add 32 to PM pos (absolute)
+			add8To16idx #32, PM_NT_LO, X
+	gml_incy:
+			LDA G1_ST_SPR_Y,Y
+			INC
+			STA G1_ST_SPR_Y,Y
+			RTS
+ 
 ;-------------------------------------------------------
 
 quit_message:
