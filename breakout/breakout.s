@@ -5,19 +5,12 @@
 
 .include "../macros.inc65"
 .include "../zeropage.inc65"
-.include "../acia.inc65"
 .include "../io.inc65"
-.include "../string.inc65"
-.include "../video.inc65"
-.include "../video_common.inc65"
+.include "../video_vars.inc65"
 .include "../video_registers.inc65"
-.include "../sprite.inc65"
-.include "../bcd.inc65"
-.include "../kbdvia.inc65"
-.include "../sound.inc65"
 .include "../colors.inc65"
 .include "../scancodes.inc65"
-.include "../pckybd.inc65"
+.include "../firmware.symbols"
 
 .export breakout
 .export BOUT_IRQ
@@ -38,7 +31,7 @@ bo_interval	= bout_vars+12  ; number of 1/60sec intervals between updating scree
 IRQ_EVENT   = bout_vars+13
 
 br_c0_vol	= bout_vars+20;
-strbuf		= bout_vars+21;
+strbuf2		= bout_vars+21;
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -758,13 +751,13 @@ sound_score:
 .endif
 
 print_ball_xy:
-;		ld16 R0, strbuf
+;		ld16 R0, strbuf2
 ;		lda ballx
 ;		jsr fmt_hex_string
 ;		jsr acia_puts
 ;		lda #' '
 ;		jsr acia_putc
-;		ld16 R0, strbuf
+;		ld16 R0, strbuf2
 ;		lda bally
 ;		jsr fmt_hex_string
 ;		jsr acia_puts

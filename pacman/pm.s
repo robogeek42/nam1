@@ -4,20 +4,13 @@
 .setcpu "65C02"
 
 .include "../macros.inc65"
-.include "../zeropage.inc65"
-.include "../acia.inc65"
 .include "../io.inc65"
-.include "../string.inc65"
-.include "../video.inc65"
-.include "../video_common.inc65"
-.include "../video_registers.inc65"
-.include "../sprite.inc65"
-.include "../bcd.inc65"
+.include "../zeropage.inc65"
+.include "../video_vars.inc65"
 .include "../scancodes.inc65"
-.include "../pckybd.inc65"
 .include "../colors.inc65"
-
-.export pacman
+.include "../video_registers.inc65"
+.include "../firmware.symbols"
 
 ; pacman vars in basic program area
 pm_vars = $7000

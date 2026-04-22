@@ -5,18 +5,12 @@
 
 .include "../macros.inc65"
 .include "../zeropage.inc65"
-.include "../acia.inc65"
 .include "../io.inc65"
-.include "../string.inc65"
-.include "../video.inc65"
-.include "../video_common.inc65"
+.include "../video_vars.inc65"
 .include "../video_registers.inc65"
-.include "../sprite.inc65"
-.include "../bcd.inc65"
-.include "../sound.inc65"
 .include "../colors.inc65"
 .include "../scancodes.inc65"
-.include "../pckybd.inc65"
+.include "../firmware.symbols"
 
 .export pong
 .export PONG_IRQ
@@ -46,7 +40,7 @@ pp_bsy_neg = pong_vars+18	  ; negative value of current ball speed in y
 pp_c0_vol	= pong_vars + 20;
 pp_collision = pong_vars + 21
 pp_coll_cnt  = pong_vars + 22
-strbuf	   = pong_vars + 23;
+pongbuff	   = pong_vars + 23;
 
 BALLSPEEDX = $02			; starting ball speeds
 BALLSPEEDXNEG = $FE
@@ -363,7 +357,7 @@ gi_check_plus:
 		INC pp_interval
 
 gi_print_interval:
-		ld16 R0,strbuf
+		ld16 R0,pongbuff
 		LDA pp_interval
 		JSR fmt_hex_string
 		JSR acia_puts
