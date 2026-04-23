@@ -1095,8 +1095,16 @@ get_ghost_allowed:
 ;------------------------------------------------------------------
 ;
 move_ghosts:
+			LDA GHOST_IRQCOUNT				 ; update every N ticks
+			AND #$03						; N=2 
+            CMP #$02
+			BNE gh_done
             LDA #0
-            JSR gh_move_left
+            JSR gh_move_right
+gh_done:
+            LDA GHOST_IRQCOUNT
+            ORA #$FC
+            STA GHOST_IRQCOUNT
 			RTS
 
 gh_move_left:
@@ -1140,7 +1148,16 @@ gh_move_right:
 
 			; increment Ghost pos (absolute)
 			inc16idx G1_NT_LO,X
+			LDA G1_ST_SPR_X,Y
+			INC
+			STA G1_ST_SPR_X,Y
+            RTS
 	gml_incx:
+			; check allowed directions
+			LDA G1_ALLOWED,X
+			AND #PM_MAP_DIR_R_BIT
+			BEQ gml_skipx
+
 			LDA G1_ST_SPR_X,Y
 			INC
 			STA G1_ST_SPR_X,Y
@@ -1182,7 +1199,15 @@ gh_move_down:
 
 			; add 32 to PM pos (absolute)
 			add8To16idx #32, PM_NT_LO, X
+			LDA G1_ST_SPR_Y,Y
+			INC
+			STA G1_ST_SPR_Y,Y
+            RTS
 	gml_incy:
+			; check allowed directions
+			LDA G1_ALLOWED,X
+			AND #PM_MAP_DIR_D_BIT
+			BEQ gml_skipy
 			LDA G1_ST_SPR_Y,Y
 			INC
 			STA G1_ST_SPR_Y,Y
