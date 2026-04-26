@@ -422,13 +422,13 @@ gl_do_update:
 
 			LDA PM_ST_SPR1_X
 			AND #$04				; 0-3, in square, 4-7 in square to right
-			BNE gl_update_pm		; not in square
+			BNE gl_update_ghost_dir		; not in square
 			BRA gl_do_insquare
 
 gl_check_vert:
 			LDA PM_ST_SPR1_Y
 			AND #$04				; 0-3, in square, 4-7 in square below
-			BNE gl_update_pm		; not in square
+			BNE gl_update_ghost_dir		; not in square
 			
 gl_do_insquare:
 			JSR pm_read_nametable
@@ -437,7 +437,7 @@ gl_do_insquare:
 			CMP #29
 			BEQ gl_is_pill
 			
-			JMP gl_update_pm
+			JMP gl_update_ghost_dir
 
 gl_is_dot:
 			; dot = add 10 to score
@@ -455,7 +455,43 @@ gl_update_score:
 			; write to name table - space
 			JSR pm_write_nametable
 
-gl_update_pm:
+gl_update_ghost_dir:
+            ; check if ghost is fully in square and make a turn decision
+            LDA #0
+			ASL			; Ghost Number * 2
+			ASL         ; * 4
+            TAY         ; Y is index into sprite table
+			ASL 		; * 8
+            TAX         ; X is index into ghost data table
+
+            ; check if fully in square
+			LDA G1_DIR,X			; check depends on direction of movement U/D or L/R
+			CMP #PM_DIR_D			;
+			BCS gl_check_gh_vert	; >= Down = Down/Up
+
+			LDA G1_ST_SPR_X,Y
+            AND #$07
+			CMP #$01				; 
+            BEQ gl_do_ghost_insquare 
+			CMP #$00				; 
+            BEQ gl_do_ghost_insquare
+            BRA gl_update_sprites   ; not in square
+
+gl_check_gh_vert:
+            LDA G1_ST_SPR_Y,Y
+            AND #$07
+			CMP #$01				; 
+            BEQ gl_do_ghost_insquare
+			CMP #$00				; 
+            BEQ gl_do_ghost_insquare
+			BRA gl_update_sprites	; not in square
+
+gl_do_ghost_insquare:
+            LDA #0
+            JSR ghost_turn_decision
+
+
+gl_update_sprites:
 			; update the sprite animations based on PM_DIR and tick number
 			JSR pm_update_pm_sprite
 			JSR pm_update_ghost_sprite
@@ -1115,9 +1151,6 @@ move_ghosts:
 			ASL 		; * 8
             TAX         ; X is index into ghost data table
             
-            LDA #0
-            JSR ghost_turn_decision
-
             LDA G1_DIR,X
 			CMP #PM_DIR_R
 			BEQ gh_move_right
@@ -1346,6 +1379,23 @@ ghost_is_in_corridor:
             BEQ giic_done
             CLC
 giic_done:
+            pla
+            RTS 
+
+;-------------------------------------------------------
+; Check if ghost N (Acc) can continue in dir they are going in
+;    expect X=index into ghost table 
+;           Y=index into sprite table
+;           A=ghost num
+;    return C=set if can continue
+;   - direction number (0=L,1=R,2=U,3=D)
+ghost_can_move_in_curr_dir:
+            pha
+            LDA G1_ALLOWED,X
+            CMP G1_DIR,X
+            BEQ gcmicd_done
+            CLC
+gcmicd_done:
             pla
             RTS 
 
