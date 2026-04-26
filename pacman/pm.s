@@ -109,7 +109,9 @@ PM_INTERRUPT	= pm_local+3
 GHOST_IRQCOUNT	= pm_local+4
 UPDATE_FLAG		= pm_local+5  ; flag 1 = update sprites
 PM_SCORE		= pm_local+6  ; 2 bytes
-PM_STR_BUFFER	= pm_local+8  ; 12 bytes
+GH_POSS         = pm_local+8
+PM_SPARE_VAR    = pm_local+9
+PM_STR_BUFFER	= pm_local+10  ; 12 bytes
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -312,6 +314,9 @@ pmdm_loop5: JSR vdp_write
 			STZ PM_SCORE
 			STZ PM_SCORE+1
 			JSR pm_draw_score
+
+            LDA #PM_DIR_L
+            STA pm_input_dir
 
 .if .def(PS2K) || .def(VKEYB)
 ; init keyboard
@@ -1066,6 +1071,7 @@ get_ghost_allowed:
 			ASL
 			ASL 		; * 8
 			TAX
+            JMP gga_readmap
 		; check special
 			LDA G1_NT_HI,X
 			CMP #1
@@ -1093,26 +1099,44 @@ get_ghost_allowed:
 			RTS
 
 ;------------------------------------------------------------------
+; Move Ghosts Choose direction when they get to a junction
+;   - direction number (0=L,1=R,2=U,3=D)
+;   G1 Red : Move in direction of pacman
 ;
 move_ghosts:
-			LDA GHOST_IRQCOUNT				 ; update every N ticks
-			AND #$03						; N=2 
-            CMP #$02
+			LDA GHOST_IRQCOUNT			; update every N ticks
+			AND #$03					; 
+            CMP #$02                    ; every N=3 ticks
 			BNE gh_done
-            LDA #0
-            JSR gh_move_right
-gh_done:
-            LDA GHOST_IRQCOUNT
-            ORA #$FC
-            STA GHOST_IRQCOUNT
-			RTS
-
-gh_move_left:
+            LDA #0                      ; G1
 			ASL			; Ghost Number * 2
 			ASL         ; * 4
-            TAY
+            TAY         ; Y is index into sprite table
 			ASL 		; * 8
-			TAX
+            TAX         ; X is index into ghost data table
+            
+            LDA #0
+            JSR ghost_turn_decision
+
+            LDA G1_DIR,X
+			CMP #PM_DIR_R
+			BEQ gh_move_right
+			CMP #PM_DIR_L
+			BEQ gh_move_left
+			CMP #PM_DIR_U
+			BEQ gh_move_up
+			CMP #PM_DIR_D
+			BEQ gh_move_down
+
+            LDA GHOST_IRQCOUNT
+            AND #$FC                    ; zero out the count so it goes 0,1,2,0
+            STA GHOST_IRQCOUNT
+gh_done:
+			RTS
+gh_move_down:
+    JMP gh_move_down_
+
+gh_move_left:
 			; if pos is at left of current square then move
 			; to next square of pos. Otherwise just move
 			LDA G1_ST_SPR_X,Y
@@ -1184,7 +1208,7 @@ gh_move_up:
     gml_skipy:
 			RTS
 
-gh_move_down:
+gh_move_down_:
 			; if pos is at bottom right of current square then move
 			; to next square of pos. Otherwise just move
 			LDA G1_ST_SPR_Y,Y
@@ -1198,7 +1222,7 @@ gh_move_down:
 			BEQ gml_skipy
 
 			; add 32 to PM pos (absolute)
-			add8To16idx #32, PM_NT_LO, X
+			add8To16idx #32, G1_NT_LO, X
 			LDA G1_ST_SPR_Y,Y
 			INC
 			STA G1_ST_SPR_Y,Y
@@ -1213,6 +1237,118 @@ gh_move_down:
 			STA G1_ST_SPR_Y,Y
 			RTS
  
+;-------------------------------------------------------
+; Make ghost turn decision 
+;   if not in_corridor change direction
+ghost_turn_decision:
+            phaxy
+            STZ GH_POSS
+            LDA #0          ; G1
+            JSR ghost_is_in_corridor
+            BCS gtd_done
+            ; find which direction PM is from us - GH_POSS
+            JSR gtd_check_lr
+            JSR gtd_check_ud
+            
+pha
+ld16 R0, PM_STR_BUFFER
+LDA G1_ALLOWED, X
+jsr fmt_hex_string
+jsr acia_puts
+lda #' '
+jsr acia_putc
+LDA GH_POSS
+jsr fmt_hex_string
+jsr acia_puts
+jsr acia_put_newline
+pla
+
+            ; go through allowed directions
+            ; turn in direction if it is one of the possibilities
+            LDA G1_ALLOWED, X
+            AND GH_POSS
+            CMP #PM_MAP_DIR_L_BIT
+            BNE gtd_next1
+            LDA #PM_DIR_L
+            STA G1_DIR, X
+gtd_done:
+            plaxy
+            RTS
+gtd_next1:
+            CMP #PM_MAP_DIR_R_BIT
+            BNE gtd_next2
+            LDA #PM_DIR_R
+            STA G1_DIR, X
+            JMP gtd_done
+gtd_next2:
+            CMP #PM_MAP_DIR_U_BIT
+            BNE gtd_next3
+            LDA #PM_DIR_U
+            STA G1_DIR, X
+            JMP gtd_done
+gtd_next3:
+            CMP #PM_MAP_DIR_D_BIT
+            BNE gtd_next4
+            LDA #PM_DIR_D
+            STA G1_DIR, X
+            JMP gtd_done
+
+gtd_next4:
+            LDA #0
+            STA G1_DIR,X
+            JMP gtd_done
+
+gtd_check_lr:
+            LDA PM_ST_SPR1_X
+            CMP G1_ST_SPR_X, X
+            BCC gtd_pm_to_left
+            ; right
+            LDA #PM_MAP_DIR_R_BIT
+            TSB GH_POSS
+            RTS
+gtd_pm_to_left:
+            ; left
+            LDA #PM_MAP_DIR_L_BIT
+            TSB GH_POSS
+            RTS
+gtd_check_ud:
+            LDA PM_ST_SPR1_Y
+            CMP G1_ST_SPR_Y, X
+            BCC gtd_pm_to_up
+            ; down
+            LDA #PM_MAP_DIR_D_BIT
+            TSB GH_POSS
+            RTS
+gtd_pm_to_up:
+            ; up
+            LDA #PM_MAP_DIR_U_BIT
+            TSB GH_POSS
+            RTS
+
+;-------------------------------------------------------
+; Check if ghost N (Acc) is in a corridor
+; check directions other than move dir and opposite
+;    expect X=index into ghost table 
+;           Y=index into sprite table
+;           A=ghost num
+;    return C=set if in corridor
+;   - direction number (0=L,1=R,2=U,3=D)
+;   - corridors = 0011=$03 1100=$0C
+ghost_is_in_corridor:
+            ;phaxy
+            ;JSR get_ghost_allowed
+            ;plaxy
+            pha
+            LDA G1_ALLOWED,X
+            CMP #$03
+            BEQ giic_done
+            CMP #$0C
+            BEQ giic_done
+            CLC
+giic_done:
+            pla
+            RTS 
+
 ;-------------------------------------------------------
 
 quit_message:
