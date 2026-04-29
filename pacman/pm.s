@@ -1137,6 +1137,10 @@ get_ghost_allowed:
 ;------------------------------------------------------------------
 ; Move Ghosts Choose direction when they get to a junction
 ;   - direction number (0=L,1=R,2=U,3=D)
+;   - bits   3  2  1  0
+;            U  D  L  R
+;            8  4  2  1 #PM_MAP_DIR_x_BIT
+;
 ;   G1 Red : Move in direction of pacman
 ;
 move_ghosts:
@@ -1277,14 +1281,48 @@ ghost_turn_decision:
             phaxy
             STZ GH_POSS
             LDA #0          ; G1
-            JSR ghost_is_in_corridor
-            BCS gtd_done
+            ;JSR ghost_is_in_corridor
+            ;BCS gtd_done
             ; find which direction PM is from us - GH_POSS
             JSR gtd_check_lr
             JSR gtd_check_ud
+
+            ; AND with map directions (G1_ALLOWED)
+            LDA GH_POSS
+            AND G1_ALLOWED,X
+            STA TMP0            ; POSS & ALLOWED
+
+            ; remove reverse direction (can't just turn in middle of move)
+            ; first get opposite of current dir
+            ; 0->1 2->3 (inc) 1->0 3->2 (dec)
+            LDA G1_DIR,X
+            STA TMP0+1
+            CMP #PM_DIR_R
+            BEQ @inc_dir
+            CMP #PM_DIR_D
+            BEQ @inc_dir
+
+            DEC TMP0+1
+            JMP gtd_reverse_next
+@inc_dir:
+            INC TMP0+1
+
+            ; TMP0+1 holds reverse dir
+gtd_reverse_next:
+            ; get NOT reverse dir - put in TMP0
+            LDA TMP0+1
+            EOR #$FF
+            AND TMP0        ; POSS & ALLOWED
+            STA TMP0        ; TMP0 now hold all possibilities
+            
             
 pha
 ld16 R0, PM_STR_BUFFER
+LDA G1_DIR, X
+jsr fmt_hex_string
+jsr acia_puts
+lda #' '
+jsr acia_putc
 LDA G1_ALLOWED, X
 jsr fmt_hex_string
 jsr acia_puts
@@ -1293,47 +1331,73 @@ jsr acia_putc
 LDA GH_POSS
 jsr fmt_hex_string
 jsr acia_puts
-jsr acia_put_newline
+lda #' '
+jsr acia_putc
+LDA TMP0
+jsr fmt_hex_string
+jsr acia_puts
+;jsr acia_put_newline
 pla
 
-            ; go through allowed directions
-            ; turn in direction if it is one of the possibilities
-            LDA G1_ALLOWED, X
-            AND GH_POSS
-            CMP #PM_MAP_DIR_L_BIT
-            BNE gtd_next1
-            LDA #PM_DIR_L
-            STA G1_DIR, X
+            ; go through remaining directions
+            ; if DIR is in there continue
+            LDA TMP0
+            AND G1_DIR,X
+            BNE gtd_choose_dir  ; choose one of the remaining dirs
+
 gtd_done:
+
+lda #' '
+jsr acia_putc
+LDA G1_DIR, X
+jsr fmt_hex_string
+jsr acia_puts
+jsr acia_put_newline
+
             plaxy
             RTS
-gtd_next1:
-            CMP #PM_MAP_DIR_R_BIT
-            BNE gtd_next2
-            LDA #PM_DIR_R
-            STA G1_DIR, X
+
+gtd_choose_dir:
+            LDA TMP0
+            CMP #PM_MAP_DIR_L_BIT
+            BEQ gtd_next1
+            LDA #PM_DIR_L
+            STA G1_DIR,X
             JMP gtd_done
+
+gtd_next1:
+            LDA TMP0
+            AND #PM_MAP_DIR_R_BIT
+            BEQ gtd_next2
+            LDA #PM_DIR_R
+            STA G1_DIR,X
+            JMP gtd_done
+
 gtd_next2:
-            CMP #PM_MAP_DIR_U_BIT
-            BNE gtd_next3
+            LDA TMP0
+            AND #PM_MAP_DIR_U_BIT
+            BEQ gtd_next3
             LDA #PM_DIR_U
-            STA G1_DIR, X
+            STA G1_DIR,X
             JMP gtd_done
 gtd_next3:
-            CMP #PM_MAP_DIR_D_BIT
-            BNE gtd_next4
+            LDA TMP0
+            AND #PM_MAP_DIR_D_BIT
+            BEQ gtd_next4
             LDA #PM_DIR_D
-            STA G1_DIR, X
+            STA G1_DIR,X
             JMP gtd_done
 
 gtd_next4:
-            LDA #0
-            STA G1_DIR,X
+            ; should never be here ...
+lda #'?'
+jsr acia_putc
+
             JMP gtd_done
 
 gtd_check_lr:
             LDA PM_ST_SPR1_X
-            CMP G1_ST_SPR_X, X
+            CMP G1_ST_SPR_X, Y
             BCC gtd_pm_to_left
             ; right
             LDA #PM_MAP_DIR_R_BIT
@@ -1346,7 +1410,7 @@ gtd_pm_to_left:
             RTS
 gtd_check_ud:
             LDA PM_ST_SPR1_Y
-            CMP G1_ST_SPR_Y, X
+            CMP G1_ST_SPR_Y, Y
             BCC gtd_pm_to_up
             ; down
             LDA #PM_MAP_DIR_D_BIT
