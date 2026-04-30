@@ -39,6 +39,7 @@ G1_NT_LO	= g1_info+3
 G1_NT_HI	= g1_info+4
 G1_ALLOWED	= g1_info+5
 G1_MODE		= g1_info+6   ; Mode (0=norm 1=scared)
+G1_DIR_BITS = g1_info+7
 
 g2_info		= g1_info+8
 ; Ghost 2
@@ -49,6 +50,7 @@ G2_NT_LO	= g2_info+3
 G2_NT_HI	= g2_info+4
 G2_ALLOWED	= g2_info+5
 G2_MODE		= g2_info+6   ; Mode (0=norm 1=scared)
+G2_DIR_BITS = g2_info+7
 
 g3_info		= g2_info+8
 ; Ghost 3
@@ -59,6 +61,7 @@ G3_NT_LO	= g3_info+3
 G3_NT_HI	= g3_info+4
 G3_ALLOWED	= g3_info+5
 G3_MODE		= g3_info+6   ; Mode (0=norm 1=scared)
+G3_DIR_BITS = g3_info+7
 
 ; only 3 for now ...
 pm_positions_end = g3_info+7
@@ -110,8 +113,9 @@ GHOST_IRQCOUNT	= pm_local+4
 UPDATE_FLAG		= pm_local+5  ; flag 1 = update sprites
 PM_SCORE		= pm_local+6  ; 2 bytes
 GH_POSS         = pm_local+8
-PM_SPARE_VAR    = pm_local+9
-PM_STR_BUFFER	= pm_local+10  ; 12 bytes
+GH_AVAIL        = pm_local+9
+GH_REVERSE      = pm_local+10
+PM_STR_BUFFER	= pm_local+11  ; 12 bytes
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -301,6 +305,8 @@ pmdm_loop5: JSR vdp_write
 			STA G1_NT_HI
 			LDA #PM_DIR_L			  ; facing left
 			STA G1_DIR
+            LDA #PM_MAP_DIR_L_BIT
+            STA G1_DIR_BITS
 
 
 ; Enable sprites
@@ -1136,7 +1142,7 @@ get_ghost_allowed:
 
 ;------------------------------------------------------------------
 ; Move Ghosts Choose direction when they get to a junction
-;   - direction number (0=L,1=R,2=U,3=D)
+;   - direction number (0=R,1=L,2=D,3=U)
 ;   - bits   3  2  1  0
 ;            U  D  L  R
 ;            8  4  2  1 #PM_MAP_DIR_x_BIT
@@ -1273,119 +1279,236 @@ gh_move_down_:
 			INC
 			STA G1_ST_SPR_Y,Y
 			RTS
- 
+
+; take direction in numeric (0=R,1=L,2=D,3=U) in Acc
+; return direction in bitfield (R=$1 L=$2 D=$4 U=$8) in Acc
+convert_dir_to_bits:
+            ; convert G1_DIR to bit representation
+            PHY
+            TAY         ; numeric direction in Y
+            LDA #1 
+            CPY #0
+            BEQ @over   ; 0 = 0001
+@loop:
+            ASL
+            DEY
+            BNE @loop
+@over:
+            PLY
+            RTS
+
+; print Acc representing dir bits as chars
+dbg_pmis: .byte "PM is ",$00
+print_dir_bits:
+    phaxy
+    PHA
+    ld16 R0, PM_STR_BUFFER
+    JSR fmt_hex_string
+    JSR acia_puts
+    LDA #':'
+    JSR acia_putc
+
+    PLA
+    PHA
+    AND #PM_MAP_DIR_U_BIT
+    BEQ @ov1
+    LDA #'U'
+    JSR acia_putc
+@ov1:
+    PLA
+    PHA
+    AND #PM_MAP_DIR_D_BIT
+    BEQ @ov2
+    LDA #'D'
+    JSR acia_putc
+@ov2:
+    PLA
+    PHA
+    AND #PM_MAP_DIR_L_BIT
+    BEQ @ov3
+    LDA #'L'
+    JSR acia_putc
+@ov3:
+    PLA
+    PHA
+    AND #PM_MAP_DIR_R_BIT
+    BEQ @dn
+    LDA #'R'
+    JSR acia_putc
+@dn:
+    LDA #' '
+    JSR acia_putc
+    PLA
+    plaxy
+    RTS
+
+dbg_directions: .byte "RLDU----",$00
+print_dir:
+    PHX
+    PHY
+    PHA
+    TAX
+    LDA dbg_directions,X
+    JSR acia_putc
+    LDA #' '
+    JSR acia_putc
+    PLA
+    PLY
+    PLX
+    RTS
+
 ;-------------------------------------------------------
 ; Make ghost turn decision 
-;   if not in_corridor change direction
 ghost_turn_decision:
             phaxy
             STZ GH_POSS
             LDA #0          ; G1
-            ;JSR ghost_is_in_corridor
-            ;BCS gtd_done
+            JSR ghost_is_in_corridor
+            BCC gtd_continue1
+            plaxy
+            RTS
+gtd_continue1:
             ; find which direction PM is from us - GH_POSS
             JSR gtd_check_lr
             JSR gtd_check_ud
 
+pha
+lda #'D'
+jsr acia_putc
+lda #':'
+jsr acia_putc
+LDA G1_DIR,X
+JSR print_dir
+
+lda #'P'
+jsr acia_putc
+lda #':'
+jsr acia_putc
+LDA GH_POSS
+JSR print_dir_bits
+
+lda #'A'
+jsr acia_putc
+lda #':'
+jsr acia_putc
+LDA G1_ALLOWED, X
+JSR print_dir_bits
+pla
+
             ; AND with map directions (G1_ALLOWED)
             LDA GH_POSS
             AND G1_ALLOWED,X
-            STA TMP0            ; POSS & ALLOWED
+            STA GH_AVAIL            ; POSS & ALLOWED
 
             ; remove reverse direction (can't just turn in middle of move)
             ; first get opposite of current dir
             ; 0->1 2->3 (inc) 1->0 3->2 (dec)
             LDA G1_DIR,X
-            STA TMP0+1
+            STA GH_REVERSE
             CMP #PM_DIR_R
             BEQ @inc_dir
             CMP #PM_DIR_D
             BEQ @inc_dir
 
-            DEC TMP0+1
+            DEC GH_REVERSE
             JMP gtd_reverse_next
 @inc_dir:
-            INC TMP0+1
+            INC GH_REVERSE
 
-            ; TMP0+1 holds reverse dir
+            ; GH_REVERSE holds reverse dir
 gtd_reverse_next:
-            ; get NOT reverse dir - put in TMP0
-            LDA TMP0+1
-            EOR #$FF
-            AND TMP0        ; POSS & ALLOWED
-            STA TMP0        ; TMP0 now hold all possibilities
-            
-            
+            ; get NOT reverse dir
+            LDA GH_REVERSE
 pha
-ld16 R0, PM_STR_BUFFER
-LDA G1_DIR, X
-jsr fmt_hex_string
-jsr acia_puts
-lda #' '
+lda #'r'
 jsr acia_putc
-LDA G1_ALLOWED, X
-jsr fmt_hex_string
-jsr acia_puts
-lda #' '
+lda #':'
 jsr acia_putc
-LDA GH_POSS
-jsr fmt_hex_string
-jsr acia_puts
-lda #' '
+LDA GH_REVERSE
+JSR print_dir
+lda #'='
 jsr acia_putc
-LDA TMP0
-jsr fmt_hex_string
-jsr acia_puts
-;jsr acia_put_newline
+pla
+            JSR convert_dir_to_bits
+JSR print_dir_bits
+            EOR #$FF
+
+            ; remove from POSS & ALLOWED
+            AND GH_AVAIL        ; POSS & ALLOWED
+            STA GH_AVAIL        ; GH_AVAIL now hold all possibilities
+            
+pha            
+lda #'v'
+jsr acia_putc
+lda #':'
+jsr acia_putc
+LDA GH_AVAIL
+jsr print_dir_bits
 pla
 
             ; go through remaining directions
             ; if DIR is in there continue
-            LDA TMP0
-            AND G1_DIR,X
-            BNE gtd_choose_dir  ; choose one of the remaining dirs
+            LDA GH_AVAIL         ; all allowed possibilities except reverse
+            AND G1_DIR_BITS,X
+            BEQ gtd_choose_dir  ; choose one of the remaining dirs
+            ; otherwise continue
 
 gtd_done:
 
-lda #' '
+pha
+lda #'F'
 jsr acia_putc
-LDA G1_DIR, X
-jsr fmt_hex_string
-jsr acia_puts
+lda #':'
+jsr acia_putc
+LDA G1_DIR,X
+JSR print_dir
 jsr acia_put_newline
+pla
 
             plaxy
             RTS
 
 gtd_choose_dir:
-            LDA TMP0
-            CMP #PM_MAP_DIR_L_BIT
+            LDA GH_AVAIL
+            BNE gtd_choose_dir2     ; no available dirs, just go any way
+            LDA G1_ALLOWED
+            STA GH_AVAIL
+gtd_choose_dir2:
+            AND #PM_MAP_DIR_L_BIT
             BEQ gtd_next1
             LDA #PM_DIR_L
             STA G1_DIR,X
+            LDA #PM_MAP_DIR_L_BIT
+            STA G1_DIR_BITS,X
             JMP gtd_done
 
 gtd_next1:
-            LDA TMP0
+            LDA GH_AVAIL
             AND #PM_MAP_DIR_R_BIT
             BEQ gtd_next2
             LDA #PM_DIR_R
             STA G1_DIR,X
+            LDA #PM_MAP_DIR_R_BIT
+            STA G1_DIR_BITS,X
             JMP gtd_done
 
 gtd_next2:
-            LDA TMP0
+            LDA GH_AVAIL
             AND #PM_MAP_DIR_U_BIT
             BEQ gtd_next3
             LDA #PM_DIR_U
             STA G1_DIR,X
+            LDA #PM_MAP_DIR_U_BIT
+            STA G1_DIR_BITS,X
             JMP gtd_done
 gtd_next3:
-            LDA TMP0
+            LDA GH_AVAIL
             AND #PM_MAP_DIR_D_BIT
             BEQ gtd_next4
             LDA #PM_DIR_D
             STA G1_DIR,X
+            LDA #PM_MAP_DIR_D_BIT
+            STA G1_DIR_BITS,X
             JMP gtd_done
 
 gtd_next4:
@@ -1432,9 +1555,6 @@ gtd_pm_to_up:
 ;   - direction number (0=L,1=R,2=U,3=D)
 ;   - corridors = 0011=$03 1100=$0C
 ghost_is_in_corridor:
-            ;phaxy
-            ;JSR get_ghost_allowed
-            ;plaxy
             pha
             LDA G1_ALLOWED,X
             CMP #$03
@@ -1456,7 +1576,7 @@ giic_done:
 ghost_can_move_in_curr_dir:
             pha
             LDA G1_ALLOWED,X
-            CMP G1_DIR,X
+            CMP G1_DIR_BITS,X
             BEQ gcmicd_done
             CLC
 gcmicd_done:
