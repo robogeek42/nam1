@@ -508,7 +508,7 @@ quit_game:
 			JSR pm_quit_game
 			ply
 			plx
-			RTS
+			JMP main_welcome
 
 ;==================================================================
 ; Subroutines

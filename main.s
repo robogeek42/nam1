@@ -97,6 +97,7 @@ LAB_stlp:
                 JSR snd_all_off
 .endif ; SOUND
 
+main_welcome:
                 ; display welcome message in the Serial Console
                 ld16 R0, msg_welcome
                 JSR acia_puts
