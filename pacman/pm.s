@@ -103,13 +103,15 @@ PM_INTERRUPT	= pm_local + 3
 GHOST_IRQCOUNT	= pm_local + 4
 UPDATE_FLAG		= pm_local + 5  ; flag 1 = update sprites
 PM_SCORE		= pm_local + 6  ; 2 bytes
+
 GH_POSS         = pm_local + 8
 GH_AVAIL        = pm_local + 9
 GH_REVERSE      = pm_local + 10
+GH_CURR_GHOST   = pm_local + 11
 
 ; game state 0 = not started 1 = playing  FF =  quit
-pm_game         = pm_local + 12
-pm_input_dir    = pm_local + 13
+pm_game         = pm_local + 16
+pm_input_dir    = pm_local + 17
 
 
 ;---------------------------------
@@ -458,12 +460,8 @@ gl_update_score:
 
 gl_update_ghost_dir:
             ; check if ghost is fully in square and make a turn decision
-            LDA #0
-			ASL			; Ghost Number * 2
-			ASL         ; * 4
-            TAY         ; Y is index into sprite table
-			ASL 		; * 8
-            TAX         ; X is index into ghost data table
+            LDA #0      ; Check G1
+            JSR set_ghost_indexes
 
             ; check if fully in square
 			LDA G1_DIR,X			; check depends on direction of movement U/D or L/R
@@ -1115,6 +1113,18 @@ get_ghost_allowed:
 			RTS
 
 ;------------------------------------------------------------------
+; Pass in Acc=Ghost.
+; Set X and Y indexes into Ghost, Sprite tables 
+; Put Ghost Number into GH_CURR_GHOST
+set_ghost_indexes:
+            STA GH_CURR_GHOST
+			ASL			; Ghost Number * 2
+			ASL         ; * 4
+            TAY         ; Y is index into sprite table
+			ASL 		; * 8
+            TAX         ; X is index into ghost data table
+            RTS
+;------------------------------------------------------------------
 ; Move Ghosts Choose direction when they get to a junction
 ;   - direction number (0=R,1=L,2=D,3=U)
 ;   - bits   3  2  1  0
@@ -1129,11 +1139,7 @@ move_ghosts:
             CMP #$02                    ; every N=3 ticks
 			BNE gh_done
             LDA #0                      ; G1
-			ASL			; Ghost Number * 2
-			ASL         ; * 4
-            TAY         ; Y is index into sprite table
-			ASL 		; * 8
-            TAX         ; X is index into ghost data table
+            JSR set_ghost_indexes
             
             LDA G1_DIR,X
 			CMP #PM_DIR_R
@@ -1336,7 +1342,7 @@ print_dir:
 ghost_turn_decision:
             phaxy
             STZ GH_POSS
-            LDA #0          ; G1
+            LDA GH_CURR_GHOST
             JSR ghost_is_in_corridor
             BCC gtd_continue1
             plaxy
