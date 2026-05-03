@@ -15,53 +15,42 @@
 ; pacman vars in basic program area
 pm_vars = $7000
 
-; game state 0 = not started 1 = playing  FF =  quit
-pm_game = pm_vars + 0
-pm_input_dir = pm_vars + 1
 
 ; positions (x,y) and direction for each actor
-pm_info = pm_vars + 2
+pm_info = pm_vars + 0
 
 ; PACMAN position info
-PM_POS_X	= pm_info+0	  ; X/Y in screen characters
-PM_POS_Y	= pm_info+1
-PM_DIR		= pm_info+2   ; Direction (number)
-PM_NT_LO	= pm_info+3   ; map (name table) position
-PM_NT_HI	= pm_info+4   ; map (name table) position
-PM_ALLOWED	= pm_info+5   ; bitmask of allowed directions
+PM_DIR		= pm_info+0   ; Direction (number)
+PM_NT_LO	= pm_info+1   ; map (name table) position
+PM_NT_HI	= pm_info+2   ; map (name table) position
+PM_ALLOWED	= pm_info+3   ; bitmask of allowed directions
 
 g1_info		= pm_info+8		; exact 8 between all data sections
 ; Ghost 1
-G1_X		= g1_info+0
-G1_Y		= g1_info+1
-G1_DIR		= g1_info+2   ; Direction
-G1_NT_LO	= g1_info+3
-G1_NT_HI	= g1_info+4
-G1_ALLOWED	= g1_info+5
-G1_MODE		= g1_info+6   ; Mode (0=norm 1=scared)
-G1_DIR_BITS = g1_info+7
+G1_DIR		= g1_info+0   ; Direction
+G1_NT_LO	= g1_info+1
+G1_NT_HI	= g1_info+2
+G1_ALLOWED	= g1_info+3
+G1_MODE		= g1_info+4   ; Mode (0=norm 1=scared)
+G1_DIR_BITS = g1_info+5
 
 g2_info		= g1_info+8
 ; Ghost 2
-G2_X		= g2_info+0
-G2_Y		= g2_info+1
-G2_DIR		= g2_info+2   ; Direction
-G2_NT_LO	= g2_info+3
-G2_NT_HI	= g2_info+4
-G2_ALLOWED	= g2_info+5
-G2_MODE		= g2_info+6   ; Mode (0=norm 1=scared)
-G2_DIR_BITS = g2_info+7
+G2_DIR		= g2_info+0   ; Direction
+G2_NT_LO	= g2_info+1
+G2_NT_HI	= g2_info+2
+G2_ALLOWED	= g2_info+3
+G2_MODE		= g2_info+4   ; Mode (0=norm 1=scared)
+G2_DIR_BITS = g2_info+5
 
 g3_info		= g2_info+8
 ; Ghost 3
-G3_X		= g3_info+0
-G3_Y		= g3_info+1
-G3_DIR		= g3_info+2   ; Direction
-G3_NT_LO	= g3_info+3
-G3_NT_HI	= g3_info+4
-G3_ALLOWED	= g3_info+5
-G3_MODE		= g3_info+6   ; Mode (0=norm 1=scared)
-G3_DIR_BITS = g3_info+7
+G3_DIR		= g3_info+0   ; Direction
+G3_NT_LO	= g3_info+1
+G3_NT_HI	= g3_info+2
+G3_ALLOWED	= g3_info+3
+G3_MODE		= g3_info+4   ; Mode (0=norm 1=scared)
+G3_DIR_BITS = g3_info+5
 
 ; only 3 for now ...
 pm_positions_end = g3_info+7
@@ -104,18 +93,29 @@ PM_ST_SPR5_X = pm_sprite_table+18
 PM_ST_SPR5_P = pm_sprite_table+19
 PM_ST_SPR5_C = pm_sprite_table+20
 
-pm_local =  pm_sprite_table+21
+;---------------------------------
+; local variables
+pm_local =  $7060
 
-IRQ_OLD			= pm_local+0  ; 2 bytes
-PM_IRQCOUNT		= pm_local+2
-PM_INTERRUPT	= pm_local+3
-GHOST_IRQCOUNT	= pm_local+4
-UPDATE_FLAG		= pm_local+5  ; flag 1 = update sprites
-PM_SCORE		= pm_local+6  ; 2 bytes
-GH_POSS         = pm_local+8
-GH_AVAIL        = pm_local+9
-GH_REVERSE      = pm_local+10
-PM_STR_BUFFER	= pm_local+11  ; 12 bytes
+IRQ_OLD			= pm_local + 0  ; 2 bytes
+PM_IRQCOUNT		= pm_local + 2
+PM_INTERRUPT	= pm_local + 3
+GHOST_IRQCOUNT	= pm_local + 4
+UPDATE_FLAG		= pm_local + 5  ; flag 1 = update sprites
+PM_SCORE		= pm_local + 6  ; 2 bytes
+GH_POSS         = pm_local + 8
+GH_AVAIL        = pm_local + 9
+GH_REVERSE      = pm_local + 10
+
+; game state 0 = not started 1 = playing  FF =  quit
+pm_game         = pm_local + 12
+pm_input_dir    = pm_local + 13
+
+
+;---------------------------------
+pm_buffers      = $70A0
+PM_STR_BUFFER	= pm_buffers + 0  ; 12 bytes?
+
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -292,13 +292,8 @@ pmdm_loop5: JSR vdp_write
 			STA PM_NT_HI
 			LDA #PM_DIR_L			  ; facing left
 			STA PM_DIR
-			JSR calc_pm_pos
 
 ; Ghost 1 start (14,9) = (14+9*32)=302=$12E
-            LDA #14
-            STA G1_X
-            LDA #9
-            STA G1_Y
 			LDA #$2E
 			STA G1_NT_LO
 			LDA #$01
@@ -1082,27 +1077,6 @@ pugs_save:
 			STA PM_ST_SPR3_P
 			STA PM_ST_SPR4_P
 pugs_done:			
-			RTS
-
-;------------------------------------------------------------------
-; Input - PM_ST_SPR1_X/Y
-; Output - PM_POS_X/Y
-;
-calc_pm_pos:
-			LDA PM_ST_SPR1_X
-			CLC
-			ADC #4
-			LSR
-			LSR
-			LSR
-			STA PM_POS_X
-			LDA PM_ST_SPR1_Y
-			CLC
-			ADC #4
-			LSR
-			LSR
-			LSR
-			STA PM_POS_Y
 			RTS
 
 ;------------------------------------------------------------------
