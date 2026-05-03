@@ -1277,6 +1277,7 @@ convert_dir_to_bits:
             PLY
             RTS
 
+;-------------------------------------------------------
 ; print Acc representing dir bits as chars
 dbg_pmis: .byte "PM is ",$00
 print_dir_bits:
@@ -1337,6 +1338,64 @@ print_dir:
     PLX
     RTS
 
+dbg_print_vars1:
+    pha
+    lda #'D'
+    jsr acia_putc
+    lda #':'
+    jsr acia_putc
+    LDA G1_DIR,X
+    JSR print_dir
+
+    lda #'P'
+    jsr acia_putc
+    lda #':'
+    jsr acia_putc
+    LDA GH_POSS
+    JSR print_dir_bits
+
+    lda #'A'
+    jsr acia_putc
+    lda #':'
+    jsr acia_putc
+    LDA G1_ALLOWED, X
+    JSR print_dir_bits
+    pla
+    RTS
+
+dbg_print_vars2:
+    pha
+    lda #'r'
+    jsr acia_putc
+    lda #':'
+    jsr acia_putc
+    LDA GH_REVERSE
+    JSR print_dir
+    lda #'='
+    jsr acia_putc
+    pla
+
+dbg_print_vars3:
+    pha            
+    lda #'v'
+    jsr acia_putc
+    lda #':'
+    jsr acia_putc
+    LDA GH_AVAIL
+    jsr print_dir_bits
+    pla
+
+dbg_print_vars4:
+    pha
+    lda #'F'
+    jsr acia_putc
+    lda #':'
+    jsr acia_putc
+    LDA G1_DIR,X
+    JSR print_dir
+    jsr acia_put_newline
+    pla
+
 ;-------------------------------------------------------
 ; Make ghost turn decision 
 ghost_turn_decision:
@@ -1352,28 +1411,7 @@ gtd_continue1:
             JSR gtd_check_lr
             JSR gtd_check_ud
 
-pha
-lda #'D'
-jsr acia_putc
-lda #':'
-jsr acia_putc
-LDA G1_DIR,X
-JSR print_dir
-
-lda #'P'
-jsr acia_putc
-lda #':'
-jsr acia_putc
-LDA GH_POSS
-JSR print_dir_bits
-
-lda #'A'
-jsr acia_putc
-lda #':'
-jsr acia_putc
-LDA G1_ALLOWED, X
-JSR print_dir_bits
-pla
+;JSR dbg_print_vars1
 
             ; AND with map directions (G1_ALLOWED)
             LDA GH_POSS
@@ -1399,32 +1437,18 @@ pla
 gtd_reverse_next:
             ; get NOT reverse dir
             LDA GH_REVERSE
-pha
-lda #'r'
-jsr acia_putc
-lda #':'
-jsr acia_putc
-LDA GH_REVERSE
-JSR print_dir
-lda #'='
-jsr acia_putc
-pla
+
+;JSR dbg_print_vars2
+
             JSR convert_dir_to_bits
-JSR print_dir_bits
+;JSR print_dir_bits
             EOR #$FF
 
             ; remove from POSS & ALLOWED
             AND GH_AVAIL        ; POSS & ALLOWED
             STA GH_AVAIL        ; GH_AVAIL now hold all possibilities
             
-pha            
-lda #'v'
-jsr acia_putc
-lda #':'
-jsr acia_putc
-LDA GH_AVAIL
-jsr print_dir_bits
-pla
+;JSR dbg_print_vars3
 
             ; go through remaining directions
             ; if DIR is in there continue
@@ -1435,15 +1459,7 @@ pla
 
 gtd_done:
 
-pha
-lda #'F'
-jsr acia_putc
-lda #':'
-jsr acia_putc
-LDA G1_DIR,X
-JSR print_dir
-jsr acia_put_newline
-pla
+;JSR dbg_print_vars4
 
             plaxy
             RTS
