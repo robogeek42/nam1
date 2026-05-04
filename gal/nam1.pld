@@ -24,9 +24,9 @@ Pin 9 = p9;
 /* Output pins */
 Pin 11 = p11;
 Pin 12 = p12;
-Pin 13 = ram_oe;
-Pin 14 = ram_cs;
-Pin 15 = ram_rwb;
+Pin 13 = p13;
+Pin 14 = ram_oe;
+Pin 15 = ram_cs;
 Pin 16 = via2;
 Pin 17 = vdp;
 Pin 18 = via1;
@@ -44,4 +44,4 @@ via2 = iocs # a7 # !a6 # !a5;  /* 7F60 - 7F7F */
 
 ram_cs = a15 # !iocs;
 ram_oe = !rwb # !phi2;
-ram_rwb = rwb;
+/* ram_rwb = rwb; */
