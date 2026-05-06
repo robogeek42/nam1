@@ -14,6 +14,14 @@ python get_symbols.py
 
 if false
 then
+    echo "============= Make App Hello2 ==================="
+    # Hello2
+    cd hello2
+    make clean install
+    cd -
+fi
+if false
+then
     echo "============= Make App Hello ==================="
     # Hello
     cd hello
