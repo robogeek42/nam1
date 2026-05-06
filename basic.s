@@ -10312,17 +10312,17 @@ LAB_KEYT:
 	.word	LBB_MODE  	; VDP MODE
 	.byte	3,'C'
 	.word	LBB_CLS  	; VDP CLS
-	.byte	3,'C'
+	.byte	4,'S'
 	.word	LBB_SCOL  	; VDP SCOL (screen text cols)
 ;	.byte	4,'L'
 ;	.word	LBB_LOAD  	; LOAD
 ;	.byte	4,'S'
 ;	.word	LBB_SAVE  	; SAVE
-	.byte	3,'S'
+	.byte	3,'D'
 	.word	LBB_DEL  	; SD DEL
-	.byte	3,'S'
+	.byte	3,'D'
 	.word	LBB_DIR  	; SD DIR
-	.byte	3,'S'
+	.byte	3,'C'
 	.word	LBB_CAT  	; SD CAT
 	.byte	3,'S'
 	.word	LBB_SPR  	; SPR
