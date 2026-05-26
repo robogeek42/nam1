@@ -117,6 +117,9 @@ main_welcome:
                 JSR acia_puts
                 JSR vdp_write_text
                 JSR KBINIT
+                ; turn on debug
+                LDA #$FF
+                STA KBD_CHAR_LAST
 .endif
                 
 .ifdef SDIO

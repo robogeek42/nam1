@@ -272,21 +272,16 @@ lp3:            pha                     ;
                bra   lp1               ; 
 
 print1byte:
-            pha
             ld16 R0,sbuf
-            pla
             jsr fmt_hex_string
             jsr acia_puts
             rts
 print_binary:
-            pha
             ld16 R0,sbuf
-            pla
             jsr fmt_bin_string
             jsr acia_puts
             rts
 printunkown:
-            pha
             lda #'['
             jsr acia_putc
             ld16 R0,sbuf
@@ -1198,6 +1193,8 @@ msg_tm_off:
     .byte "Set TM Off",$0D,$0A,$00
 msg_tm_on:
     .byte "Set TM On",$0D,$0A,$00
+msg_release_code:
+    .byte "Release:",$00
 
 ps2k_debug_print_scan_code:
     pha
@@ -1314,18 +1311,55 @@ ksg_get_code:
 
 ;--------------------------------------------------------------
 ; tests non-typematic - outputs flags for asdfghjk (8 keys)
-;    KBD_CHAR_LAST ($ED) if this is not 0 print Scan code debug
+;    KBD_CHAR_LAST ($37) if this is not 0 print Scan code debug
 ; q to quit
 .export test_ps2_keyboard_2
+
+tpk2_print_CHAR_SPECIAL:
+    pha
+    phy
+    ld16 R0, sbuf
+    lda #'['
+    jsr acia_putc
+    lda KBD_CHAR
+    jsr fmt_hex_string
+    jsr acia_puts
+    lda #' '
+    jsr acia_putc
+    lda KBD_SPECIAL
+    jsr fmt_hex_string
+    jsr acia_puts
+    lda #']'
+    jsr acia_putc
+    ply
+    pla
+    rts
+
+tpk2_print_release:
+    pha
+    lda KBD_CHAR_LAST
+    beq @over3                      ; flag is 0 so skip debug
+    ld16 R0,msg_release_code
+    jsr acia_puts
+    jsr acia_putc
+    jsr acia_put_newline
+@over3:
+    pla
+    rts
+    
+;---- tpk2 entry ----
 test_ps2_keyboard_2:
     jsr KBINIT
     jsr KBTMOFF
     lda #0
     sta KBD_FLAGS
     
+;---- tpk2 main loop ----
 tpk2_loop:
     jsr KBSCAN_GAME
     bcc tpk2_loop           ; carry-clear means no key
+
+    jsr tpk2_print_CHAR_SPECIAL    
 
     ldx #0
     lda KBD_CHAR
@@ -1336,10 +1370,12 @@ tpk2_loop:
     ; swap it to A and set X=1
     lda KBD_SPECIAL
     beq tpk2_loop         ; 0 in KBD_SPECIAL means it was a special key release code - ignore
+    jsr tpk2_print_release      ; print release code
     ldx #1
+    jmp tpk2_check_keys
 
 tpk2_debug_print:
-    ; Scan code printing if debug ($ED) is turned on
+    ; Scan code printing if debug ($37) is turned on
     pha
     lda KBD_CHAR_LAST
     beq @over1                      ; flag is 0 so skip debug
@@ -1365,11 +1401,11 @@ tpk2_check_keys:
     cmp #SC_G
     beq tpk2_do_G
     cmp #SC_H
-    beq tpk2_do_H
+    beq tpk2_do_H_jmp
     cmp #SC_J
-    beq tpk2_do_J
+    beq tpk2_do_J_jmp
     cmp #SC_K
-    beq tpk2_do_K
+    beq tpk2_do_K_jmp
     jmp tpk2_loop
 
 tpk2_do_extended_JV:
@@ -1386,31 +1422,50 @@ tpk2_done:
     jsr KBTMON
     rts
 
+tpk2_do_H_jmp:
+    jmp tpk2_do_H
+tpk2_do_J_jmp:
+    jmp tpk2_do_J
+tpk2_do_K_jmp:
+    jmp tpk2_do_K
+
 tpk2_do_A:
     cpx #1                  ; X=1 means this is a break code
     beq @overA
-    smb7 KBD_FLAGS          ; make code - set flag
+    LDA KBD_FLAGS          ; make code - set flag
+    ORA #%10000000
+    STA KBD_FLAGS          ; make code - set flag
     jmp tpk2_update
 @overA:
-    rmb7 KBD_FLAGS          ; break code - reset flag
+    LDA KBD_FLAGS          ; break code - reset flag
+    AND #%01111111
+    STA KBD_FLAGS          ; make code - set flag
     jmp tpk2_update
 
 tpk2_do_S:
     cpx #1
     beq @overS
-    smb6 KBD_FLAGS
+    LDA KBD_FLAGS          ; make code - set flag
+    ORA #%01000000
+    STA KBD_FLAGS          ; make code - set flag
     jmp tpk2_update
 @overS:
-    rmb6 KBD_FLAGS
+    LDA KBD_FLAGS          ; break code - reset flag
+    AND #%10111111
+    STA KBD_FLAGS          ; make code - set flag
     jmp tpk2_update
 
 tpk2_do_D:
     cpx #1
     beq @overD
-    smb5 KBD_FLAGS
+    LDA KBD_FLAGS          ; make code - set flag
+    ORA #%00100000
+    STA KBD_FLAGS          ; make code - set flag
     jmp tpk2_update
 @overD:
-    rmb5 KBD_FLAGS
+    LDA KBD_FLAGS          ; break code - reset flag
+    AND #%11011111
+    STA KBD_FLAGS          ; make code - set flag
     jmp tpk2_update
 
 tpk2_do_F:
