@@ -26,7 +26,7 @@ then
     cd -
 fi
 
-if true
+if false
 then
     echo "============= Make App Pacman ==================="
     # Pacman
@@ -44,7 +44,7 @@ then
     cd -
 fi
 
-if false
+if true
 then
     echo "============= Make App Breakout ==================="
     # Breakout
