@@ -835,7 +835,10 @@ kbinit:
 ;    sta portAreg 
 ; end debug
 
-               lda   #$02              ; init - num lock on, all other off
+    ; LEDs : bit0 = scroll lock, bit1 = num lock, bit2 = caps
+
+               ;lda   #$02              ; init - num lock on, all other off
+               lda   #$04              ; init - caps lock on, all other off
                sta   special           ; 
 kbinit1:        lda   #KBCMD_RESET      ; keybrd reset
                jsr   kbsend            ; reset keyboard
