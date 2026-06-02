@@ -79,7 +79,11 @@ vdp_regwrite:
                 STA VDP_WR_REG        ; Data
                 NOP
                 NOP
+                NOP
                 STY VDP_WR_REG        ; Register 80...87
+                NOP
+                NOP
+                NOP
                 RTS
 
 ; 3. Write Address
@@ -88,9 +92,11 @@ vdp_regwrite:
 vdp_set_addr_w: 
                 STY VDP_WR_REG      ; Address lo byte
                 NOP
+                NOP
                 AND #$3F
                 ORA #$40
                 STA VDP_WR_REG      ; Address hi byte
+                NOP
                 NOP
                 NOP
                 RTS
@@ -100,8 +106,10 @@ vdp_set_addr_w:
 vdp_set_addr_r: 
                 STY VDP_WR_REG      ; Address lo byte
                 NOP
+                NOP
                 AND #$3F
                 STA VDP_WR_REG      ; Address hi byte
+                NOP
                 NOP
                 NOP
                 RTS
@@ -173,13 +181,22 @@ vdp_setaddr_color_table_g2:
 vdp_write:
                 STA VDP_WR_VRAM
                 NOP
+                NOP
+                NOP
+                NOP
+                NOP
                 RTS
 vdp_writex:
                 STX VDP_WR_VRAM
+                NOP
+                NOP
+                NOP
                 NOP
                 RTS
 ;----------------------------------------------------------------
 ; VDP Read VRAM
 vdp_read:
+                NOP
+                NOP
                 LDA VDP_RD_VRAM
                 RTS
