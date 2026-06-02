@@ -49,20 +49,11 @@ breakout:
 .endif
 
 ; set mode
-		LDA #3					; Multicolor Graphics mode
+        ; load a custom colour in mode 4 ... 
+        LDA #FG_LIT_GREEN | BG_BLACK
+        STA VDP_MODE4_COL
+		LDA #4					; Graphics II mode with graphics layout
 		JSR vdp_set_mode
-		; Set main play area colors
-		;LDA #FG_WHITE
-		;ORA #BG_DRK_BLUE
-		;JSR vdp_load_flat_colors
-		; set border color
-		LDA #FG_WHITE
-		ORA #BG_LIT_GREEN
-		LDY #$87
-		JSR vdp_regwrite
-
-		; clear screen to pattern
-		JSR vdp_load_mc_standard_name_table
 
 ; Draw board
         JSR draw_board
@@ -624,6 +615,7 @@ pih_restore_irq:
 ; Draw board
 ;
 draw_board:
+        
 
 		RTS
 
