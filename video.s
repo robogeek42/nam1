@@ -90,8 +90,15 @@ vdp_sm_loop:	LDA (ZP_TMP0), Y		; Load register value from mode tab
 				STX VDP_WR_REG
 				INY
 				INX
-				CPY #8
+				CPY #7
 				BNE vdp_sm_loop
+                ; Load custom colour
+                LDY VDP_MODE
+                LDA VDP_MODE0_COL, Y
+				STA VDP_WR_REG			; set registers directly as subroutine uses X for reg num
+                LDY #7
+				STA VDP_REGS,Y			; Save 
+				STX VDP_WR_REG
 
 				LDA #0
 				STA ZP_CURSOR
