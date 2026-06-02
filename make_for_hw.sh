@@ -12,15 +12,7 @@ cp firmware homebrew.bin
 
 python get_symbols.py
 
-if false
-then
-    echo "============= Make App Hello2 ==================="
-    # Hello2
-    cd hello2
-    make clean install
-    cd -
-fi
-if false
+if [ "X$APP_HELLO" != "X" ]
 then
     echo "============= Make App Hello ==================="
     # Hello
@@ -29,7 +21,7 @@ then
     cd -
 fi
 
-if true
+if [ "X$APP_PACMAN" != "X" ]
 then
     echo "============= Make App Pacman ==================="
     # Pacman
@@ -38,7 +30,7 @@ then
     cd -
 fi
 
-if false
+if [ "X$APP_PONG" != "X" ]
 then
     echo "============= Make App Pong ==================="
     # Pong
@@ -47,7 +39,7 @@ then
     cd -
 fi
 
-if false
+if [ "X$APP_BREAKOUT" != "X" ]
 then
     echo "============= Make App Breakout ==================="
     # Breakout
