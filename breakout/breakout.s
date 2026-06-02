@@ -291,21 +291,27 @@ gip_done:
 		rts
 
 gip_do_RIGHT:
+        lda KBD_FLAGS
 		cpx #0
 		beq @do_make
-		RMB0 KBD_FLAGS	  ; key unpressed - unset bit 0
+		and #$FE            ; key unpressed - unset bit 0
+        sta KBD_FLAGS
 		rts
   @do_make:
-		SMB0 KBD_FLAGS	  ; key was pressed - set bit 0
+		ora #$01            ; key was pressed - set bit 0
+        sta KBD_FLAGS
 		rts
 
 gip_do_LEFT:
+		lda KBD_FLAGS
 		cpx #0
 		beq @do_make
-		RMB1 KBD_FLAGS
+		and #$FD
+        sta KBD_FLAGS
 		rts
   @do_make:
-		SMB1 KBD_FLAGS
+		ora #$02
+        sta KBD_FLAGS
 		rts
 
 .endif
