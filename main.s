@@ -20,6 +20,7 @@
 .include "sound.inc65"
 .include "bcd.inc65"
 .include "pckybd.inc65"
+.include "colors.inc65"
 .ifdef UCHESS2
 .include "uchess2.inc65"
 .endif
@@ -103,6 +104,18 @@ main_welcome:
                 JSR acia_puts
 
 .ifdef VDP
+                ; Set video mode default colours
+                LDA #BG_BLACK | FG_WHITE
+                STA VDP_MODE0_COL
+                LDA #BG_WHITE | FG_DRK_GREEN
+                STA VDP_MODE1_COL
+                LDA #BG_DRK_BLUE | FG_WHITE
+                STA VDP_MODE2_COL
+                LDA #BG_BLACK | FG_WHITE
+                STA VDP_MODE3_COL
+                LDA #BG_BLACK | FG_LIT_YELLOW
+                STA VDP_MODE4_COL
+
                 ; Setup video with Mode 0
                 LDA #0
                 JSR vdp_set_mode
