@@ -36,6 +36,7 @@
 .export vdp_set_addr_w
 .export vdp_set_addr_r
 .export vdp_setaddr_name_table
+.export vdp_setaddr_name_table_offset_g2
 .export vdp_setaddr_pattern_table
 .export vdp_setaddr_pattern_table_g1
 .export vdp_setaddr_pattern_table_g2
@@ -176,6 +177,17 @@ vdp_setaddr_color_table_g2:
                 JSR vdp_set_addr_w
                 RTS
 
+vdp_setaddr_name_table_offset_g2:  ;; add TMP0[L],TMP0+1[H] to name offset
+                LDY TMP0
+                LDA VDP_REGS+2     ;; Set VRAM address to name table (VDP_REG2 * 0x400)
+                ASL
+                ASL
+                CLC
+                ADC TMP0+1
+                JSR vdp_set_addr_w
+                RTS
+
+                
 ;----------------------------------------------------------------
 ; VDP Write VRAM
 vdp_write:

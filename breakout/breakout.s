@@ -49,11 +49,13 @@ breakout:
 .endif
 
 ; set mode
-        ; load a custom colour in mode 4 ... 
-        LDA #FG_LIT_GREEN | BG_BLACK
-        STA VDP_MODE4_COL
-		LDA #4					; Graphics II mode with graphics layout
+        ; load a custom colour in mode 2 ... 
+        LDA #FG_WHITE | BG_BLACK
+        STA VDP_MODE2_COL
+		LDA #2					; Graphics II mode
 		JSR vdp_set_mode
+
+        JSR load_graphics
 
 ; Draw board
         JSR draw_board
@@ -612,98 +614,124 @@ pih_restore_irq:
 		RTS
 
 ;----------------------------------------------------------------------
+; load custom graphics chars 
+;
+load_graphics:
+
+        STZ TMP0
+lg_loop_out:
+        JSR vdp_setaddr_pattern_table_offset
+        LDX #NUM_GRAPH_BYTES
+        LDY #0
+lg_loop:
+        LDA GRAPHICS_TAB, Y
+        JSR vdp_write
+        INY
+        DEX
+        BNE lg_loop
+
+        ; do next set
+        LDA TMP0
+        CLC
+        ADC #$08
+        STA TMP0
+        CMP #$18
+        BNE lg_loop_out
+        RTS
+
+create_ball_chars:
+        ; store from $400 onwards
+        STZ TMP0
+        LDA #$04
+        STA TMP0+1
+        JSR vdp_setaddr_pattern_table_offset
+
+    ; for N=1 TO 7
+    ;   for I=1 TO 7
+    ;     if I<=N
+    ;       write DATA[I]
+    ;     else
+    ;       write 0
+    ;   }
+    ; }
+
+
+;----------------------------------------------------------------------
 ; Draw board
 ;
+
 draw_board:
-        
+
+        ; Name Table (characters first)
+        STZ TMP0
+        STZ TMP0+1
+        JSR vdp_setaddr_name_table_offset_g2
+        ; TMP1 points to row index
+        ; X points to char in row at that index
+        STZ TMP1
+@db_loop2:        
+        LDX TMP1            ; row index
+        LDA SCR_ROW_INDEX,X
+        ASL                 ; Index * 32
+        ASL
+        ASL
+        ASL
+        ASL
+        TAY                 ; row at index TMP1 is in Y
+        LDX #32
+@db_loop1:
+        LDA SCR_ROWS,Y      ; get char at Y
+        JSR vdp_write
+        INY
+        DEX
+        BNE @db_loop1
+        INC TMP1
+        LDA TMP1
+        CMP #24
+        BNE @db_loop2
 
 		RTS
 
 ;----------------------------------------------------------------------
 ; Draw paddle - width 6 pixels
 draw_paddle:
-		; check if batx is even or odd
-		; if even store $FF in X, odd store $0F - this wil be 1st write
-		LDA batx
-		ROR
-		BCC db_iseven
-		LDX #$0F
-		JMP db_overif
-	db_iseven:
-		LDX #$FF
-		; also need to clear previous position so bat moving right 
-		; cleared behind it
-		;
-		; convert batx-2 to position on line $05*6, this will be X*4
-		LDA batx
-		DEC
-		DEC
-		LSR
-		ASL
-		ASL
-		ASL
-		; Add $0506
-		CLC
-		ADC #$06
-		TAY
-		LDA #$05
-		JSR vdp_set_addr_w
-		LDA #$00
-		JSR vdp_write
+        ; clear
+        JSR clear_paddle_line
 
-	db_overif:
-		; convert batx to position on line $05*6, this will be X*4
-		LDA batx
-		LSR
-		ASL
-		ASL
-		ASL
-		; Add $0506
-		CLC
-		ADC #$06
-		TAY
-		LDA #$05
-		JSR vdp_set_addr_w
-		JSR vdp_writex
-		; move to next dot-pair and write $FF
-		TYA 
-		CLC
-		ADC #$08
-		TAY
-		LDA #$05
-		JSR vdp_set_addr_w
-		LDA #$FF
-		JSR vdp_write
-		; move to next dot-pair and write $FF
-		TYA 
-		CLC
-		ADC #$08
-		TAY
-		LDA #$05
-		JSR vdp_set_addr_w
-		LDA #$FF
-		JSR vdp_write
-		; last byte write, either $F0 (batx was odd) or $00
-		; has effect of overwriting previous bat pos if bat is moving left
-		LDA batx
-		ROR
-		BCC db_iseven2
-		LDX #$F0
-		JMP db_overif2
-	db_iseven2:
-		LDX #$0
-	db_overif2:
-		; move to next dot-pair and write val in X
-		TYA 
-		CLC
-		ADC #8
-		TAY
-		LDA #$05
-		JSR vdp_set_addr_w
-		JSR vdp_writex
-
+        ; bat on line 22 = 22*32 = $2C0
+        LDA #$C0
+        STA TMP0
+        LDA #$02
+        STA TMP0+1
+        LDA batx
+        LSR         ; div by 2
+        STA TMP1
+        add8To16 TMP1, TMP0
+        JSR vdp_setaddr_name_table_offset_g2
+        ; write full char bat part for now
+        LDA #BAT_R2
+        JSR vdp_write
+        LDA #BAT_RF
+        JSR vdp_write
+        LDA #BAT_L2
+        JSR vdp_write
 		RTS
 
+clear_paddle_line:
+        LDA #$02
+        STA TMP0+1
+        LDA #$C0
+        STA TMP0
+        JSR vdp_setaddr_name_table_offset_g2
+        LDY #32 ; second line-type in board table
+        LDX #32 ; write 32 chars as a line
+@dbl_loop1:
+        LDA SCR_ROWS,Y      ; get char at Y
+        JSR vdp_write
+        INY
+        DEX
+        BNE @dbl_loop1
+        RTS
 ;----------------------------------------------------------------------
 ; Sound
 ;
@@ -764,3 +792,69 @@ print_ball_xy:
 
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
+
+
+SCR_ROW_INDEX:
+    .byte $00,$01,$03,$03,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$02
+SCR_ROWS:
+    .byte $05,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$06
+    .byte $03,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$04
+    .byte $07,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$08
+    .byte $03,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$04
+SCR_ROW_COLOURS:
+    .byte $F0,$F0,$30,$40,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
+
+NUM_GRAPH_CHARS = 25
+NUM_GRAPH_BYTES = 25*8
+GRAPHICS_TAB:
+    GR_SPACE = 0
+    .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
+    GR_HALF_TOP = 1
+    .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; top half
+    GR_HALF_BOT = 2
+    .byte $00,$00,$00,$00,$FF,$FF,$FF,$FF   ; bot half
+    GR_HALF_LEFT = 3
+    .byte $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0   ; left half
+    GR_HALF_RIGHT = 4
+    .byte $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F   ; right half
+    GR_HALF_TOP_LEFT = 5
+    .byte $FF,$FF,$FF,$FF,$F0,$F0,$F0,$F0   ; top and left
+    GR_HALF_TOP_RIGHT = 6
+    .byte $FF,$FF,$FF,$FF,$0F,$0F,$0F,$0F   ; top and right
+    GR_HALF_BOT_LEFT = 7
+    .byte $F0,$F0,$F0,$F0,$FF,$FF,$FF,$FF   ; bot and left
+    GR_HALF_BOT_RIGHT = 8
+    .byte $0F,$0F,$0F,$0F,$FF,$FF,$FF,$FF   ; bot and right
+    GR_HALF_MID = 9
+    .byte $00,$00,$FF,$FF,$FF,$FF,$00,$00   ; simple brick all to edges
+    GR_HALF_BRICK_LEFT = $A
+    .byte $00,$00,$7F,$7F,$7F,$7F,$00,$00   ; brick left part
+    GR_HALF_BRICK_RIGHT = $B
+    .byte $00,$00,$FE,$FE,$FE,$FE,$00,$00   ; brick right part
+
+BAT_DATA:
+    BAT_R1 = $0C
+    .byte $03,$03,$03,$03,$00,$00,$00,$00   ; quarter at right
+    BAT_R2 = $0D
+    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; half at right
+    BAT_R3 = $0E
+    .byte $3F,$3F,$3F,$3F,$00,$00,$00,$00   ; 3 quarter at right
+    BAT_RF = $0F
+    .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; full bat
+    BAT_L3 = $10
+    .byte $FC,$FC,$FC,$FC,$00,$00,$00,$00   ; 3 quarter at left
+    BAT_L2 = $11
+    .byte $F0,$F0,$F0,$F0,$00,$00,$00,$00   ; half at left
+    BAT_L1 = $12
+    .byte $C0,$C0,$C0,$C0,$00,$00,$00,$00   ; quarter at left
+    
+BALL_DATA:
+    ; 4x4 blocks by quadrant
+    BALL_TL = $13
+    .byte $F0,$F0,$F0,$F0,$00,$00,$00,$00   ; T L
+    BALL_TR = $14
+    .byte $00,$00,$00,$00,$F0,$F0,$F0,$F0   ; T R
+    BALL_BL = $13
+    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; B L
+    BALL_BR = $16
+    .byte $00,$00,$00,$00,$0F,$0F,$0F,$0F   ; B R
