@@ -64,13 +64,13 @@ breakout:
 		STZ br_game
 
 	; starting bat position
-		LDA #30
+		LDA #60
 		STA batx
 		
 	; starting ball position and sped
 		LDA #32 
 		STA ballx
-		LDA #46 
+		LDA #42 
 		STA bally
 		LDA #$01
 		STA ballxv
@@ -134,19 +134,12 @@ game_loop:
 check_irq_count:
 		LDA IRQ_EVENT
 		BEQ gl_skip_update
-		LDA #0
-		STA IRQ_EVENT
+        STZ IRQ_EVENT
 
 .if .def(PS2K) || .def(VKEYB)
 		JSR check_key_flags
 .endif
 		JSR draw_paddle
-
-		LDA IRQ_COUNT
-		CMP #0
-		BNE gl_skip_update
-		LDA bo_interval		 ;; start counting again (bo_interval * 1/60th)
-		STA IRQ_COUNT
 
 		JSR sound_vol       ; reduce sound vol after a note
 
@@ -158,7 +151,12 @@ check_irq_count:
 		CMP #$FF		; 	quit requested?
 		BNE gl_dogame	; 		no, then continue
 		JMP quit_game	; 		yes, quit
+
 gl_dogame:
+        LDA IRQ_COUNT
+        AND #3
+        BNE gl_skip_update
+
 		JSR clear_ball
 		JSR move_ball
 		JSR draw_ball
@@ -175,12 +173,9 @@ BOUT_IRQ:
 		PHA
 
 		JSR vdp_getstatus		   ;; read VDP status to reenable the VDP interrupt
-		LDA IRQ_COUNT			   ;; if count >0
-		BEQ @skip
-		DEC IRQ_COUNT			   ;; count--
-@skip:
-		LDA #1
-		STA IRQ_EVENT
+		INC IRQ_COUNT			   ;; count++
+        INC IRQ_EVENT              ;; will be reset by client
+
 		PLA
 		RTI
 ;---------------------------------------
@@ -220,14 +215,15 @@ gi_do_START:
 gi_move_left:
 		LDA batx
 		DEC
-		BMI giml_over
+		CMP #4
+		BCC giml_over
 		STA batx
 	giml_over:
 		RTS
 gi_move_right:
 		LDA batx
 		INC
-		CMP #59
+		CMP #113
 		BCS gimr_over
 		STA batx
 	gimr_over:
@@ -314,97 +310,54 @@ gip_do_LEFT:
 check_game:
 		RTS
 
-;--------------------------------------------------
-; return the VDP address of any pos X,Y in TMP1
-; X and Y are in TMP2
-get_mc_point_address:
-		; Calculate address to write to
-		; Address (Ydiv8)*256 + Ymod8 + (Xdiv2)*8
-		; store addess in TMP1 (2 bytes)
-		
-		; (Ydiv8)*256 is putting Ydiv8 into high byte
-		LDA TMP2+1		; Y
-		LSR				; y div 2
-		LSR				; y div 4
-		LSR				; y div 8
-		STA TMP1+1
-
-		; now add Y mod 8, so this is putting Y mod 8 into low byte
-		LDA TMP2+1		; Y
-		AND #$07
-		STA TMP1
-		
-		; finally add Xdiv2 * 8 (X<64 so this will fit in a byte)
-		LDA TMP2  		; X
-		AND #$FE
-		ASL
-		ASL
-		; now add to TMP1
-		ADC TMP1
-		STA TMP1
-		LDA TMP1+1
-		ADC #0
-		STA TMP1+1
-		RTS
-
 ;---------------------------------------
 ; Draw ball
-draw_ball:
-		LDA ballx
-		STA TMP2
-		LDA bally
-		STA TMP2+1
-		JSR get_mc_point_address 	; read into TMP1
+draw_ball_set_char:
+        LDA bally   ; calc bally/2 * 32 == bally * 16
+        AND #$FE    ; /2 *2 gets rid of lsb
+        STA TMP0    ; store result in TMP0
+        STZ TMP0+1
 
-		; start write on VDP at correct address
-		LDA TMP1+1
-		LDY TMP1
-		JSR vdp_set_addr_w
-		; calc byte and write to pattern table (starts at 0)
-		LDA ballx				; Check if X is odd/even to get correct nybble
-		AND #1
-		BEQ db_hi_nybble
-		LDA #$0F
-		JSR vdp_write
-		RTS
-	db_hi_nybble:
-		LDA #$F0
-		JSR vdp_write
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        
+        LDA ballx
+        LSR         ; ballx/2
+        STA TMP1
+        add8To16 TMP1, TMP0
+
+        JSR vdp_setaddr_name_table_offset_g2
+        RTS
+        
+draw_ball:
+        JSR draw_ball_set_char
+        ; decide on char
+        LDA ballx
+        AND #1
+        STA TMP1
+        LDA bally
+        AND #1
+        ASL
+        CLC
+        ADC TMP1
+        TAX
+        LDA BALL_DATA_CHARS,X
+        JSR vdp_write
+        
 		RTS
 		
 ;---------------------------------------
 ; Clear ball
 clear_ball:
-		LDA ballx
-		STA TMP2
-		LDA bally
-		STA TMP2+1
-		JSR get_mc_point_address 	; read into TMP1
-
-		; read byte at ball address
-		LDA TMP1+1
-		LDY TMP1
-		JSR vdp_set_addr_r
-		JSR vdp_read
-		PHA
-
-		; start write on VDP at correct address
-		LDA TMP1+1
-		LDY TMP1
-		JSR vdp_set_addr_w
-		; calc byte and write to pattern table (starts at 0)
-		LDA ballx				; Check if X is odd/even to get correct nybble
-		AND #1
-		BEQ cb_hi_nybble
-	; low nybble
-		PLA
-		AND #$F0
-		JSR vdp_write
-		RTS
-	cb_hi_nybble:
-		PLA
-		AND #$0F
-		JSR vdp_write
+        JSR draw_ball_set_char
+        LDA #GR_SPACE
+        JSR vdp_write
 		RTS
 		
 ;--------------------------------------------------
@@ -412,7 +365,7 @@ clear_ball:
 ; return in Acc
 ;
 read_col_at_pos:
-		JSR get_mc_point_address ; read into TMP1
+		;JSR get_mc_point_address ; read into TMP1
 		LDA TMP1+1
 		LDY TMP1
 		JSR vdp_set_addr_r
@@ -481,9 +434,9 @@ move_ball:
 		STA TMP2
 
 ; 2. IF X<0 or X>64 reverse XV
-		CMP #0
-		BMI mb_reverse_xv
-		CMP #64
+		CMP #3
+		BCC mb_reverse_xv
+		CMP #61
 		BCS mb_reverse_xv
 		JMP mb_do_y
 	mb_reverse_xv:
@@ -491,9 +444,9 @@ move_ball:
 		TWOSCOMP				; 2s complement
 		STA ballxv
 ; - Add XV to X -> nextx
-		CLC
-		ADC ballx				; to X
-		STA TMP2				; and save
+		;CLC
+		;ADC ballx				; to X
+		;STA TMP2				; and save
 	
 ; 3. Add YV to Y -> nexty
 mb_do_y:
@@ -502,20 +455,21 @@ mb_do_y:
 		ADC bally
 		STA TMP2+1
 		
-; 4. IF Y>48 reverse YV
-		CMP #48
-		BCS mb_reverse_yv		; Y >= 48
-		CMP #0
-		BMI mb_reverse_yv		; Y < 0 ... should be newball_score
+; 4. IF Y>45 go to pause state
+		CMP #45
+		BCS mb_lost_ball		; Y >= 45
+		CMP #3
+		BMI mb_reverse_yv		; Y < 3
 		JMP mb_hit_check
 	mb_reverse_yv:
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
 	; - Add YV to Y -> nexty
-		CLC
-		ADC bally				; add new speed to Y
-		STA TMP2+1				; and save
+		;CLC
+		;ADC bally				; add new speed to Y
+		;STA TMP2+1				; and save
+
 
 ; 5. Check under next ball position (Acc -> NextCol)
 mb_hit_check:
@@ -574,6 +528,21 @@ mb_store_final:
 		LDA TMP2+1
 		STA bally				; store new Y
 		RTS
+
+mb_lost_ball:
+        LDA #2
+        STA br_game
+
+	; starting ball position and speed
+		LDA #32 
+		STA ballx
+		LDA #42 
+		STA bally
+		LDA #$01
+		STA ballxv
+		LDA #$FF
+		STA ballyv
+        RTS
 
 
 
@@ -704,18 +673,33 @@ draw_paddle:
         LDA #$02
         STA TMP0+1
         LDA batx
-        LSR         ; div by 2
+        LSR         ;
+        LSR         ; div by 4
         STA TMP1
         add8To16 TMP1, TMP0
         JSR vdp_setaddr_name_table_offset_g2
-        ; write full char bat part for now
-        LDA #BAT_R2
+        LDA batx
+        AND #3
+        CMP #0
+        BEQ dp_left
+        TAX
+        LDA BAT_DATA_CHARS_LEFT,X
         JSR vdp_write
-        LDA #BAT_RF
+        LDA #BAT_FULL
         JSR vdp_write
-        LDA #BAT_L2
+        LDA #BAT_FULL
+        JSR vdp_write
+        LDA BAT_DATA_CHARS_RIGHT,X
         JSR vdp_write
 		RTS
+dp_left:
+        LDA #BAT_FULL
+        JSR vdp_write
+        LDA #BAT_FULL
+        JSR vdp_write
+        LDA #BAT_FULL
+        JSR vdp_write
+        RTS
 
 clear_paddle_line:
         LDA #$02
@@ -797,15 +781,22 @@ quit_message:
 SCR_ROW_INDEX:
     .byte $00,$01,$03,$03,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$02
 SCR_ROWS:
-    .byte $05,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$06
-    .byte $03,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$04
-    .byte $07,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$08
-    .byte $03,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$04
+    .byte $16,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$15
+    .byte $04,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$03
+    .byte $14,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$13
+    .byte $04,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$03
 SCR_ROW_COLOURS:
     .byte $F0,$F0,$30,$40,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
 
-NUM_GRAPH_CHARS = 25
-NUM_GRAPH_BYTES = 25*8
+BAT_DATA_CHARS_LEFT:
+    .byte $0C,$0D,$0E,$0F
+BAT_DATA_CHARS_RIGHT:
+    .byte $20,$10,$11,$12
+BALL_DATA_CHARS:
+    .byte $13,$14,$15,$16
+
+NUM_GRAPH_CHARS = $17
+NUM_GRAPH_BYTES = $17*8
 GRAPHICS_TAB:
     GR_SPACE = 0
     .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
@@ -826,35 +817,35 @@ GRAPHICS_TAB:
     GR_HALF_BOT_RIGHT = 8
     .byte $0F,$0F,$0F,$0F,$FF,$FF,$FF,$FF   ; bot and right
     GR_HALF_MID = 9
-    .byte $00,$00,$FF,$FF,$FF,$FF,$00,$00   ; simple brick all to edges
+    .byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$00   ; simple brick all to edges
     GR_HALF_BRICK_LEFT = $A
-    .byte $00,$00,$7F,$7F,$7F,$7F,$00,$00   ; brick left part
+    .byte $00,$7F,$7F,$7F,$7F,$7F,$7F,$00   ; brick left part
     GR_HALF_BRICK_RIGHT = $B
-    .byte $00,$00,$FE,$FE,$FE,$FE,$00,$00   ; brick right part
+    .byte $00,$FE,$FE,$FE,$FE,$FE,$FE,$00   ; brick right part
 
 BAT_DATA:
-    BAT_R1 = $0C
-    .byte $03,$03,$03,$03,$00,$00,$00,$00   ; quarter at right
-    BAT_R2 = $0D
-    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; half at right
-    BAT_R3 = $0E
-    .byte $3F,$3F,$3F,$3F,$00,$00,$00,$00   ; 3 quarter at right
-    BAT_RF = $0F
+    BAT_FULL = $0C
     .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; full bat
-    BAT_L3 = $10
-    .byte $FC,$FC,$FC,$FC,$00,$00,$00,$00   ; 3 quarter at left
+    BAT_R3 = $0D
+    .byte $3F,$3F,$3F,$3F,$00,$00,$00,$00   ; 3 quarter at right
+    BAT_R2 = $0E
+    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; half at right
+    BAT_R1 = $0F
+    .byte $03,$03,$03,$03,$00,$00,$00,$00   ; quarter at right
+    BAT_L1 = $10
+    .byte $C0,$C0,$C0,$C0,$00,$00,$00,$00   ; quarter at left
     BAT_L2 = $11
     .byte $F0,$F0,$F0,$F0,$00,$00,$00,$00   ; half at left
-    BAT_L1 = $12
-    .byte $C0,$C0,$C0,$C0,$00,$00,$00,$00   ; quarter at left
-    
+    BAT_L3 = $12
+    .byte $FC,$FC,$FC,$FC,$00,$00,$00,$00   ; 3 quarter at left
+     
 BALL_DATA:
     ; 4x4 blocks by quadrant
     BALL_TL = $13
     .byte $F0,$F0,$F0,$F0,$00,$00,$00,$00   ; T L
     BALL_TR = $14
-    .byte $00,$00,$00,$00,$F0,$F0,$F0,$F0   ; T R
-    BALL_BL = $13
-    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; B L
+    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; T R
+    BALL_BL = $15
+    .byte $00,$00,$00,$00,$F0,$F0,$F0,$F0   ; B L
     BALL_BR = $16
     .byte $00,$00,$00,$00,$0F,$0F,$0F,$0F   ; B R
