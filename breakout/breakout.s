@@ -10,6 +10,7 @@
 .include "../video_registers.inc65"
 .include "../colors.inc65"
 .include "../scancodes.inc65"
+;.include "../bcd.inc65"
 .include "../firmware.symbols"
 
 .export breakout
@@ -63,19 +64,8 @@ breakout:
 ;; initialise game variables
 		STZ br_game
 
-	; starting bat position
-		LDA #60
-		STA batx
+        JSR mb_starting_pos
 		
-	; starting ball position and sped
-		LDA #32 
-		STA ballx
-		LDA #42 
-		STA bally
-		LDA #$01
-		STA ballxv
-		LDA #$FF
-		STA ballyv
 
 ;---------------------------------------
 .if .def(PS2K) || .def(VKEYB)
@@ -313,8 +303,8 @@ check_game:
 ;---------------------------------------
 ; Draw ball
 draw_ball_set_char:
-        LDA bally   ; calc bally/2 * 32 == bally * 16
-        AND #$FE    ; /2 *2 gets rid of lsb
+        LDA bally   ; calc bally/4 * 32 == bally * 8
+        AND #$FC    ; /4 *4 gets rid of 2xlsb
         STA TMP0    ; store result in TMP0
         STZ TMP0+1
 
@@ -324,11 +314,10 @@ draw_ball_set_char:
         ROL TMP0+1
         ASL TMP0
         ROL TMP0+1
-        ASL TMP0
-        ROL TMP0+1
         
         LDA ballx
-        LSR         ; ballx/2
+        LSR         ; 
+        LSR         ; ballx/4
         STA TMP1
         add8To16 TMP1, TMP0
 
@@ -339,9 +328,11 @@ draw_ball:
         JSR draw_ball_set_char
         ; decide on char
         LDA ballx
+        LSR         ; /2
         AND #1
         STA TMP1
         LDA bally
+        LSR         ; /2
         AND #1
         ASL
         CLC
@@ -351,6 +342,8 @@ draw_ball:
         JSR vdp_write
         
 		RTS
+
+draw_ball2_set_char:
 		
 ;---------------------------------------
 ; Clear ball
@@ -433,20 +426,16 @@ move_ball:
 		ADC ballx
 		STA TMP2
 
-; 2. IF X<0 or X>64 reverse XV
-		CMP #3
+; 2. IF at border reverse XV
+		CMP #7
 		BCC mb_reverse_xv
-		CMP #61
+		CMP #120
 		BCS mb_reverse_xv
 		JMP mb_do_y
 	mb_reverse_xv:
 		LDA ballxv
 		TWOSCOMP				; 2s complement
 		STA ballxv
-; - Add XV to X -> nextx
-		;CLC
-		;ADC ballx				; to X
-		;STA TMP2				; and save
 	
 ; 3. Add YV to Y -> nexty
 mb_do_y:
@@ -455,72 +444,49 @@ mb_do_y:
 		ADC bally
 		STA TMP2+1
 		
-; 4. IF Y>45 go to pause state
-		CMP #45
-		BCS mb_lost_ball		; Y >= 45
-		CMP #3
-		BMI mb_reverse_yv		; Y < 3
+; 4. IF Y at bot edge go to pause state and reset ball and bar
+		CMP #90
+		BCS mb_lost_ball		; 
+		CMP #7
+		BMI mb_reverse_yv		; Y Top edge
 		JMP mb_hit_check
 	mb_reverse_yv:
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
-	; - Add YV to Y -> nexty
-		;CLC
-		;ADC bally				; add new speed to Y
-		;STA TMP2+1				; and save
 
 
 ; 5. Check under next ball position (Acc -> NextCol)
 mb_hit_check:
+        ; check bat
+        ; line check ... 
+        LDA TMP2+1  
+        CMP #86
+        BNE mb_check_brick      ; can only hit bat on one line
 
-;		JSR read_col_at_pos
-;
-;; IF NextCol == WHITE reverse Y 
-;		CMP #15
-;		BEQ mb5_reverse_y
-;		JMP mb_check_brick
-;mb5_reverse_y:
-;	; Adjust YV/XV 
-;		; so far just bounce evenly
-;		LDA ballyv
-;		TWOSCOMP
-;		STA ballyv
-;	; Add YV to Y -> nexty
-;		CLC
-;		ADC bally				; add new speed to Y
-;		STA TMP2+1				; and save
+JSR print_bat_x
+LDA #' ' 
+JSR acia_putc
+JSR print_ball_xy
+JSR acia_put_newline
 
-; 5. detect bat position
-		; if ball nexty >=46 
-		LDA TMP2+1				; nexty
-		CMP #46
-		BCC mb_nohit1			; < 46
-
-		LDA TMP2				; nextx
-		CMP batx
-		BCS mb_nohit1			; Ball < Batx (left)
-		ADC #3
-		CMP batx
-		BCC mb_nohit1
-	; Adjust YV/XV 
+        
+        LDA TMP2                ; next ball x
+        CMP batx                ; Bat  leftmost pos
+        BCC mb_check_brick      ; ballx < batx
+        CLC
+        LDA batx
+        ADC #12                  ; Bat width
+        CMP TMP2
+        BCC mb_check_brick      ; batx+12 < ballx
+        ; reverse Y dir
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
-	; Add YV to Y -> nexty
-		CLC
-		ADC bally				; add new speed to Y
-		STA TMP2+1				; and save
-mb_nohit1:
 
 mb_check_brick:
-;	   6. IF NextCol != BLACK Reverse YV
-;	      Remove Brick
-;	      Add YV to Y -> nexty
-;		JSR read_col_at_pos
+        
 
-;
-;      7. Finalise movment TMP2 -> ballx/y
 mb_store_final:
 		; change is good
 		LDA TMP2
@@ -533,19 +499,20 @@ mb_lost_ball:
         LDA #2
         STA br_game
 
+mb_starting_pos:
+	; starting bat position
+		LDA #60
+		STA batx
 	; starting ball position and speed
-		LDA #32 
+		LDA #64 
 		STA ballx
-		LDA #42 
+		LDA #84 
 		STA bally
-		LDA #$01
+		LDA #$02
 		STA ballxv
-		LDA #$FF
+		LDA #$FE
 		STA ballyv
         RTS
-
-
-
 
 ;---------------------------------------
 ;
@@ -587,43 +554,37 @@ pih_restore_irq:
 ;
 load_graphics:
 
-        STZ TMP0
+        STZ TMP0    ; page counter - $00, $08, $10 
+
+        ; outer look is to load 3 pages
 lg_loop_out:
+        ld16 TMP1, GRAPHICS_TAB  
+        ; set VDP load address
         JSR vdp_setaddr_pattern_table_offset
-        LDX #NUM_GRAPH_BYTES
+
+        LDX #NUM_GRAPH_CHARS    ; max 256 characters (2k bytes)
+lg_char_loop:
         LDY #0
-lg_loop:
-        LDA GRAPHICS_TAB, Y
+lg_byte_loop:
+        LDA (TMP1), Y
         JSR vdp_write
         INY
+        CPY #8
+        BNE lg_byte_loop
+        add8To16 #8, TMP1
         DEX
-        BNE lg_loop
+        BNE lg_char_loop
 
-        ; do next set
+        ; Mode2 GRII screen has 768 patterns = 6k
+        ; do next set of 256 chars (2048 bytes = $800)
         LDA TMP0
         CLC
         ADC #$08
         STA TMP0
         CMP #$18
         BNE lg_loop_out
+
         RTS
-
-create_ball_chars:
-        ; store from $400 onwards
-        STZ TMP0
-        LDA #$04
-        STA TMP0+1
-        JSR vdp_setaddr_pattern_table_offset
-
-    ; for N=1 TO 7
-    ;   for I=1 TO 7
-    ;     if I<=N
-    ;       write DATA[I]
-    ;     else
-    ;       write 0
-    ;   }
-    ; }
-
 
 ;----------------------------------------------------------------------
 ; Draw board
@@ -662,7 +623,7 @@ draw_board:
 		RTS
 
 ;----------------------------------------------------------------------
-; Draw paddle - width 6 pixels
+; Draw paddle - width 12 pixels (3 chars)
 draw_paddle:
         ; clear
         JSR clear_paddle_line
@@ -761,18 +722,28 @@ sound_score:
 .endif
 
 print_ball_xy:
-;		ld16 R0, strbuf2
-;		lda ballx
-;		jsr fmt_hex_string
-;		jsr acia_puts
-;		lda #' '
-;		jsr acia_putc
-;		ld16 R0, strbuf2
-;		lda bally
-;		jsr fmt_hex_string
-;		jsr acia_puts
-;		jsr acia_put_newline
-;		rts
+		lda ballx
+        JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+		ld16 R0, strbuf2
+        JSR BCD2STR                ; convert BCD to string
+		jsr acia_puts
+		lda #','
+		jsr acia_putc
+
+		lda bally
+        JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+		ld16 R0, strbuf2
+        JSR BCD2STR                ; convert BCD to string
+		jsr acia_puts
+		;jsr acia_put_newline
+		rts
+print_bat_x:
+		lda batx
+        JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+		ld16 R0, strbuf2
+        JSR BCD2STR                ; convert BCD to string
+		jsr acia_puts
+        rts
 
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
@@ -794,12 +765,14 @@ BAT_DATA_CHARS_RIGHT:
     .byte $20,$10,$11,$12
 BALL_DATA_CHARS:
     .byte $13,$14,$15,$16
+BALL_DATA_2pixmove_CHARS:
+    .byte $17
 
-NUM_GRAPH_CHARS = $17
-NUM_GRAPH_BYTES = $17*8
+NUM_GRAPH_CHARS = $2F
+
 GRAPHICS_TAB:
     GR_SPACE = 0
-    .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
+    .byte $80,$00,$00,$00,$00,$00,$00,$00   ; space
     GR_HALF_TOP = 1
     .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; top half
     GR_HALF_BOT = 2
@@ -849,3 +822,35 @@ BALL_DATA:
     .byte $00,$00,$00,$00,$F0,$F0,$F0,$F0   ; B L
     BALL_BR = $16
     .byte $00,$00,$00,$00,$0F,$0F,$0F,$0F   ; B R
+
+BALL_DATA_2pixmove:
+    ; $17
+    .byte $C0,$C0,$00,$00,$00,$00,$00,$00
+    .byte $F0,$F0,$00,$00,$00,$00,$00,$00
+    .byte $3C,$3C,$00,$00,$00,$00,$00,$00
+    .byte $0F,$0F,$00,$00,$00,$00,$00,$00
+    .byte $03,$03,$00,$00,$00,$00,$00,$00
+    ; $1C
+    .byte $C0,$C0,$C0,$C0,$00,$00,$00,$00
+    .byte $F0,$F0,$F0,$F0,$00,$00,$00,$00
+    .byte $3C,$3C,$3C,$3C,$00,$00,$00,$00
+    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00
+    .byte $03,$03,$03,$03,$00,$00,$00,$00
+    ; $21
+    .byte $00,$00,$C0,$C0,$C0,$C0,$00,$00
+    .byte $00,$00,$F0,$F0,$F0,$F0,$00,$00
+    .byte $00,$00,$3C,$3C,$3C,$3C,$00,$00
+    .byte $00,$00,$0F,$0F,$0F,$0F,$00,$00
+    .byte $00,$00,$03,$03,$03,$03,$00,$00
+    ; $26
+    .byte $00,$00,$00,$00,$C0,$C0,$C0,$C0
+    .byte $00,$00,$00,$00,$F0,$F0,$F0,$F0
+    .byte $00,$00,$00,$00,$3C,$3C,$3C,$3C
+    .byte $00,$00,$00,$00,$0F,$0F,$0F,$0F
+    .byte $00,$00,$00,$00,$03,$03,$03,$03
+    ; $2B
+    .byte $00,$00,$00,$00,$00,$00,$C0,$C0
+    .byte $00,$00,$00,$00,$00,$00,$F0,$F0
+    .byte $00,$00,$00,$00,$00,$00,$3C,$3C
+    .byte $00,$00,$00,$00,$00,$00,$0F,$0F
+    .byte $00,$00,$00,$00,$00,$00,$03,$03
