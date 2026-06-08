@@ -25,7 +25,7 @@ ballxv	= bout_vars+4		; ball velocity in X
 ballyv	= bout_vars+5		; ball velocity in Y
 batx    = bout_vars+6		; left pos of bat
 
-br_game		= bout_vars+8; Game state. 0=not started, 1=playing, FF=quit, FE=win message
+br_game		= bout_vars+8; Game state. 0=not started, 1=playing, 2=pause, FF=quit, FE=win message
 IRQ_COUNT	= bout_vars+9
 IRQ_OLD		= bout_vars+10 ; 2 bytes
 bo_interval	= bout_vars+12  ; number of 1/60sec intervals between updating screen
@@ -33,6 +33,19 @@ IRQ_EVENT   = bout_vars+13
 
 br_c0_vol	= bout_vars+20;
 strbuf2		= bout_vars+21;
+
+BORDER_X_MIN = 5
+BORDER_X_MAX = 122
+BORDER_Y_MIN = 5
+BORDER_Y_MAX = 90
+BAT_LINE = 86
+BAT_WIDTH = 12
+
+START_BAT = 60
+START_BALL_X = 62
+START_BALL_Y = 84
+START_BALL_VX = $02
+START_BALL_VY = $FE
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -340,25 +353,6 @@ draw_ball_set_address_next_line:
         JSR vdp_setaddr_name_table_offset_g2
         RTS
         
-draw_ball:
-        JSR draw_ball_set_address
-        ; decide on char
-        LDA ballx
-        LSR         ; /2
-        AND #1
-        STA TMP1
-        LDA bally
-        LSR         ; /2
-        AND #1
-        ASL
-        CLC
-        ADC TMP1
-        TAX
-        LDA BALL_DATA_CHARS,X
-        JSR vdp_write
-        
-		RTS
-
 draw_ball2:
         ; decide on char
 
@@ -509,9 +503,9 @@ move_ball:
 		STA TMP2
 
 ; 2. IF at border reverse XV
-		CMP #5
+		CMP #BORDER_X_MIN
 		BCC mb_reverse_xv
-		CMP #122
+		CMP #BORDER_X_MAX
 		BCS mb_reverse_xv
 		JMP mb_do_y
 	mb_reverse_xv:
@@ -527,9 +521,9 @@ mb_do_y:
 		STA TMP2+1
 		
 ; 4. IF Y at bot edge go to pause state and reset ball and bar
-		CMP #90
+		CMP #BORDER_Y_MAX
 		BCS mb_lost_ball		; 
-		CMP #5
+		CMP #BORDER_Y_MIN
 		BMI mb_reverse_yv		; Y Top edge
 		JMP mb_hit_check
 	mb_reverse_yv:
@@ -543,7 +537,7 @@ mb_hit_check:
         ; check bat
         ; line check ... 
         LDA TMP2+1  
-        CMP #86
+        CMP #BAT_LINE
         BNE mb_check_brick      ; can only hit bat on one line
 
 JSR print_bat_x
@@ -558,7 +552,7 @@ JSR acia_put_newline
         BCC mb_check_brick      ; ballx < batx
         CLC
         LDA batx
-        ADC #12                  ; Bat width
+        ADC #BAT_WIDTH 
         CMP TMP2
         BCC mb_check_brick      ; batx+12 < ballx
         ; reverse Y dir
@@ -583,16 +577,16 @@ mb_lost_ball:
 
 mb_starting_pos:
 	; starting bat position
-		LDA #60
+		LDA #START_BAT
 		STA batx
 	; starting ball position and speed
-		LDA #61 
+		LDA #START_BALL_X 
 		STA ballx
-		LDA #84 
+		LDA #START_BALL_Y 
 		STA bally
-		LDA #$01
+		LDA #START_BALL_VX
 		STA ballxv
-		LDA #$FE
+		LDA #START_BALL_VY
 		STA ballyv
         RTS
 
@@ -842,9 +836,9 @@ SCR_ROW_COLOURS:
     .byte $F0,$F0,$30,$40,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
 
 BAT_DATA_CHARS_LEFT:
-    .byte $0C,$0D,$0E,$0F
+    .byte BAT_FULL,BAT_R3,BAT_R2,BAT_R1
 BAT_DATA_CHARS_RIGHT:
-    .byte $20,$10,$11,$12
+    .byte GR_SPACE,BAT_L1,BAT_L2,BAT_L3
 BALL_DATA_CHARS:
     .byte $13,$14,$15,$16
 
