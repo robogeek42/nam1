@@ -314,6 +314,18 @@ check_game:
 		RTS
 
 ;---------------------------------------
+get_NT_read_addr_for_ball:
+        JSR draw_ball_set_address_y
+        LDA ballx
+        LSR         ; 
+        LSR         ; ballx/4
+        STA TMP1
+        add8To16 TMP1, TMP0
+
+        JSR vdp_setaddr_name_table_offset_g2_read
+        RTS
+
+;---------------------------------------
 ; Draw ball
 draw_ball_set_address_y:
         LDA bally   ; calc bally/4 * 32 == bally * 8
@@ -538,7 +550,7 @@ mb_hit_check:
         ; line check ... 
         LDA TMP2+1  
         CMP #BAT_LINE
-        BNE mb_check_brick      ; can only hit bat on one line
+        BNE mb_store_final      ; can only hit bat on one line
 
 JSR print_bat_x
 LDA #' ' 
@@ -549,26 +561,46 @@ JSR acia_put_newline
         
         LDA TMP2                ; next ball x
         CMP batx                ; Bat  leftmost pos
-        BCC mb_check_brick      ; ballx < batx
+        BCC mb_store_final      ; ballx < batx
         CLC
         LDA batx
         ADC #BAT_WIDTH 
         CMP TMP2
-        BCC mb_check_brick      ; batx+12 < ballx
+        BCC mb_store_final      ; batx+12 < ballx
         ; reverse Y dir
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
 
-mb_check_brick:
-        
-
 mb_store_final:
-		; change is good
+		; change is good, save into ball position
 		LDA TMP2
 		STA ballx				; store new X
 		LDA TMP2+1
 		STA bally				; store new Y
+
+mb_check_brick:
+        ; only check if Y < 28
+        LDA ballx  ; next ballY
+        CMP #20
+        BCS mb_end
+
+        ; calc ball pos in name table
+        JSR get_NT_read_addr_for_ball
+        JSR vdp_read
+        CMP #2
+        BCS mb_end
+
+        ; set NT at this pos blank
+        JSR draw_ball_set_address_y
+        LDA #GR_SPACE
+        JSR vdp_write
+        ; bounce
+		LDA ballyv
+		TWOSCOMP
+		STA ballyv
+
+mb_end:
 		RTS
 
 mb_lost_ball:
@@ -660,6 +692,28 @@ lg_byte_loop:
         CMP #$18
         BNE lg_loop_out
 
+; colours for bricks
+        LDA #$80
+        STA TMP0
+        LDA #$01
+        STA TMP0+1
+        JSR vdp_setaddr_color_table_offset_g2
+        LDA #FG_DRK_BLUE | BG_BLACK
+        JSR lg_set_cols
+        LDA #FG_MED_RED | BG_BLACK
+        JSR lg_set_cols
+        LDA #FG_MED_GREEN | BG_BLACK
+        JSR lg_set_cols
+        LDA #FG_LIT_YELLOW | BG_BLACK
+        JSR lg_set_cols
+        RTS
+
+lg_set_cols:
+        LDX #24
+    lgsc_loop:
+        JSR vdp_write
+        DEX
+        BNE lgsc_loop
         RTS
 
 ;----------------------------------------------------------------------
@@ -753,6 +807,7 @@ clear_paddle_line:
         DEX
         BNE @dbl_loop1
         RTS
+
 ;----------------------------------------------------------------------
 ; Sound
 ;
@@ -826,12 +881,19 @@ quit_message:
 
 
 SCR_ROW_INDEX:
-    .byte $00,$01,$03,$03,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$02
+    .byte $00,$01,$03,$04,$05,$06,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$02
 SCR_ROWS:
     .byte $16,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$15
     .byte $04,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$03
     .byte $14,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$13
-    .byte $04,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$0A,$0B,$03
+; all col1
+    .byte $04,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$31,$32,$03
+; all col2
+    .byte $04,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$34,$35,$03
+; all col3
+    .byte $04,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$37,$38,$03
+; all col4
+    .byte $04,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$3A,$3B,$03
 SCR_ROW_COLOURS:
     .byte $F0,$F0,$30,$40,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0
 
@@ -855,7 +917,7 @@ BALL_DATA_2pix_CHARS_quad_11:
     ; Y=0 X=0   1   2   3 Y=1 X=0  1   2   3 Y=2 X=0   1   2   3 Y=3 X=0   1   2   3
     .byte $00,$00,$00,$00,    $00,$00,$00,$00,   $00,$00,$00,$00,     $00,$00,$00,$17
 
-NUM_GRAPH_CHARS = $30
+NUM_GRAPH_CHARS = $3C
 
 GRAPHICS_TAB:
     GR_SPACE = 0
@@ -942,3 +1004,20 @@ BALL_DATA_2pix:
     .byte $00,$00,$00,$00,$00,$00,$0F,$0F
     .byte $00,$00,$00,$00,$00,$00,$03,$03
 
+BRICK_COLOUR:
+    ; $30
+    .byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$00   ; simple brick all to edges
+    .byte $00,$7F,$7F,$7F,$7F,$7F,$7F,$00   ; brick left part
+    .byte $00,$FE,$FE,$FE,$FE,$FE,$FE,$00   ; brick right part
+
+    .byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$00   ; simple brick all to edges
+    .byte $00,$7F,$7F,$7F,$7F,$7F,$7F,$00   ; brick left part
+    .byte $00,$FE,$FE,$FE,$FE,$FE,$FE,$00   ; brick right part
+
+    .byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$00   ; simple brick all to edges
+    .byte $00,$7F,$7F,$7F,$7F,$7F,$7F,$00   ; brick left part
+    .byte $00,$FE,$FE,$FE,$FE,$FE,$FE,$00   ; brick right part
+
+    .byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$00   ; simple brick all to edges
+    .byte $00,$7F,$7F,$7F,$7F,$7F,$7F,$00   ; brick left part
+    .byte $00,$FE,$FE,$FE,$FE,$FE,$FE,$00   ; brick right part
