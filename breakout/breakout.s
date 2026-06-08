@@ -149,7 +149,7 @@ gl_dogame:
 
 		JSR clear_ball
 		JSR move_ball
-		JSR draw_ball
+		JSR draw_ball2
 
 		JSR check_game
 		;JSR draw_score
@@ -302,7 +302,7 @@ check_game:
 
 ;---------------------------------------
 ; Draw ball
-draw_ball_set_char:
+draw_ball_set_address_y:
         LDA bally   ; calc bally/4 * 32 == bally * 8
         AND #$FC    ; /4 *4 gets rid of 2xlsb
         STA TMP0    ; store result in TMP0
@@ -314,7 +314,10 @@ draw_ball_set_char:
         ROL TMP0+1
         ASL TMP0
         ROL TMP0+1
-        
+        RTS
+
+draw_ball_set_address:
+        JSR draw_ball_set_address_y
         LDA ballx
         LSR         ; 
         LSR         ; ballx/4
@@ -323,9 +326,22 @@ draw_ball_set_char:
 
         JSR vdp_setaddr_name_table_offset_g2
         RTS
+draw_ball_set_address_next_line:
+        JSR draw_ball_set_address_y
+        
+        LDA ballx
+        LSR         ; 
+        LSR         ; ballx/4
+        CLC
+        ADC #32
+        STA TMP1
+        add8To16 TMP1, TMP0
+
+        JSR vdp_setaddr_name_table_offset_g2
+        RTS
         
 draw_ball:
-        JSR draw_ball_set_char
+        JSR draw_ball_set_address
         ; decide on char
         LDA ballx
         LSR         ; /2
@@ -343,14 +359,102 @@ draw_ball:
         
 		RTS
 
-draw_ball2_set_char:
-		
+draw_ball2:
+        ; decide on char
+
+        ; single char if x<3 and y<3
+        ; 2 chars if x=3 or y=3
+        ; 4 chars if x=3 and y=3
+
+        ; get index into BALL tables
+        LDA bally
+        AND #3
+        ASL
+        ASL       
+        STA TMP2+1  ; 4 x (bally % 4)
+
+        LDA ballx
+        AND #3
+        STA TMP2    ; (ballx % 4)
+
+        CLC
+        ADC TMP2+1
+        TAY         ; Y has index into ball chars table for each quadrant
+
+        ; draw 1st quad
+        JSR draw_ball_set_address
+        LDA BALL_DATA_2pix_CHARS_quad_00, Y
+        JSR vdp_write
+
+        LDA TMP2            ; ball span 2 X ?
+        CMP #3
+        BNE db2_check_y     ; no
+                            ; yes
+        ; draw 2nd quad (X=1,Y=0)
+        LDA BALL_DATA_2pix_CHARS_quad_10, Y
+        JSR vdp_write
+        
+        ; can be here if X went across 2 chars or not
+    db2_check_y:
+        LDA bally          ; y span 2 Y?
+        AND #3
+        CMP #3
+        BNE db2_end         ; no
+                            ; yes
+        ; draw 3rd quad
+        JSR draw_ball_set_address_next_line
+        LDA BALL_DATA_2pix_CHARS_quad_01, Y
+        JSR vdp_write
+
+        LDA TMP2            ; ball span 2 X ?
+        CMP #3
+        BNE db2_end         ; no
+        
+        ; draw 4th quad
+        LDA BALL_DATA_2pix_CHARS_quad_11, Y
+        JSR vdp_write
+
+    db2_end:
+        RTS
+
 ;---------------------------------------
 ; Clear ball
 clear_ball:
-        JSR draw_ball_set_char
+        ; always clear 1st quad
+        JSR draw_ball_set_address
         LDA #GR_SPACE
         JSR vdp_write
+
+        LDA ballx   ; check X
+        AND #3
+        CMP #3
+        BNE cb_check_y
+
+        ; clear 2nd quad 
+        LDA #GR_SPACE
+        JSR vdp_write
+
+    cb_check_y:
+        LDA bally          ; y span 2 Y?
+        AND #3
+        CMP #3
+        BNE cb_end         ; no
+
+        ; clear 3rd quad 
+        JSR draw_ball_set_address_next_line
+        LDA #GR_SPACE
+        JSR vdp_write
+
+        LDA ballx   ; check X again
+        AND #3
+        CMP #3
+        BNE cb_end
+
+        ; clear 4th quad 
+        LDA #GR_SPACE
+        JSR vdp_write
+
+    cb_end:
 		RTS
 		
 ;--------------------------------------------------
@@ -392,30 +496,8 @@ read_ball:
 ;--------------------------------------------------
 ; Check ball position and change speed as necessary
 ; Move the ball according to current speed
-;    logic:
-;      -- current ball position in ballx/y
-;         current movement velocity in ballxv/yv
-;      -- next ball position in TMP2/TMP2+1 == nextx/y
-;      1. Add XV to X -> nextx
-;      2. IF X<0 or X>64 reverse XV
-;         - Add XV to X -> nextx
-;      3. Add YV to Y -> nexty
-;      4. IF Y>48 reverse YV
-;         - Add YV to Y -> nexty
-;         IF Y<0 ==> new ball
-;
-;      -- TMP2(nextx/y) contains next position including wall bounce
-;
-;      5. Check under next ball position (Acc -> NextCol)
-;         IF NextCol == WHITE reverse Y 
-;           Adjust YV/XV 
-;           Add YV to Y -> nexty
-;
-;	   6. IF NextCol != BLACK Reverse YV
-;	      Remove Brick
-;	      Add YV tio Y -> nexty
-;
-;      7. Finalise movment TMP2 -> ballx/y
+;      -- TMP2(nextx/y) contains next position.
+;      -- if next pos is next to wall, change direction
 ;
 move_ball:
 
@@ -427,9 +509,9 @@ move_ball:
 		STA TMP2
 
 ; 2. IF at border reverse XV
-		CMP #7
+		CMP #5
 		BCC mb_reverse_xv
-		CMP #120
+		CMP #122
 		BCS mb_reverse_xv
 		JMP mb_do_y
 	mb_reverse_xv:
@@ -447,7 +529,7 @@ mb_do_y:
 ; 4. IF Y at bot edge go to pause state and reset ball and bar
 		CMP #90
 		BCS mb_lost_ball		; 
-		CMP #7
+		CMP #5
 		BMI mb_reverse_yv		; Y Top edge
 		JMP mb_hit_check
 	mb_reverse_yv:
@@ -504,11 +586,11 @@ mb_starting_pos:
 		LDA #60
 		STA batx
 	; starting ball position and speed
-		LDA #64 
+		LDA #61 
 		STA ballx
 		LDA #84 
 		STA bally
-		LDA #$02
+		LDA #$01
 		STA ballxv
 		LDA #$FE
 		STA ballyv
@@ -765,14 +847,25 @@ BAT_DATA_CHARS_RIGHT:
     .byte $20,$10,$11,$12
 BALL_DATA_CHARS:
     .byte $13,$14,$15,$16
-BALL_DATA_2pixmove_CHARS:
-    .byte $17
 
-NUM_GRAPH_CHARS = $2F
+BALL_DATA_2pix_CHARS_quad_00:
+    ; Y=0 X=0   1   2   3 Y=1 X=0  1   2    3 Y=2 X=0   1   2   3 Y=3 X=0   1   2   3
+    .byte $1D,$1E,$1F,$20,    $22,$23,$24,$25,    $27,$28,$29,$2A,    $2C,$2D,$2E,$2F
+BALL_DATA_2pix_CHARS_quad_10:
+    ; Y=0 X=0   1   2   3 Y=1 X=0   1   2   3 Y=2 X=0   1   2   3 Y=3 X=0   1   2   3
+    .byte $00,$00,$00,$1C,    $00,$00,$00,$21,    $00,$00,$00,$26,    $00,$00,$00,$2B
+BALL_DATA_2pix_CHARS_quad_01:
+    ; Y=0 X=0   1   2   3 Y=1 X=0  1   2   3 Y=2 X=0   1   2   3 Y=3 X=0   1   2   3
+    .byte $00,$00,$00,$00,    $00,$00,$00,$00,   $00,$00,$00,$00,     $18,$19,$1A,$1B
+BALL_DATA_2pix_CHARS_quad_11:
+    ; Y=0 X=0   1   2   3 Y=1 X=0  1   2   3 Y=2 X=0   1   2   3 Y=3 X=0   1   2   3
+    .byte $00,$00,$00,$00,    $00,$00,$00,$00,   $00,$00,$00,$00,     $00,$00,$00,$17
+
+NUM_GRAPH_CHARS = $30
 
 GRAPHICS_TAB:
     GR_SPACE = 0
-    .byte $80,$00,$00,$00,$00,$00,$00,$00   ; space
+    .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
     GR_HALF_TOP = 1
     .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; top half
     GR_HALF_BOT = 2
@@ -823,7 +916,7 @@ BALL_DATA:
     BALL_BR = $16
     .byte $00,$00,$00,$00,$0F,$0F,$0F,$0F   ; B R
 
-BALL_DATA_2pixmove:
+BALL_DATA_2pix:
     ; $17
     .byte $C0,$C0,$00,$00,$00,$00,$00,$00
     .byte $F0,$F0,$00,$00,$00,$00,$00,$00
@@ -854,3 +947,4 @@ BALL_DATA_2pixmove:
     .byte $00,$00,$00,$00,$00,$00,$3C,$3C
     .byte $00,$00,$00,$00,$00,$00,$0F,$0F
     .byte $00,$00,$00,$00,$00,$00,$03,$03
+
