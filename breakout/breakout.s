@@ -28,24 +28,30 @@ batx    = bout_vars+6		; left pos of bat
 br_game		= bout_vars+8; Game state. 0=not started, 1=playing, 2=pause, FF=quit, FE=win message
 IRQ_COUNT	= bout_vars+9
 IRQ_OLD		= bout_vars+10 ; 2 bytes
-bo_interval	= bout_vars+12  ; number of 1/60sec intervals between updating screen
+ball_update	= bout_vars+12  ; number of 1/60sec intervals between updating ball
 IRQ_EVENT   = bout_vars+13
+wallbounce  = bout_vars+14  ; temp flag if bounced
 
 br_c0_vol	= bout_vars+20;
 strbuf2		= bout_vars+21;
 
-BORDER_X_MIN = 5
-BORDER_X_MAX = 122
-BORDER_Y_MIN = 5
+BORDER_X_MIN = 4
+BORDER_X_MAX = 123
+BORDER_Y_MIN = 4
 BORDER_Y_MAX = 90
-BAT_LINE = 86
-BAT_WIDTH = 12
 
+BAT_LINE = 86       ; bat is on 88,89
+BAT_LINE_DIV2 = 43  ; bat line in chars
+BAT_WIDTH = 12
+BAT_EDGE_SIZE = 2
 START_BAT = 60
+
 START_BALL_X = 62
 START_BALL_Y = 84
 START_BALL_VX = $02
 START_BALL_VY = $FE
+
+BALL_INITIAL_UPDATE_SPEED = 4
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -98,12 +104,11 @@ pih_save_old:
 		STA IRQ_OLD
 		LDA IRQ_ADDR+1
 		STA IRQ_OLD+1
-
-		LDA #$03
-		STA bo_interval
-		STA IRQ_COUNT
-		LDA #0
-		STA IRQ_EVENT
+        
+        LDA #BALL_INITIAL_UPDATE_SPEED
+        STA ball_update
+		STZ IRQ_COUNT
+		STZ IRQ_EVENT
 
 pih_setup_new:
 		LDA #<BOUT_IRQ
@@ -157,8 +162,9 @@ check_irq_count:
 
 gl_dogame:
         LDA IRQ_COUNT
-        AND #3
-        BNE gl_skip_update
+        CMP ball_update     ; ball update speed
+        BCC gl_skip_update
+        STZ IRQ_COUNT
 
 		JSR clear_ball
 		JSR move_ball
@@ -221,6 +227,11 @@ gi_move_left:
 		CMP #4
 		BCC giml_over
 		STA batx
+; debug
+;JSR print_bat_x
+;LDA #' '
+;JSR acia_putc
+;
 	giml_over:
 		RTS
 gi_move_right:
@@ -229,6 +240,11 @@ gi_move_right:
 		CMP #113
 		BCS gimr_over
 		STA batx
+; debug
+;JSR print_bat_x
+;LDA #' '
+;JSR acia_putc
+;
 	gimr_over:
 		RTS
 ;---------------------------------------
@@ -500,109 +516,7 @@ read_ball:
 		JSR read_col_at_pos
 		
 ;--------------------------------------------------
-; Check ball position and change speed as necessary
-; Move the ball according to current speed
-;      -- TMP2(nextx/y) contains next position.
-;      -- if next pos is next to wall, change direction
-;
-move_ball:
-
-; Check walls
-; 1. Add XV to X -> nextx
-		CLC	
-		LDA ballxv
-		ADC ballx
-		STA TMP2
-
-; 2. IF at border reverse XV
-		CMP #BORDER_X_MIN
-		BCC mb_reverse_xv
-		CMP #BORDER_X_MAX
-		BCS mb_reverse_xv
-		JMP mb_do_y
-	mb_reverse_xv:
-		LDA ballxv
-		TWOSCOMP				; 2s complement
-		STA ballxv
-	
-; 3. Add YV to Y -> nexty
-mb_do_y:
-		CLC
-		LDA ballyv
-		ADC bally
-		STA TMP2+1
-		
-; 4. IF Y at bot edge go to pause state and reset ball and bar
-		CMP #BORDER_Y_MAX
-		BCS mb_lost_ball		; 
-		CMP #BORDER_Y_MIN
-		BMI mb_reverse_yv		; Y Top edge
-		JMP mb_hit_check
-	mb_reverse_yv:
-		LDA ballyv
-		TWOSCOMP
-		STA ballyv
-
-
-; 5. Check under next ball position (Acc -> NextCol)
-mb_hit_check:
-        ; check bat
-        ; line check ... 
-        LDA TMP2+1  
-        CMP #BAT_LINE
-        BNE mb_store_final      ; can only hit bat on one line
-
-JSR print_bat_x
-LDA #' ' 
-JSR acia_putc
-JSR print_ball_xy
-JSR acia_put_newline
-
-        
-        LDA TMP2                ; next ball x
-        CMP batx                ; Bat  leftmost pos
-        BCC mb_store_final      ; ballx < batx
-        CLC
-        LDA batx
-        ADC #BAT_WIDTH 
-        CMP TMP2
-        BCC mb_store_final      ; batx+12 < ballx
-        ; reverse Y dir
-		LDA ballyv
-		TWOSCOMP
-		STA ballyv
-
-mb_store_final:
-		; change is good, save into ball position
-		LDA TMP2
-		STA ballx				; store new X
-		LDA TMP2+1
-		STA bally				; store new Y
-
-mb_check_brick:
-        ; only check if Y < 28
-        LDA ballx  ; next ballY
-        CMP #20
-        BCS mb_end
-
-        ; calc ball pos in name table
-        JSR get_NT_read_addr_for_ball
-        JSR vdp_read
-        CMP #2
-        BCS mb_end
-
-        ; set NT at this pos blank
-        JSR draw_ball_set_address_y
-        LDA #GR_SPACE
-        JSR vdp_write
-        ; bounce
-		LDA ballyv
-		TWOSCOMP
-		STA ballyv
-
-mb_end:
-		RTS
-
+; Lost ball. Reset ball and bat and pause game
 mb_lost_ball:
         LDA #2
         STA br_game
@@ -621,6 +535,190 @@ mb_starting_pos:
 		LDA #START_BALL_VY
 		STA ballyv
         RTS
+;--------------------------------------------------
+; Check ball position and change speed as necessary
+; Move the ball according to current speed
+;      -- TMP2(nextx/y) contains next position.
+;      -- if next pos is next to wall, change direction
+;
+move_ball:
+        STZ wallbounce
+; 1. Check walls
+;    Add XV to X -> nextx
+		CLC	
+		LDA ballxv
+		ADC ballx
+		STA TMP2
+
+;    IF at border reverse XV
+        LDX #BORDER_X_MIN
+		CMP #BORDER_X_MIN
+		BCC mb_reverse_xv
+        LDX #BORDER_X_MAX
+		CMP #BORDER_X_MAX
+		BCS mb_reverse_xv
+		JMP mb_do_y
+	mb_reverse_xv:
+		LDA ballxv
+		TWOSCOMP				; 2s complement
+		STA ballxv
+    ; next x should be adjusted to account for bounce
+    ; formula is 2 x wallX-nextX
+        TXA
+        ASL
+        SEC
+        SBC TMP2
+        STA TMP2
+        INC wallbounce
+	
+;    Add YV to Y -> nexty
+mb_do_y:
+		CLC
+		LDA ballyv
+		ADC bally
+		STA TMP2+1
+		
+; 2. IF Y at bot edge go to pause state and reset ball and bar
+		CMP #BORDER_Y_MAX
+		BCS mb_lost_ball		; 
+		CMP #BORDER_Y_MIN
+		BMI mb_reverse_yv		; Y Top edge
+		JMP mb_check_if_bounced
+	mb_reverse_yv:
+		LDA ballyv
+		TWOSCOMP
+		STA ballyv
+    ; next Y should be adjusted to account for bounce
+    ; formula is 2 x topY-nextY
+        LDA #BORDER_Y_MIN
+        ASL
+        SEC
+        SBC TMP2+1
+        STA TMP2+1
+        INC wallbounce
+
+; 3 If bounced at a wall, update position and go back to start 
+mb_check_if_bounced:
+        LDA wallbounce
+        CMP #0
+        BEQ mb_hit_bat_check
+    ; resolve
+		LDA TMP2
+		STA ballx				; store new X
+		LDA TMP2+1
+		STA bally				; store new Y
+        JMP move_ball
+
+; at this point, wall bounces are resolved and next position is either
+;  - possible bounce off bat
+;  - possible hit of brick
+;  - nothing to hit
+
+; 4. Check bat first
+mb_hit_bat_check:
+        ; Is nextY on the same line as the bat?
+        LDA TMP2+1  
+        LSR
+        CMP #BAT_LINE_DIV2      ; can only hit bat on one line
+        BNE mb_check_brick
+
+; debug
+;JSR acia_put_newline
+JSR print_bat_x
+LDA #' ' 
+JSR acia_putc
+JSR print_ball_xy
+JSR acia_put_newline
+        
+        LDA TMP2                ; next ball x
+        CMP batx                ; Bat leftmost pos
+        BCC mb_store_final      ; ballx < batx
+        CLC
+        LDA batx
+        ADC #BAT_WIDTH 
+        CMP TMP2
+        BCC mb_store_final      ; batx+12 < ballx
+        ; reverse Y dir
+		LDA ballyv
+		TWOSCOMP
+		STA ballyv
+    ; next Y should be adjusted to account for bounce
+    ; formula is 2 x batY-nextY
+        LDA #BAT_LINE
+        ASL
+        SEC
+        SBC TMP2+1
+        STA TMP2+1
+
+    ; change x speed if hit left edge of bat
+        LDA TMP2                ; next ball x
+        SEC
+        SBC batx
+        CMP #BAT_EDGE_SIZE                ; Bat leftmost 2 pixels
+        BCC mb_hit_left_part  ; ballx-batx < 2
+        CMP #BAT_WIDTH-BAT_EDGE_SIZE      ; bat rightmost 2 pixels
+        BCS mb_hit_right_part ; ballx-batx >= 10
+        ; can't hit bricks from here so we are done
+        JMP mb_store_final
+
+    mb_hit_left_part:
+        ; hit left part, make speed more left (subtract 1)
+        SEC
+        LDA ballxv
+        SBC #1
+        STA ballxv
+; debug
+JSR print_ball_speed
+JSR acia_put_newline
+
+        JMP mb_store_final
+
+    mb_hit_right_part:
+        ; hit right part, increase speed to right
+        CLC
+        LDA ballxv
+        ADC #1
+        STA ballxv
+; debug
+JSR print_ball_speed
+JSR acia_put_newline
+        JMP mb_store_final
+
+; 5. Check bricks. We still have nextX/Y in TMP2
+mb_check_brick:
+jmp mb_store_final
+        ; only check if Y < 28
+        LDA TMP2+1  ; next ballY
+        CMP #20
+        BCS mb_store_final ; no chance of hitting bricks so resolve and exit
+
+
+        ; calc ball pos in name table
+        JSR get_NT_read_addr_for_ball
+        JSR vdp_read
+        CMP #0              
+        BEQ mb_store_final  ; char == 0 is a space. Resolve and exit.
+
+        ; Hit. set NT at this pos blank
+        JSR draw_ball_set_address_y
+        LDA #GR_SPACE
+        JSR vdp_write
+        ; bounce
+		LDA ballyv
+		TWOSCOMP
+		STA ballyv
+
+; 6. Resolve next x/y 
+mb_store_final:
+		; change is good, save into ball position
+		LDA TMP2
+		STA ballx				; store new X
+		LDA TMP2+1
+		STA bally				; store new Y
+
+        RTS
+
+;--------------------------------------------------
 
 ;---------------------------------------
 ;
@@ -875,6 +973,26 @@ print_bat_x:
         JSR BCD2STR                ; convert BCD to string
 		jsr acia_puts
         rts
+print_ball_speed:
+		lda #'s'
+		jsr acia_putc
+		lda #':'
+		jsr acia_putc
+		lda ballxv
+        JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+		ld16 R0, strbuf2
+        JSR BCD2STR                ; convert BCD to string
+		jsr acia_puts
+		lda #','
+		jsr acia_putc
+
+		lda ballyv
+        JSR BINBCD8                ; convert to BCD and write in RES,RES+1
+		ld16 R0, strbuf2
+        JSR BCD2STR                ; convert BCD to string
+		jsr acia_puts
+		;jsr acia_put_newline
+		rts
 
 quit_message:
 	.byte "Goodbye!",$0d,$0a,$00
