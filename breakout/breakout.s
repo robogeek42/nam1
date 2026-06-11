@@ -330,18 +330,6 @@ check_game:
 		RTS
 
 ;---------------------------------------
-get_NT_read_addr_for_ball:
-        JSR draw_ball_set_address_y
-        LDA ballx
-        LSR         ; 
-        LSR         ; ballx/4
-        STA TMP1
-        add8To16 TMP1, TMP0
-
-        JSR vdp_setaddr_name_table_offset_g2_read
-        RTS
-
-;---------------------------------------
 ; Draw ball
 draw_ball_set_address_y:
         LDA bally   ; calc bally/4 * 32 == bally * 8
@@ -632,12 +620,12 @@ JSR acia_put_newline
         
         LDA TMP2                ; next ball x
         CMP batx                ; Bat leftmost pos
-        BCC mb_store_final      ; ballx < batx
+        BCC jmp_mb_store_final  ; ballx < batx
         CLC
         LDA batx
         ADC #BAT_WIDTH 
         CMP TMP2
-        BCC mb_store_final      ; batx+12 < ballx
+        BCC jmp_mb_store_final  ; batx+12 < ballx
         ; reverse Y dir
 		LDA ballyv
 		TWOSCOMP
@@ -659,6 +647,7 @@ JSR acia_put_newline
         CMP #BAT_WIDTH-BAT_EDGE_SIZE      ; bat rightmost 2 pixels
         BCS mb_hit_right_part ; ballx-batx >= 10
         ; can't hit bricks from here so we are done
+jmp_mb_store_final:
         JMP mb_store_final
 
     mb_hit_left_part:
@@ -686,18 +675,24 @@ JSR acia_put_newline
 
 ; 5. Check bricks. We still have nextX/Y in TMP2
 mb_check_brick:
-jmp mb_store_final
         ; only check if Y < 28
         LDA TMP2+1  ; next ballY
-        CMP #20
+        CMP #28
         BCS mb_store_final ; no chance of hitting bricks so resolve and exit
-
 
         ; calc ball pos in name table
         JSR get_NT_read_addr_for_ball
         JSR vdp_read
         CMP #0              
         BEQ mb_store_final  ; char == 0 is a space. Resolve and exit.
+
+; debug 
+ld16 R0, strbuf2
+jsr fmt_hex_string
+jsr acia_puts
+jsr acia_put_newline
+
+jmp mb_store_final
 
         ; Hit. set NT at this pos blank
         JSR draw_ball_set_address_y
@@ -719,6 +714,35 @@ mb_store_final:
         RTS
 
 ;--------------------------------------------------
+get_NT_read_addr_for_ball:
+        JSR draw_ball_set_address_y
+        LDA ballx
+        LSR         ; 
+        LSR         ; ballx/4
+        STA TMP1
+        add8To16 TMP1, TMP0
+
+; debug
+ld16 R0, strbuf2
+LDA TMP0
+STA ZP_TMP0
+LDA TMP0+1
+STA ZP_TMP0+1
+jsr fmt_hex_string
+jsr acia_puts
+LDA ZP_TMP0
+jsr fmt_hex_string
+jsr acia_puts
+lda #' '
+jsr acia_putc
+LDA ZP_TMP0
+STA TMP0
+LDA ZP_TMP0+1
+STA TMP0+1
+
+        JSR vdp_setaddr_name_table_offset_g2_read
+        RTS
+
 
 ;---------------------------------------
 ;
