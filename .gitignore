@@ -1,6 +1,6 @@
 *.lst
 *.o
-firmware*
+firmware
 map
 old
 *old
@@ -10,3 +10,6 @@ foo.sr
 homebrew.bin
 *.log
 *.s.*
+*.vice
+*.symbols
+*.map
