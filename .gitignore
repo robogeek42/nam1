@@ -13,3 +13,8 @@ homebrew.bin
 *.vice
 *.symbols
 *.map
+pacman/pacman
+pong/pong
+hello/hello
+breakout/breakout
+hello2/hello2
