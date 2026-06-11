@@ -30,13 +30,15 @@ IRQ_COUNT	= bout_vars+9
 IRQ_OLD		= bout_vars+10 ; 2 bytes
 ball_update	= bout_vars+12  ; number of 1/60sec intervals between updating ball
 IRQ_EVENT   = bout_vars+13
-wallbounce  = bout_vars+14  ; temp flag if bounced
+ballnextx   = bout_vars+14
+ballnexty   = bout_vars+15
+wallbounce  = bout_vars+16  ; temp flag if bounced
 
 br_c0_vol	= bout_vars+20;
 strbuf2		= bout_vars+21;
 
 BORDER_X_MIN = 4
-BORDER_X_MAX = 123
+BORDER_X_MAX = 122
 BORDER_Y_MIN = 4
 BORDER_Y_MAX = 90
 
@@ -468,42 +470,6 @@ clear_ball:
 		RTS
 		
 ;--------------------------------------------------
-; Read color under pos TMP2
-; return in Acc
-;
-read_col_at_pos:
-		;JSR get_mc_point_address ; read into TMP1
-		LDA TMP1+1
-		LDY TMP1
-		JSR vdp_set_addr_r
-		JSR vdp_read
-		PHA
-		LDA TMP2				; Check if X is odd/even to get correct nybble
-		AND #1
-		BEQ rb_hi_nybble
-		PLA
-		AND #$0F
-		RTS
-	rb_hi_nybble:
-		PLA
-		LSR
-		LSR
-		LSR
-		LSR
-		RTS
-
-;--------------------------------------------------
-; Read color under the ball
-; return in Acc
-;
-read_ball:
-		LDA ballx
-		STA TMP2
-		LDA bally
-		STA TMP2+1
-		JSR read_col_at_pos
-		
-;--------------------------------------------------
 ; Lost ball. Reset ball and bat and pause game
 mb_lost_ball:
         LDA #2
@@ -526,7 +492,7 @@ mb_starting_pos:
 ;--------------------------------------------------
 ; Check ball position and change speed as necessary
 ; Move the ball according to current speed
-;      -- TMP2(nextx/y) contains next position.
+;      -- ballnextx/y contains next position.
 ;      -- if next pos is next to wall, change direction
 ;
 move_ball:
@@ -536,7 +502,7 @@ move_ball:
 		CLC	
 		LDA ballxv
 		ADC ballx
-		STA TMP2
+		STA ballnextx
 
 ;    IF at border reverse XV
         LDX #BORDER_X_MIN
@@ -555,8 +521,8 @@ move_ball:
         TXA
         ASL
         SEC
-        SBC TMP2
-        STA TMP2
+        SBC ballnextx
+        STA ballnextx
         INC wallbounce
 	
 ;    Add YV to Y -> nexty
@@ -564,7 +530,7 @@ mb_do_y:
 		CLC
 		LDA ballyv
 		ADC bally
-		STA TMP2+1
+		STA ballnexty
 		
 ; 2. IF Y at bot edge go to pause state and reset ball and bar
 		CMP #BORDER_Y_MAX
@@ -581,8 +547,8 @@ mb_do_y:
         LDA #BORDER_Y_MIN
         ASL
         SEC
-        SBC TMP2+1
-        STA TMP2+1
+        SBC ballnexty
+        STA ballnexty
         INC wallbounce
 
 ; 3 If bounced at a wall, update position and go back to start 
@@ -591,11 +557,12 @@ mb_check_if_bounced:
         CMP #0
         BEQ mb_hit_bat_check
     ; resolve
-		LDA TMP2
-		STA ballx				; store new X
-		LDA TMP2+1
-		STA bally				; store new Y
-        JMP move_ball
+        JMP mb_check_brick
+		;LDA ballnextx
+		;STA ballx				; store new X
+		;LDA ballnexty
+		;STA bally				; store new Y
+        ;JMP move_ball
 
 ; at this point, wall bounces are resolved and next position is either
 ;  - possible bounce off bat
@@ -605,7 +572,7 @@ mb_check_if_bounced:
 ; 4. Check bat first
 mb_hit_bat_check:
         ; Is nextY on the same line as the bat?
-        LDA TMP2+1  
+        LDA ballnexty  
         LSR
         CMP #BAT_LINE_DIV2      ; can only hit bat on one line
         BNE mb_check_brick
@@ -618,13 +585,13 @@ JSR acia_putc
 JSR print_ball_xy
 JSR acia_put_newline
         
-        LDA TMP2                ; next ball x
+        LDA ballnextx                ; next ball x
         CMP batx                ; Bat leftmost pos
         BCC jmp_mb_store_final  ; ballx < batx
         CLC
         LDA batx
         ADC #BAT_WIDTH 
-        CMP TMP2
+        CMP ballnextx
         BCC jmp_mb_store_final  ; batx+12 < ballx
         ; reverse Y dir
 		LDA ballyv
@@ -635,11 +602,11 @@ JSR acia_put_newline
         LDA #BAT_LINE
         ASL
         SEC
-        SBC TMP2+1
-        STA TMP2+1
+        SBC ballnexty
+        STA ballnexty
 
     ; change x speed if hit left edge of bat
-        LDA TMP2                ; next ball x
+        LDA ballnextx                ; next ball x
         SEC
         SBC batx
         CMP #BAT_EDGE_SIZE                ; Bat leftmost 2 pixels
@@ -673,15 +640,15 @@ JSR print_ball_speed
 JSR acia_put_newline
         JMP mb_store_final
 
-; 5. Check bricks. We still have nextX/Y in TMP2
+; 5. Check bricks. We still have nextX/Y in ballnextx/y
 mb_check_brick:
         ; only check if Y < 28
-        LDA TMP2+1  ; next ballY
+        LDA ballnexty  ; next ballY
         CMP #28
         BCS mb_store_final ; no chance of hitting bricks so resolve and exit
 
         ; calc ball pos in name table
-        JSR get_NT_read_addr_for_ball
+        JSR get_NT_read_addr_for_ballnext
         JSR vdp_read
         CMP #0              
         BEQ mb_store_final  ; char == 0 is a space. Resolve and exit.
@@ -692,31 +659,46 @@ jsr fmt_hex_string
 jsr acia_puts
 jsr acia_put_newline
 
-jmp mb_store_final
+;jmp mb_store_final
 
         ; Hit. set NT at this pos blank
-        JSR draw_ball_set_address_y
-        LDA #GR_SPACE
-        JSR vdp_write
+        ;JSR draw_ball_set_address_y
+        ;LDA #GR_SPACE
+        ;JSR vdp_write
         ; bounce
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
+        ; subtract y
+        LDA ballnexty
+        CLC
+        ADC ballyv
+        STA ballnexty
 
 ; 6. Resolve next x/y 
 mb_store_final:
 		; change is good, save into ball position
-		LDA TMP2
+		LDA ballnextx
 		STA ballx				; store new X
-		LDA TMP2+1
+		LDA ballnexty
 		STA bally				; store new Y
 
         RTS
 
 ;--------------------------------------------------
-get_NT_read_addr_for_ball:
-        JSR draw_ball_set_address_y
-        LDA ballx
+get_NT_read_addr_for_ballnext:
+        LDA ballnexty   ; calc bally/4 * 32 == bally * 8
+        AND #$FC    ; /4 *4 gets rid of 2xlsb
+        STA TMP0    ; store result in TMP0
+        STZ TMP0+1
+
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        LDA ballnextx
         LSR         ; 
         LSR         ; ballx/4
         STA TMP1
@@ -826,7 +808,7 @@ lg_byte_loop:
         JSR lg_set_cols
         LDA #FG_MED_GREEN | BG_BLACK
         JSR lg_set_cols
-        LDA #FG_LIT_YELLOW | BG_BLACK
+        LDA #FG_MAGENTA | BG_BLACK
         JSR lg_set_cols
         RTS
 
@@ -1063,7 +1045,7 @@ NUM_GRAPH_CHARS = $3C
 
 GRAPHICS_TAB:
     GR_SPACE = 0
-    .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
+    .byte $80,$00,$00,$00,$00,$00,$00,$00   ; space
     GR_HALF_TOP = 1
     .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; top half
     GR_HALF_BOT = 2
