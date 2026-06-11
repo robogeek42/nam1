@@ -1,6 +1,8 @@
 ; vim: ts=4 et sw=4
 ; Table 2-1 from TMS9918A Datasheet
 ;
+.setcpu "65C02"
+
 ;+--------------------+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+------+
 ;|                    |                    Bits                       |     | !a1 |  a0  |
 ;|    Operation       |  0  |  1  |  2  |  3  |  4  |  5  |  6  |  7  | CSW | CSR | MODE | a1  a0  
@@ -36,11 +38,14 @@
 .export vdp_set_addr_w
 .export vdp_set_addr_r
 .export vdp_setaddr_name_table
+.export vdp_setaddr_name_table_offset_g2
+.export vdp_setaddr_name_table_offset_g2_read
 .export vdp_setaddr_pattern_table
 .export vdp_setaddr_pattern_table_g1
 .export vdp_setaddr_pattern_table_g2
 .export vdp_setaddr_color_table_g1
 .export vdp_setaddr_color_table_g2
+.export vdp_setaddr_color_table_offset_g2
 .export vdp_setaddr_sprite_attribute_table
 .export vdp_setaddr_sprite_pattern_table
 .export vdp_setaddr_pattern_table_offset
@@ -176,6 +181,41 @@ vdp_setaddr_color_table_g2:
                 JSR vdp_set_addr_w
                 RTS
 
+vdp_setaddr_name_table_offset_g2:  ;; add TMP0[L],TMP0+1[H] to name offset
+                PHY
+                LDY TMP0
+                LDA VDP_REGS+2     ;; Set VRAM address to name table (VDP_REG2 * 0x400)
+                ASL
+                ASL
+                CLC
+                ADC TMP0+1
+                JSR vdp_set_addr_w
+                PLY
+                RTS
+vdp_setaddr_name_table_offset_g2_read:  ;; add TMP0[L],TMP0+1[H] to name offset
+                PHY
+                LDY TMP0
+                LDA VDP_REGS+2     ;; Set VRAM address to name table (VDP_REG2 * 0x400)
+                ASL
+                ASL
+                CLC
+                ADC TMP0+1
+                JSR vdp_set_addr_r
+                PLY
+                RTS
+
+vdp_setaddr_color_table_offset_g2:
+                LDA VDP_REGS+3   ;; Color table
+                AND #$80            ;; just want upper bit
+                CLC
+                ROR
+                ROR
+                CLC                 ;; offset
+                ADC TMP0+1
+                LDY TMP0
+                JSR vdp_set_addr_w
+                RTS
+                
 ;----------------------------------------------------------------
 ; VDP Write VRAM
 vdp_write:
