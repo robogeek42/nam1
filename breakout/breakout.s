@@ -1045,7 +1045,7 @@ NUM_GRAPH_CHARS = $3C
 
 GRAPHICS_TAB:
     GR_SPACE = 0
-    .byte $80,$00,$00,$00,$00,$00,$00,$00   ; space
+    .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
     GR_HALF_TOP = 1
     .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; top half
     GR_HALF_BOT = 2
