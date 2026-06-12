@@ -33,6 +33,7 @@ IRQ_EVENT   = bout_vars+13
 ballnextx   = bout_vars+14
 ballnexty   = bout_vars+15
 wallbounce  = bout_vars+16  ; temp flag if bounced
+hit_side    = bout_vars+17  ; if zero last hit was vertical else from side
 
 br_c0_vol	= bout_vars+20;
 strbuf2		= bout_vars+21;
@@ -663,7 +664,21 @@ mb_check_brick:
         ; Hit.
         JSR brick_hit
 
-        ; bounce
+        LDA hit_side
+        BNE mb_bounce_vertical
+        ; bounce horizontal
+		LDA ballxv
+		TWOSCOMP
+		STA ballxv
+        ; subtract x
+        LDA ballnextx
+        CLC
+        ADC ballxv
+        STA ballnextx
+        JMP mb_store_final
+        
+mb_bounce_vertical:
+        ; bounce vertical
 		LDA ballyv
 		TWOSCOMP
 		STA ballyv
@@ -749,6 +764,14 @@ brick_hit:
         ORA #1
         STA TMP0
         STZ TMP0+1
+
+        ; work out if the brick that was hit was 
+        ; hit from above/below or from the side
+        ;   if there is a brick above/below, then hit is vertical
+        ;   else it is horizontal
+        JSR vdp_setaddr_name_table_offset_g2_read
+        JSR vdp_read
+        STA hit_side
         
         ; Set 2 bricks of char to space
         JSR vdp_setaddr_name_table_offset_g2
