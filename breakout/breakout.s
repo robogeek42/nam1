@@ -24,6 +24,7 @@ bally	= bout_vars+1
 ballxv	= bout_vars+4		; ball velocity in X
 ballyv	= bout_vars+5		; ball velocity in Y
 batx    = bout_vars+6		; left pos of bat
+balls   = bout_vars+7
 
 br_game		= bout_vars+8; Game state. 0=not started, 1=playing, 2=pause, FF=quit, FE=win message
 IRQ_COUNT	= bout_vars+9
@@ -34,6 +35,9 @@ ballnextx   = bout_vars+14
 ballnexty   = bout_vars+15
 wallbounce  = bout_vars+16  ; temp flag if bounced
 hit_side    = bout_vars+17  ; if zero last hit was vertical else from side
+
+scorel  = bout_vars+18
+scoreh  = bout_vars+19
 
 br_c0_vol	= bout_vars+20;
 strbuf2		= bout_vars+21;
@@ -60,8 +64,6 @@ BALL_INITIAL_UPDATE_SPEED = 4
 IRQ_ADDR = $20A
 
 .bss
-score_buffer:
-	.res 4,0
 
 .code
 
@@ -80,14 +82,19 @@ breakout:
 
         JSR load_graphics
 
-; Draw board
-        JSR draw_board
-
 ;; initialise game variables
 		STZ br_game
-
         JSR mb_starting_pos
-		
+        LDA #0
+	    STA scorel	
+	    STZ scoreh	
+        LDA #4
+        STA balls
+
+; Draw board
+        JSR draw_board
+        JSR display_score
+        JSR display_balls
 
 ;---------------------------------------
 .if .def(PS2K) || .def(VKEYB)
@@ -741,6 +748,11 @@ get_NT_read_addr_for_ballnext:
 ;---------------------------------------
 ; brick hit
 brick_hit:
+        LDA #10
+        STA TMP0
+        add8To16 TMP0, scorel
+        JSR display_score
+
         ; get char position directly above or below ball
         LDA bally
         CLC
@@ -968,6 +980,90 @@ clear_paddle_line:
         RTS
 
 ;----------------------------------------------------------------------
+; display score
+display_score:
+        LDA scorel
+        STA R1
+        LDA scoreh
+        STA R1+1
+		JSR BINBCD16               ; convert to BCD and write in TMP0,TMP0+1,TMP1 (3bytes)
+        ; up to 3 BCD "bytes" - 6 digits
+        ; each nibble is a BCD digit
+
+        ld16 R0, strbuf2           ; output buffer
+
+        JSR get_padding            ; num padding 0s in X
+        CPX #0
+        BEQ @ds_over
+        LDY #0
+    @ds_pad_loop:
+        LDA #'0'+$80
+        STA (R0),Y
+        inc16 R0
+        DEX
+        BNE @ds_pad_loop
+
+    @ds_over:        
+        JSR BCD4BYTE2STR           ; convert BCD to string
+    ; convert chars to reverse mode (+128)
+        LDY #0
+    @ds_loop:
+        LDA (R0),Y
+        BEQ @ds_done
+        CLC
+        ADC #$80
+        STA (R0),Y
+        INY
+        BNE @ds_loop
+    @ds_done:
+
+        ld16 R0, strbuf2
+
+        ; set screenpos in VDP_CURS
+        STZ VDP_CURS+1
+        LDA #26
+        STA VDP_CURS
+        JSR vdp_write_text
+        RTS
+
+; padding for a 6 digit BCD number (0-5) in X
+; if the number is zero then the last zero will be printed by above
+get_padding:
+        LDX #0          ; number of zeros
+        LDA TMP0+2
+        BNE @gp_get_last
+        INX
+        INX
+        LDA TMP0+1
+        BNE @gp_get_last
+        INX
+        INX
+        LDA TMP0
+
+    @gp_get_last:
+        CMP #$10
+        BCS @gp_done
+        INX
+
+    @gp_done:
+        RTS
+
+display_balls:
+        STZ VDP_CURS+1
+        LDA #6
+        STA VDP_CURS
+        ld16 R0,strbuf2
+        LDY #0
+        LDA balls
+        CLC
+        ADC #$80+$30
+        STA (R0),Y
+        INY
+        LDA #0
+        STA (R0),Y
+        JSR vdp_write_text
+        RTS
+;----------------------------------------------------------------------
 ; Sound
 ;
 .ifdef SOUND
@@ -1062,7 +1158,7 @@ quit_message:
 SCR_ROW_INDEX:
     .byte $00,$01,$03,$04,$05,$06,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$02
 SCR_ROWS:
-    .byte $16,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$15
+    .byte $C2,$C1,$CC,$CC,$D3,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$A0,$D3,$C3,$CF,$D2,$C5,$A0,$A0,$A0,$A0,$A0,$A0,$A0
     .byte $04,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$03
     .byte $14,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$13
 ; all col1
@@ -1200,3 +1296,4 @@ BRICK_COLOUR:
     .byte $00,$FF,$FF,$FF,$FF,$FF,$FF,$00   ; simple brick all to edges
     .byte $00,$7F,$7F,$7F,$7F,$7F,$7F,$00   ; brick left part
     .byte $00,$FE,$FE,$FE,$FE,$FE,$FE,$00   ; brick right part
+
