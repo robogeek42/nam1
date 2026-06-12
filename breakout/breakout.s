@@ -1102,13 +1102,13 @@ GRAPHICS_TAB:
     GR_SPACE = 0
     .byte $00,$00,$00,$00,$00,$00,$00,$00   ; space
     GR_HALF_TOP = 1
-    .byte $FF,$FF,$FF,$FF,$00,$00,$00,$00   ; top half
+    .byte $FF,$FF,$FF,$FF,$55,$AA,$55,$AA   ; top half
     GR_HALF_BOT = 2
-    .byte $00,$00,$00,$00,$FF,$FF,$FF,$FF   ; bot half
+    .byte $55,$AA,$55,$AA,$FF,$FF,$FF,$FF   ; bot half
     GR_HALF_LEFT = 3
-    .byte $F0,$F0,$F0,$F0,$F0,$F0,$F0,$F0   ; left half
+    .byte $F5,$FA,$F5,$FA,$F5,$FA,$F5,$FA   ; left half
     GR_HALF_RIGHT = 4
-    .byte $0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F   ; right half
+    .byte $5F,$AF,$5F,$AF,$5F,$AF,$5F,$AF   ; right half
     GR_HALF_TOP_LEFT = 5
     .byte $FF,$FF,$FF,$FF,$F0,$F0,$F0,$F0   ; top and left
     GR_HALF_TOP_RIGHT = 6
@@ -1143,13 +1143,13 @@ BAT_DATA:
 BALL_DATA:
     ; 4x4 blocks by quadrant
     BALL_TL = $13
-    .byte $F0,$F0,$F0,$F0,$00,$00,$00,$00   ; T L
+    .byte $F5,$FA,$F5,$FA,$55,$AA,$55,$AA   ; T L
     BALL_TR = $14
-    .byte $0F,$0F,$0F,$0F,$00,$00,$00,$00   ; T R
+    .byte $5F,$AF,$5F,$AF,$55,$AA,$55,$AA   ; T R
     BALL_BL = $15
-    .byte $00,$00,$00,$00,$F0,$F0,$F0,$F0   ; B L
+    .byte $55,$AA,$55,$AA,$F5,$FA,$F5,$FA   ; B L
     BALL_BR = $16
-    .byte $00,$00,$00,$00,$0F,$0F,$0F,$0F   ; B R
+    .byte $55,$AA,$55,$AA,$5F,$AF,$5F,$AF   ; B R
 
 BALL_DATA_2pix:
     ; $17
