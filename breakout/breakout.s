@@ -577,13 +577,13 @@ mb_hit_bat_check:
         CMP #BAT_LINE_DIV2      ; can only hit bat on one line
         BNE mb_check_brick
 
-; debug
+;; debug
+;;JSR acia_put_newline
+;JSR print_bat_x
+;LDA #' ' 
+;JSR acia_putc
+;JSR print_ball_xy
 ;JSR acia_put_newline
-JSR print_bat_x
-LDA #' ' 
-JSR acia_putc
-JSR print_ball_xy
-JSR acia_put_newline
         
         LDA ballnextx                ; next ball x
         CMP batx                ; Bat leftmost pos
@@ -623,9 +623,9 @@ jmp_mb_store_final:
         LDA ballxv
         SBC #1
         STA ballxv
-; debug
-JSR print_ball_speed
-JSR acia_put_newline
+;; debug
+;JSR print_ball_speed
+;JSR acia_put_newline
 
         JMP mb_store_final
 
@@ -635,9 +635,10 @@ JSR acia_put_newline
         LDA ballxv
         ADC #1
         STA ballxv
-; debug
-JSR print_ball_speed
-JSR acia_put_newline
+;; debug
+;JSR print_ball_speed
+;JSR acia_put_newline
+
         JMP mb_store_final
 
 ; 5. Check bricks. We still have nextX/Y in ballnextx/y
@@ -653,18 +654,15 @@ mb_check_brick:
         CMP #0              
         BEQ mb_store_final  ; char == 0 is a space. Resolve and exit.
 
-; debug 
-ld16 R0, strbuf2
-jsr fmt_hex_string
-jsr acia_puts
-jsr acia_put_newline
+;; debug 
+;ld16 R0, strbuf2
+;jsr fmt_hex_string
+;jsr acia_puts
+;jsr acia_put_newline
 
-;jmp mb_store_final
+        ; Hit.
+        JSR brick_hit
 
-        ; Hit. set NT at this pos blank
-        ;JSR draw_ball_set_address_y
-        ;LDA #GR_SPACE
-        ;JSR vdp_write
         ; bounce
 		LDA ballyv
 		TWOSCOMP
@@ -704,27 +702,61 @@ get_NT_read_addr_for_ballnext:
         STA TMP1
         add8To16 TMP1, TMP0
 
-; debug
-ld16 R0, strbuf2
-LDA TMP0
-STA ZP_TMP0
-LDA TMP0+1
-STA ZP_TMP0+1
-jsr fmt_hex_string
-jsr acia_puts
-LDA ZP_TMP0
-jsr fmt_hex_string
-jsr acia_puts
-lda #' '
-jsr acia_putc
-LDA ZP_TMP0
-STA TMP0
-LDA ZP_TMP0+1
-STA TMP0+1
+;; debug
+;ld16 R0, strbuf2
+;LDA TMP0
+;STA ZP_TMP0
+;LDA TMP0+1
+;STA ZP_TMP0+1
+;jsr fmt_hex_string
+;jsr acia_puts
+;LDA ZP_TMP0
+;jsr fmt_hex_string
+;jsr acia_puts
+;lda #' '
+;jsr acia_putc
+;LDA ZP_TMP0
+;STA TMP0
+;LDA ZP_TMP0+1
+;STA TMP0+1
 
         JSR vdp_setaddr_name_table_offset_g2_read
         RTS
 
+;---------------------------------------
+; brick hit
+brick_hit:
+        ; get char position directly above or below ball
+        LDA bally
+        CLC
+        ADC ballyv
+        AND #$FC
+        ASL     
+        ASL     
+        ASL     
+        STA TMP0        ; ((bally + speed) / 4) * 32
+        LDA ballx
+        LSR
+        LSR             
+        CLC
+        ADC TMP0        ; + (ballx / 4)
+                        ; always in top third of NT so < 256 total
+        STA TMP0
+        ; get leftmost brick (odd)
+        ;   : subtract 1 and set LSB
+        DEC TMP0
+        LDA TMP0
+        ORA #1
+        STA TMP0
+        STZ TMP0+1
+        
+        ; Set 2 bricks of char to space
+        JSR vdp_setaddr_name_table_offset_g2
+        LDA #GR_SPACE
+        JSR vdp_write
+        JSR vdp_write
+        RTS
+        
 
 ;---------------------------------------
 ;
