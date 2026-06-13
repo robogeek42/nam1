@@ -26,7 +26,7 @@ ballyv	= bout_vars+5		; ball velocity in Y
 batx    = bout_vars+6		; left pos of bat
 balls   = bout_vars+7
 
-br_game		= bout_vars+8; Game state. 0=not started, 1=playing, 2=pause, FF=quit, FE=win message
+br_game		= bout_vars+8; Game state. 0=not started, 1=playing, 2=pause, FF=quit
 IRQ_COUNT	= bout_vars+9
 IRQ_OLD		= bout_vars+10 ; 2 bytes
 ball_update	= bout_vars+12  ; number of 1/60sec intervals between updating ball
@@ -42,6 +42,13 @@ scoreh  = bout_vars+19
 br_c0_vol	= bout_vars+20;
 strbuf2		= bout_vars+21;
 
+GS_NOT_STARTED = 0
+GS_PLAYING     = 1
+GS_PAUSE       = 2
+GS_END         = 3
+GS_WAIT_RESTART = 4
+GS_QUIT        = $FF
+
 BORDER_X_MIN = 4
 BORDER_X_MAX = 122
 BORDER_Y_MIN = 4
@@ -53,10 +60,11 @@ BAT_WIDTH = 12
 BAT_EDGE_SIZE = 2
 START_BAT = 60
 
-START_BALL_X = 62
+START_BALL_X = 5    ; i.e. bat_x + 5
 START_BALL_Y = 84
 START_BALL_VX = $02
 START_BALL_VY = $FE
+START_BALLS = 3
 
 BALL_INITIAL_UPDATE_SPEED = 4
 
@@ -82,19 +90,7 @@ breakout:
 
         JSR load_graphics
 
-;; initialise game variables
-		STZ br_game
-        JSR mb_starting_pos
-        LDA #0
-	    STA scorel	
-	    STZ scoreh	
-        LDA #4
-        STA balls
-
-; Draw board
-        JSR draw_board
-        JSR display_score
-        JSR display_balls
+        JSR initialise
 
 ;---------------------------------------
 .if .def(PS2K) || .def(VKEYB)
@@ -136,6 +132,7 @@ pih_enable_vdp_irq:
 
 		JSR vdp_getstatus   ;; clear interrupt flag in VDP
 
+
 ; Start allowing interrupts at CPU
 		CLI
 
@@ -161,14 +158,19 @@ check_irq_count:
 
 		JSR sound_vol       ; reduce sound vol after a note
 
-		LDA br_game		; check game state:
-		CMP #$00		; 	game not started?
-		BEQ game_loop	; 		yes, keep just checking input and drawing paddles
-		CMP #$02		;   pause state?
-		BEQ game_loop
-		CMP #$FF		; 	quit requested?
-		BNE gl_dogame	; 		no, then continue
-		JMP quit_game	; 		yes, quit
+		LDA br_game		        ; check game state:
+		CMP #GS_NOT_STARTED		; 	game not started?
+		BEQ game_loop	        ; 		yes, keep just checking input and drawing paddles
+        CMP #GS_PLAYING
+        BEQ gl_dogame
+		CMP #GS_PAUSE		    ;   pause state?
+		BEQ gl_pause_state
+		CMP #GS_QUIT		    ; 	quit requested?
+		BEQ quit_game	
+        CMP #GS_END
+        BEQ end_game
+
+		JMP game_loop
 
 gl_dogame:
         LDA IRQ_COUNT
@@ -180,11 +182,18 @@ gl_dogame:
 		JSR move_ball
 		JSR draw_ball2
 
-		JSR check_game
-		;JSR draw_score
-
 gl_skip_update:
         JMP game_loop
+
+gl_pause_state:
+		JSR clear_ball
+        LDA batx
+        CLC
+        ADC #START_BALL_X
+        STA ballx
+		JSR draw_ball2
+        JMP game_loop
+        
 
 ;---------------------------------------
 ; Interrupt handler
@@ -199,6 +208,69 @@ BOUT_IRQ:
 		RTI
 ;---------------------------------------
 
+;---------------------------------------
+end_game:
+		ld16 R0,msg_game_over
+        LDA #$01 
+        STA VDP_CURS+1
+        LDA #$6B
+        STA VDP_CURS
+        JSR vdp_write_text
+        LDA #GS_WAIT_RESTART
+        STA br_game
+        JMP game_loop
+        
+;---------------------------------------
+quit_game:
+		ld16 R0,msg_quit
+		JSR acia_puts
+; restore interrupt vector 
+pih_restore_irq:
+		LDA IRQ_OLD
+		STA IRQ_ADDR
+		LDA IRQ_OLD+1
+		STA IRQ_ADDR+1
+; disable interrupts at CPU
+		SEI
+
+; disable interrupts from VDP
+		LDA VDP_REGS+1	  ;; data to write is existing Reg1
+		AND #$DF			;; unset interrupt bit
+		STA VDP_REGS+1
+		LDY #$81			;; register to write (1)
+		JSR vdp_regwrite
+
+		JSR vdp_getstatus   ;; clear interrupt flag in VDP
+
+.ifdef SOUND
+		; stop any sounds
+		JSR snd_all_off
+.endif
+.if .def(PS2K) || .def(VKEYB)
+		; reenable typematic repeat
+		jsr KBTMON
+.endif
+		LDA #0
+		JSR vdp_set_mode
+		RTS
+;---------------------------------------
+
+;; initialise game variables and display
+initialise:
+        LDA #GS_NOT_STARTED
+		STA br_game
+        JSR mb_starting_pos
+        LDA #0
+	    STA scorel	
+	    STZ scoreh	
+        LDA #START_BALLS
+        STA balls
+
+; Draw board
+        JSR draw_board
+        JSR display_score
+        JSR display_balls
+        RTS
 
 ;---------------------------------------
 ; Get input from ACIA
@@ -223,13 +295,21 @@ gi_done:
 		RTS
 
 gi_do_QUIT:
-		LDA #$FF
+		LDA #GS_QUIT
 		STA br_game
 		rts
 gi_do_START:
-		LDA #$01
+        LDA br_game
+        CMP #GS_WAIT_RESTART
+        BNE @over
+        JSR initialise
+        LDA #GS_PAUSE
+        STA br_game
+        RTS
+    @over:
+		LDA #GS_PLAYING
 		STA br_game
-		rts
+		RTS
 
 gi_move_left:
 		LDA batx
@@ -333,11 +413,6 @@ gip_do_LEFT:
 		rts
 
 .endif
-
-;---------------------------------------
-; Check game conditions
-check_game:
-		RTS
 
 ;---------------------------------------
 ; Draw ball
@@ -480,7 +555,18 @@ clear_ball:
 ;--------------------------------------------------
 ; Lost ball. Reset ball and bat and pause game
 mb_lost_ball:
-        LDA #2
+        DEC balls
+        JSR display_balls
+        LDA balls
+        BNE mlb_continue
+        LDA #GS_END
+        STA br_game
+lda #'e'
+jsr acia_putc
+        RTS
+
+    mlb_continue:
+        LDA #GS_PAUSE
         STA br_game
 
 mb_starting_pos:
@@ -488,7 +574,7 @@ mb_starting_pos:
 		LDA #START_BAT
 		STA batx
 	; starting ball position and speed
-		LDA #START_BALL_X 
+		LDA #START_BALL_X + START_BAT
 		STA ballx
 		LDA #START_BALL_Y 
 		STA bally
@@ -792,41 +878,6 @@ brick_hit:
         JSR vdp_write
         RTS
         
-
-;---------------------------------------
-;
-quit_game:
-		ld16 R0,quit_message
-		JSR acia_puts
-; restore interrupt vector 
-pih_restore_irq:
-		LDA IRQ_OLD
-		STA IRQ_ADDR
-		LDA IRQ_OLD+1
-		STA IRQ_ADDR+1
-; disable interrupts at CPU
-		SEI
-
-; disable interrupts from VDP
-		LDA VDP_REGS+1	  ;; data to write is existing Reg1
-		AND #$DF			;; unset interrupt bit
-		STA VDP_REGS+1
-		LDY #$81			;; register to write (1)
-		JSR vdp_regwrite
-
-		JSR vdp_getstatus   ;; clear interrupt flag in VDP
-
-.ifdef SOUND
-		; stop any sounds
-		JSR snd_all_off
-.endif
-.if .def(PS2K) || .def(VKEYB)
-		; reenable typematic repeat
-		jsr KBTMON
-.endif
-		LDA #0
-		JSR vdp_set_mode
-		RTS
 
 ;----------------------------------------------------------------------
 ; load custom graphics chars 
@@ -1151,8 +1202,10 @@ print_ball_speed:
 		;jsr acia_put_newline
 		rts
 
-quit_message:
+msg_quit:
 	.byte "Goodbye!",$0d,$0a,$00
+msg_game_over:
+	.byte "GAME OVER",$00
 
 
 SCR_ROW_INDEX:
