@@ -650,6 +650,9 @@ mb_check_if_bounced:
         LDA wallbounce
         CMP #0
         BEQ mb_hit_bat_check
+.ifdef SOUND
+		JSR sound_ping
+.endif
     ; resolve
         JMP mb_check_brick
 		;LDA ballnextx
@@ -708,6 +711,11 @@ mb_hit_bat_check:
         CMP #BAT_WIDTH-BAT_EDGE_SIZE      ; bat rightmost 2 pixels
         BCS mb_hit_right_part ; ballx-batx >= 10
         ; can't hit bricks from here so we are done
+
+.ifdef SOUND
+		JSR sound_pong
+.endif
+
 jmp_mb_store_final:
         JMP mb_store_final
 
@@ -721,6 +729,10 @@ jmp_mb_store_final:
 ;JSR print_ball_speed
 ;JSR acia_put_newline
 
+.ifdef SOUND
+		JSR sound_pong2
+.endif
+
         JMP mb_store_final
 
     mb_hit_right_part:
@@ -732,6 +744,10 @@ jmp_mb_store_final:
 ;; debug
 ;JSR print_ball_speed
 ;JSR acia_put_newline
+
+.ifdef SOUND
+		JSR sound_pong2
+.endif
 
         JMP mb_store_final
 
@@ -838,6 +854,9 @@ brick_hit:
         STA TMP0
         add8To16 TMP0, scorel
         JSR display_score
+.ifdef SOUND
+		JSR sound_ping
+.endif
 
         ; get char position directly above or below ball
         LDA bally
@@ -1148,12 +1167,23 @@ sound_pong:
 		JSR snd_write
 		STZ br_c0_vol
 		RTS
+sound_pong2:
+		; Set frequency to %0100000110 = 262 -> 3.6864MHz/32*262 ~= 440Hz
+		LDA #%10000110  ; Freq Channel 1 (of 3)
+		JSR snd_write
+		LDA #%00011000  ; Freq DDDDDD 
+		JSR snd_write
+		LDA #%10010000 ; c0 vol = full (0)
+		JSR snd_write
+		STZ br_c0_vol
+		RTS
 sound_score:
 		RTS
 .else
 sound_vol:
 sound_ping:
 sound_pong:
+sound_pong2:
 sound_score:
 		RTS
 .endif
