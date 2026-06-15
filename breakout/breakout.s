@@ -34,7 +34,7 @@ IRQ_EVENT   = bout_vars+13
 ballnextx   = bout_vars+14
 ballnexty   = bout_vars+15
 wallbounce  = bout_vars+16  ; temp flag if bounced
-hit_side    = bout_vars+17  ; if zero last hit was vertical else from side
+hit_vertical = bout_vars+17  ; if zero last hit was vertical else from side
 
 scorel  = bout_vars+18
 scoreh  = bout_vars+19
@@ -561,8 +561,8 @@ mb_lost_ball:
         BNE mlb_continue
         LDA #GS_END
         STA br_game
-lda #'e'
-jsr acia_putc
+;lda #'e'
+;jsr acia_putc
         RTS
 
     mlb_continue:
@@ -759,7 +759,8 @@ mb_check_brick:
         BCS mb_store_final ; no chance of hitting bricks so resolve and exit
 
         ; calc ball pos in name table
-        JSR get_NT_read_addr_for_ballnext
+        JSR get_NT_addr_for_ballnext
+        JSR vdp_setaddr_name_table_offset_g2_read
         JSR vdp_read
         CMP #0              
         BEQ mb_store_final  ; char == 0 is a space. Resolve and exit.
@@ -773,8 +774,25 @@ mb_check_brick:
         ; Hit.
         JSR brick_hit
 
-        LDA hit_side
+        ; blank whole brick
+        ;
+        JSR get_NT_addr_for_ballnext
+        ; get leftmost brick (odd)
+        ;   : subtract 1 and set LSB
+        DEC TMP0
+        LDA TMP0
+        ORA #1
+        STA TMP0
+        STZ TMP0+1
+        JSR vdp_setaddr_name_table_offset_g2
+        LDA #GR_SPACE
+        JSR vdp_write
+        JSR vdp_write
+
+        LDA hit_vertical
         BNE mb_bounce_vertical
+lda #'H'
+jsr acia_putc
         ; bounce horizontal
 		LDA ballxv
 		TWOSCOMP
@@ -787,6 +805,8 @@ mb_check_brick:
         JMP mb_store_final
         
 mb_bounce_vertical:
+lda #'V'
+jsr acia_putc
         ; bounce vertical
 		LDA ballyv
 		TWOSCOMP
@@ -808,7 +828,7 @@ mb_store_final:
         RTS
 
 ;--------------------------------------------------
-get_NT_read_addr_for_ballnext:
+get_NT_addr_for_ballnext:
         LDA ballnexty   ; calc bally/4 * 32 == bally * 8
         AND #$FC    ; /4 *4 gets rid of 2xlsb
         STA TMP0    ; store result in TMP0
@@ -844,7 +864,6 @@ get_NT_read_addr_for_ballnext:
 ;LDA ZP_TMP0+1
 ;STA TMP0+1
 
-        JSR vdp_setaddr_name_table_offset_g2_read
         RTS
 
 ;---------------------------------------
@@ -888,15 +907,9 @@ brick_hit:
         ;   else it is horizontal
         JSR vdp_setaddr_name_table_offset_g2_read
         JSR vdp_read
-        STA hit_side
+        STA hit_vertical
         
-        ; Set 2 bricks of char to space
-        JSR vdp_setaddr_name_table_offset_g2
-        LDA #GR_SPACE
-        JSR vdp_write
-        JSR vdp_write
         RTS
-        
 
 ;----------------------------------------------------------------------
 ; load custom graphics chars 
