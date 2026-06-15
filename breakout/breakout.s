@@ -683,11 +683,15 @@ mb_hit_bat_check:
 ;JSR acia_put_newline
         
         LDA ballnextx                ; next ball x
+        ; add 1 to account for ball size
+        CLC
+        ADC #1
         CMP batx                ; Bat leftmost pos
         BCC jmp_mb_store_final  ; ballx < batx
         CLC
         LDA batx
         ADC #BAT_WIDTH 
+        ADC #1
         CMP ballnextx
         BCC jmp_mb_store_final  ; batx+12 < ballx
         ; reverse Y dir
