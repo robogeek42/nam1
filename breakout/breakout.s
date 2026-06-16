@@ -733,11 +733,14 @@ jmp_mb_store_final:
         SEC
         LDA ballxv
         SBC #1
+        ; don't allow to go to zero
+        BEQ mbhl_over
         STA ballxv
 ;; debug
 ;JSR print_ball_speed
 ;JSR acia_put_newline
 
+    mbhl_over:
 .ifdef SOUND
 		JSR sound_pong2
 .endif
@@ -749,11 +752,14 @@ jmp_mb_store_final:
         CLC
         LDA ballxv
         ADC #1
+        ; don't allow to go to zero
+        BEQ mbhr_over
         STA ballxv
 ;; debug
 ;JSR print_ball_speed
 ;JSR acia_put_newline
 
+    mbhr_over:
 .ifdef SOUND
 		JSR sound_pong2
 .endif
