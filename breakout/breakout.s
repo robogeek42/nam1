@@ -35,12 +35,15 @@ ballnextx   = bout_vars+14
 ballnexty   = bout_vars+15
 wallbounce  = bout_vars+16  ; temp flag if bounced
 hit_vertical = bout_vars+17  ; if zero last hit was vertical else from side
+brick_hit_state_horizontal = bout_vars+18
+brick_hit_state_vertical = bout_vars+19
 
-scorel  = bout_vars+18
-scoreh  = bout_vars+19
+scorel  = bout_vars+20
+scoreh  = bout_vars+21
 
-br_c0_vol	= bout_vars+20;
-strbuf2		= bout_vars+21;
+br_c0_vol	= bout_vars+22;
+
+strbuf2		= bout_vars+32;
 
 GS_NOT_STARTED = 0
 GS_PLAYING     = 1
@@ -67,6 +70,8 @@ START_BALL_VY = $FE
 START_BALLS = 3
 
 BALL_INITIAL_UPDATE_SPEED = 4
+
+SCORE_BRICK_HIT = 10
 
 ; IRQ location - points to address part of JMP xxxx
 IRQ_ADDR = $20A
@@ -762,64 +767,7 @@ mb_check_brick:
         CMP #28
         BCS mb_store_final ; no chance of hitting bricks so resolve and exit
 
-        ; calc ball pos in name table
-        JSR get_NT_addr_for_ballnext
-        JSR vdp_setaddr_name_table_offset_g2_read
-        JSR vdp_read
-        CMP #0              
-        BEQ mb_store_final  ; char == 0 is a space. Resolve and exit.
-
-;; debug 
-;ld16 R0, strbuf2
-;jsr fmt_hex_string
-;jsr acia_puts
-;jsr acia_put_newline
-
-        ; Hit.
-        JSR brick_hit
-
-        ; blank whole brick
-        ;
-        JSR get_NT_addr_for_ballnext
-        ; get leftmost brick (odd)
-        ;   : subtract 1 and set LSB
-        DEC TMP0
-        LDA TMP0
-        ORA #1
-        STA TMP0
-        STZ TMP0+1
-        JSR vdp_setaddr_name_table_offset_g2
-        LDA #GR_SPACE
-        JSR vdp_write
-        JSR vdp_write
-
-        LDA hit_vertical
-        BNE mb_bounce_vertical
-lda #'H'
-jsr acia_putc
-        ; bounce horizontal
-		LDA ballxv
-		TWOSCOMP
-		STA ballxv
-        ; subtract x
-        LDA ballnextx
-        CLC
-        ADC ballxv
-        STA ballnextx
-        JMP mb_store_final
-        
-mb_bounce_vertical:
-lda #'V'
-jsr acia_putc
-        ; bounce vertical
-		LDA ballyv
-		TWOSCOMP
-		STA ballyv
-        ; subtract y
-        LDA ballnexty
-        CLC
-        ADC ballyv
-        STA ballnexty
+        JSR do_check_brick
 
 ; 6. Resolve next x/y 
 mb_store_final:
@@ -849,54 +797,148 @@ get_NT_addr_for_ballnext:
         LSR         ; ballx/4
         STA TMP1
         add8To16 TMP1, TMP0
+        RTS
 
-;; debug
-;ld16 R0, strbuf2
-;LDA TMP0
-;STA ZP_TMP0
-;LDA TMP0+1
-;STA ZP_TMP0+1
-;jsr fmt_hex_string
-;jsr acia_puts
-;LDA ZP_TMP0
-;jsr fmt_hex_string
-;jsr acia_puts
-;lda #' '
-;jsr acia_putc
-;LDA ZP_TMP0
-;STA TMP0
-;LDA ZP_TMP0+1
-;STA TMP0+1
+; ballx/y + vertical speed
+get_NT_addr_for_ball_vertical:
+        LDA bally   ; calc (bally+speedy)/4 * 32
+        CLC
+        ADC ballyv
+        AND #$FC    ; /4 *4 gets rid of 2xlsb
+        STA TMP0    ; store result in TMP0
+        STZ TMP0+1
 
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        LDA ballx
+        LSR         ; 
+        LSR         ; ballx/4
+        STA TMP1
+        add8To16 TMP1, TMP0
+        RTS
+; ballx/y + horizontal speed
+get_NT_addr_for_ball_horizontal:
+        LDA bally   ; calc (bally)/4 * 32
+        AND #$FC    ; /4 *4 gets rid of 2xlsb
+        STA TMP0    ; store result in TMP0
+        STZ TMP0+1
+
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        ASL TMP0
+        ROL TMP0+1
+        LDA ballx
+        CLC
+        ADC ballxv
+        LSR         ; 
+        LSR         ; ballx/4
+        STA TMP1
+        add8To16 TMP1, TMP0
+        RTS
+
+;--------------------------------------------------------------
+; Check brick 
+;   - check next ball position for a brick-hit
+;   - workout if it hit vertically or to the side
+;   - blank the brick
+;   - bounce the ball
+do_check_brick:
+        ; Get chars above and next to ball
+        JSR get_NT_addr_for_ball_vertical
+        JSR vdp_setaddr_name_table_offset_g2_read
+        JSR vdp_read
+        STA brick_hit_state_vertical
+    
+        JSR get_NT_addr_for_ball_horizontal
+        JSR vdp_setaddr_name_table_offset_g2_read
+        JSR vdp_read
+        STA brick_hit_state_horizontal
+
+        ; if there is nothing in the next ball position, we haven't hit anything
+        LDA brick_hit_state_horizontal
+        ORA brick_hit_state_vertical
+        CMP #0              
+        BEQ dcb_exit  ; char == 0 is a space. Resolve and exit.
+
+        ; Hit.
+        ;  - do hit stuff
+        JSR brick_hit
+        JSR remove_bricks
+
+        ; bounce off brick(s)
+        LDA brick_hit_state_vertical
+        BNE mb_bounce_vertical
+        LDA brick_hit_state_horizontal
+        BNE mb_bounce_horizontal
+
+dcb_exit:
+        RTS
+
+mb_bounce_horizontal:
+        ; bounce horizontal
+		LDA ballxv
+		TWOSCOMP
+		STA ballxv
+        ; subtract x
+        LDA ballnextx
+        CLC
+        ADC ballxv
+        STA ballnextx
+        RTS
+        
+mb_bounce_vertical:
+        ; bounce vertical
+		LDA ballyv
+		TWOSCOMP
+		STA ballyv
+        ; subtract y
+        LDA ballnexty
+        CLC
+        ADC ballyv
+        STA ballnexty
         RTS
 
 ;---------------------------------------
 ; brick hit
+;  - play brick ping sound
 brick_hit:
-        LDA #10
+        LDA #SCORE_BRICK_HIT
         STA TMP0
         add8To16 TMP0, scorel
         JSR display_score
 .ifdef SOUND
 		JSR sound_ping
 .endif
+        RTS
 
-        ; get char position directly above or below ball
-        LDA bally
-        CLC
-        ADC ballyv
-        AND #$FC
-        ASL     
-        ASL     
-        ASL     
-        STA TMP0        ; ((bally + speed) / 4) * 32
-        LDA ballx
-        LSR
-        LSR             
-        CLC
-        ADC TMP0        ; + (ballx / 4)
-                        ; always in top third of NT so < 256 total
-        STA TMP0
+;---------------------------------------
+; remove bricks that have hit
+remove_bricks:
+        LDA brick_hit_state_vertical
+        BEQ @horiz          ; no brick above/below ball, check to side
+        ; vertical hit
+        JSR get_NT_addr_for_ball_vertical
+        JSR remove_brick
+    @horiz:
+        ; Check to size, even if we already checked above/below
+        LDA brick_hit_state_horizontal
+        BEQ @over           ; nothing to the side
+        ; horizontal hit
+        JSR get_NT_addr_for_ball_horizontal
+        JSR remove_brick
+    @over:
+        RTS
+
+;---------------------------------------
+; Remove brick in position in TMP0,TMP0+1
+remove_brick:
+        ; blank whole brick
         ; get leftmost brick (odd)
         ;   : subtract 1 and set LSB
         DEC TMP0
@@ -904,15 +946,10 @@ brick_hit:
         ORA #1
         STA TMP0
         STZ TMP0+1
-
-        ; work out if the brick that was hit was 
-        ; hit from above/below or from the side
-        ;   if there is a brick above/below, then hit is vertical
-        ;   else it is horizontal
-        JSR vdp_setaddr_name_table_offset_g2_read
-        JSR vdp_read
-        STA hit_vertical
-        
+        JSR vdp_setaddr_name_table_offset_g2
+        LDA #GR_SPACE
+        JSR vdp_write
+        JSR vdp_write
         RTS
 
 ;----------------------------------------------------------------------
