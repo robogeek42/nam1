@@ -594,7 +594,10 @@ vdp_move_line_down:
 				RTS
 				
 @bottom_row:	;; scroll screen
+                LDA ENABLE_SCROLL
+                BEQ @skip_scroll
 				JSR vdp_scroll_up_line
+            @skip_scroll:
 				;; move to begining of row
 				JSR vdp_move_to_start_line
 				;; clear line
@@ -850,7 +853,10 @@ vdp_move_line_down_m4:
 				RTS
 				
 @bottom_row_m4:	;; scroll screen
+                LDA ENABLE_SCROLL
+                BEQ @skip_scroll
 				JSR vdp_scroll_up_line_m4
+            @skip_scroll:
 				;; move to begining of row
 				JSR vdp_move_to_start_line
 				;; clear line at VDP_YPOS

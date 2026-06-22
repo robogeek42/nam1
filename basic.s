@@ -288,7 +288,7 @@ IrqBase		= $DF		; IRQ handler enabled/setup/triggered flags
 ;       		= $EB		; ?
 ;    		   	= $EC		; ?
 ;       		= $ED		; ?
-;			= $EE		; ?
+;ENABLE_SCROLL	= $EE		; Scroll Enable flag : 1=Enabled defined in zeropage.inc65
 
 Decss			= $EF		; number to decimal string start
 Decssp1		= Decss+1	; number to decimal string start

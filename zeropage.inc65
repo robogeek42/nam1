@@ -57,8 +57,9 @@ sd_slo         = $E0        ; 1 Sector pointer low
 sd_shi         = $E1        ; 1 Sector pointer high
 sd_sect        = $E2        ; 4 SD Card sector address
 sd_addr        = $E6        ; 4 SD Card byte address
-; max $EE
+; max $ED
 ;-----------------------------------------------------------
+ENABLE_SCROLL	= $EE		; Scroll Enable flag : 1=Enabled
 
 plotX   = $14		; Plot X or X1
 plotY   = $15		; Plot Y or X2
