@@ -351,8 +351,7 @@ TK_DIR  	= TK_DEL+1		; SD DIR
 TK_CAT  	= TK_DIR+1		; SD CAT
 TK_SPR  	= TK_CAT+1		; Sprite commands
 TK_LOADIMG  = TK_SPR+1     	; LOADIMG
-TK_PACMAN  	= TK_LOADIMG+1	; PACMAN token
-TK_LOADBIN  = TK_PACMAN+1	; Binary load
+TK_LOADBIN  = TK_LOADIMG+1	; Binary load
 TK_PLAY  	= TK_LOADBIN+1	; Play sound file
 TK_DELAY  	= TK_PLAY+1		; Delay N ms
 TK_CURS  	= TK_DELAY+1	; Move Text Cursor
@@ -7880,15 +7879,6 @@ LAB_TWOPI:
 	LDY  #>LAB_2C7C		; set (2*pi) pointer high byte
 	JMP  LAB_UFAC		; unpack memory (AY) into FAC1 and return
 
-LAB_PACMAN:
-.ifdef PACMAN
-	JSR pacman
-.ifdef SOUND
-	JSR snd_all_off
-.endif
-.endif
-	RTS
-
 ; COL <FGCol>,<BGCol> 
 ; Set colour to use under new printed chars
 ; stored in ZP var TXT_COL
@@ -9428,6 +9418,7 @@ bres_xd_pos_yd_neg_yd_big:
 ;msg_bres_xd_pos_yd_neg_yd_big:  .byte "Oct4 Xd+ Yd- Xd<Yd",$0d,$0a,$00
 ;msg_bres_choose_swap:           .byte "swap",$0d,$0a,$00
 
+
 ;=================================================================
 ; system dependant i/o vectors
 ; these are in RAM and are set by the monitor at start-up
@@ -9697,7 +9688,6 @@ LAB_CTBL:
 	.word	LAB_CAT-1		; CAT  		SD command
 	.word	LAB_SPR-1		; SPRite		VDP command
 	.word	LAB_LOADIMG-1	; LOADIMG  	VDP command
-	.word	LAB_PACMAN-1	; PACMAN  	Built-in Game
 	.word	LAB_LOADBIN-1	; LOADBIN  		SD file command
 	.word	LAB_PLAY-1		; PLAY 		sound command
 	.word	LAB_DELAY-1		; DELAY ms
@@ -10105,8 +10095,6 @@ LBB_OR:
 	.byte	"R",TK_OR		; OR
 	.byte	$00
 TAB_ASCP:
-LBB_PACMAN:
-	.byte	"ACMAN",TK_PACMAN  ; PACMAN
 LBB_PEEK:
 	.byte	"EEK(",TK_PEEK  ; PEEK(
 LBB_PI:
@@ -10328,8 +10316,6 @@ LAB_KEYT:
 	.word	LBB_SPR  	; SPR
 	.byte	7,'L'
 	.word	LBB_LOADIMG  	; LOADIMG
-	.byte	6,'P'
-	.word	LBB_PACMAN  	; PACMAN
 	.byte	7,'L'
 	.word	LBB_LOADBIN  	; LOADBIN
 	.byte	4,'P'
