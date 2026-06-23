@@ -20,3 +20,5 @@ VDP_MODE1_COL = VDP_VARS+12     ; current colours for mode 1
 VDP_MODE2_COL = VDP_VARS+13     ; current colours for mode 2
 VDP_MODE3_COL = VDP_VARS+14     ; current colours for mode 3
 VDP_MODE4_COL = VDP_VARS+15     ; current colours for mode 4
+
+VDP_NEW_CHAR = VDP_VARS+16

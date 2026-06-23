@@ -48,6 +48,7 @@
 		.export vdp_cc_move_down
 		.export vdp_cc_move_left
 		.export vdp_cc_move_right
+        .export vdp_define_char
 
 
 .bss
@@ -267,6 +268,64 @@ lc_loop2:		LDA (TMP0),Y
 				
 				RTS
 ;----------------------------------------------------------------
+
+; parameters are in char_def_buff
+vdp_define_char:
+    ; Get CHAR*8 for offset into pattern table
+        STZ TMP0+1
+        LDA char_def_buff
+        ASL
+        ROL TMP0+1
+        ASL
+        ROL TMP0+1
+        ASL
+        ROL TMP0+1
+        STA TMP0
+
+        ; check mode 
+        LDA VDP_MODE
+        CMP #2 
+        BEQ vdc_get_addr_char_g2
+
+    vdc_get_addr_char_g1:
+        ; Set VRAM address to VDP_REG4 * 0x800
+        LDA VDP_REGS+4
+        ASL
+        ASL
+        ASL
+        JMP vdc_add_offset
+
+    vdc_get_addr_char_g2:
+        LDA VDP_REGS+4      ;; Pattern Table
+        AND #$04            ;; just want upper bit (of the 3 that are used)
+        ASL
+        ASL
+        ASL
+
+    vdc_add_offset:
+        CLC                 ;; add offset
+        ADC TMP0
+        STA TMP0
+        LDA TMP0+1
+        ADC #0
+        STA TMP0+1
+
+    ; now send addr to VDP
+        LDA TMP0+1
+        LDY TMP0
+        JSR vdp_set_addr_w
+
+    ; send 8 bytes of character def
+
+        LDY #1
+    @vdc_loop:
+        LDA char_def_buff, Y
+        JSR vdp_write
+        INY 
+        CPY #9
+        BNE @vdc_loop
+
+        RTS
 
 ;================================================================
 ; Load color table - only for modes 1 & 2

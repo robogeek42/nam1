@@ -28,6 +28,9 @@ CURS <X>,<Y>
         FUNCTION - no brackets
         Wait for a Key Press and return ASCII value
 
+CDEF CH,data...
+        Redefine character CH with 8 bytes of data
+
 General Commands
 ----------------
 

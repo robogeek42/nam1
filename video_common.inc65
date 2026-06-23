@@ -17,5 +17,6 @@
 
 .import VDP_REGS
 .import VDP_VARS
+.import char_def_buff
 
 .include "video_vars.inc65"

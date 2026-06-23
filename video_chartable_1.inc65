@@ -23,7 +23,7 @@ CHAR_TAB:
     ; four lines
     .byte $ff,$c3,$c3,$c3, $c3,$c3,$c3,$ff ;  graphic    $0e
 
-    ; diaonals
+    ; diagonals
     .byte $c0,$c0,$30,$30, $0c,$0c,$03,$03 ;  graphic    $0f
     .byte $03,$03,$0c,$0c, $30,$30,$c0,$c0 ;  graphic    $10
 

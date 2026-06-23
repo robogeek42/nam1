@@ -361,10 +361,11 @@ TK_COL  	= TK_HELP+1		; Set text colour
 TK_PLOT  	= TK_COL+1		; Plot X,Y (Mode 4 only)
 TK_GCOL  	= TK_PLOT+1		; Graphics Colour (Mode 4 only)
 TK_LINE  	= TK_GCOL+1		; Line drawing (Mode 4 only)
+TK_CDEF     = TK_LINE+1       ; Redefine character
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_LINE+1		; TAB token
+TK_TAB  	= TK_CDEF+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -8328,15 +8329,16 @@ MSG_HELP1:
 .byte "SCOL Fg,Bg    Screen col",$0D,$0A
 .byte "COL Fg,Bg     Mode4 col",$0D,$0A
 .byte "CURS X,Y      Move text curs",$0D,$0A,$00
-MSG_HELP2:  
+MSG_HELP2:
+.byte "CDEF C,data.. Redefine char",$0D,$0A
 .byte "A = GETKEY    Wait for KEY",$0D,$0A
 .byte "              Return ASCII code",$0D,$0A
 .byte "DELAY T       Sleep (busy) T ms",$0D,$0A
 .byte "SPR H         Sprite help",$0D,$0A
 .byte "DIR           Disk Dir",$0D,$0A
-.byte "DISK <N>      Switch to disk N",$0D,$0A
-.byte "DEL <fn>      DELETE file",$0D,$0A,$00
+.byte "DISK <N>      Switch to disk N",$0D,$0A,$00
 MSG_HELP3:  
+.byte "DEL <fn>      DELETE file",$0D,$0A
 .byte "CAT <fn>      Type to output",$0D,$0A
 .byte "LOAD|SAVE <fn> Basic prog",$0D,$0A
 .byte "LOADIMG <fn>   Load Gii Image",$0D,$0A
@@ -9418,6 +9420,31 @@ bres_xd_pos_yd_neg_yd_big:
 ;msg_bres_xd_pos_yd_neg_yd_big:  .byte "Oct4 Xd+ Yd- Xd<Yd",$0d,$0a,$00
 ;msg_bres_choose_swap:           .byte "swap",$0d,$0a,$00
 
+;------------------------------------
+; expect 9 parameters. 1 char num and 8 bytes of def
+LAB_CDEF:
+	; Do 9 times for char and parameters
+	LDY #0
+@paramloop:
+	PHY
+	JSR  LAB_EVNM
+	JSR  LAB_F2FX
+	LDA  Itempl			; Get value (Y1)
+	PLY
+	STA  char_def_buff,Y
+	INY
+	CPY #9
+	BEQ @no_comma
+	PHY
+	; ","
+	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
+	PLY
+	CPY  #9
+	BNE  @paramloop
+@no_comma:
+	; have 9 parameters
+	JSR vdp_define_char
+	RTS
 
 ;=================================================================
 ; system dependant i/o vectors
@@ -9698,6 +9725,7 @@ LAB_CTBL:
 	.word LAB_PLOT-1		; Plot X,Y in Mode 4
 	.word LAB_GCOL-1		; Set new plot colour (FG,BG)
 	.word LAB_LINE-1		; Line drawing in Mode 4
+	.word LAB_CDEF-1		; Redefine char
 
 ; function pre process routine table
 
@@ -9940,6 +9968,8 @@ LBB_BITTST:
 					; BITTST(
 	.byte	$00
 TAB_ASCC:
+LBB_CDEF:
+	.byte "DEF",TK_CDEF	; CDEF
 LBB_CLS:
 	.byte	"LS",TK_CLS  	; CLS (VDP)
 LBB_CALL:
@@ -10336,6 +10366,8 @@ LAB_KEYT:
 	.word	LBB_GCOL  	; 
 	.byte	4,'L'
 	.word	LBB_LINE  	; 
+	.byte	4,'C'
+	.word	LBB_CDEF  	; 
 
 ; secondary commands (can't start a statement)
 

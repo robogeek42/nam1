@@ -56,9 +56,11 @@
 .bss
 VDP_REGS:   .res  8,0
 VDP_VARS:   .res  16,0
+char_def_buff:  .res 10, 0
 
 .export VDP_REGS
 .export VDP_VARS
+.export char_def_buff
 
 
 
