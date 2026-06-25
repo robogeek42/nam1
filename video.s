@@ -231,12 +231,14 @@ vdp_load_chars:
 
 ; mode 2 - load chars twice more
 				LDA #$08
-				STA TMP0
+				STA TMP0+1
+                STZ TMP0
 				JSR vdp_setaddr_pattern_table_offset
 				JSR vlc_load
 
 				LDA #$10
-				STA TMP0
+				STA TMP0+1
+                STZ TMP0
 				JSR vdp_setaddr_pattern_table_offset
 				JSR vlc_load
 
@@ -282,38 +284,31 @@ vdp_define_char:
         ROL TMP0+1
         STA TMP0
 
+        JSR vdc_load_char
+
         ; check mode 
         LDA VDP_MODE
         CMP #2 
-        BEQ vdc_get_addr_char_g2
+        BNE vdc_done
 
-    vdc_get_addr_char_g1:
-        ; Set VRAM address to VDP_REG4 * 0x800
-        LDA VDP_REGS+4
-        ASL
-        ASL
-        ASL
-        JMP vdc_add_offset
-
-    vdc_get_addr_char_g2:
-        LDA VDP_REGS+4      ;; Pattern Table
-        AND #$04            ;; just want upper bit (of the 3 that are used)
-        ASL
-        ASL
-        ASL
-
-    vdc_add_offset:
-        CLC                 ;; add offset
-        ADC TMP0
-        STA TMP0
-        LDA TMP0+1
-        ADC #0
+        ; do twice more for mode 2
+        CLC
+        LDA #$08
+        ADC TMP0+1 
         STA TMP0+1
+        JSR vdc_load_char
 
-    ; now send addr to VDP
-        LDA TMP0+1
-        LDY TMP0
-        JSR vdp_set_addr_w
+        CLC
+        LDA #$08
+        ADC TMP0+1 
+        STA TMP0+1
+        JSR vdc_load_char
+
+    vdc_done:
+        RTS
+
+    vdc_load_char:
+        JSR vdp_setaddr_pattern_table_offset
 
     ; send 8 bytes of character def
 
@@ -326,6 +321,7 @@ vdp_define_char:
         BNE @vdc_loop
 
         RTS
+
 
 ;================================================================
 ; Load color table - only for modes 1 & 2

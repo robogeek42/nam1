@@ -131,20 +131,21 @@ vdp_setaddr_name_table:
                 RTS
 
 vdp_setaddr_pattern_table:
-                LDA #0
-                STA TMP0
-vdp_setaddr_pattern_table_offset:   ;; add TMP0*256 to pattern table address
+                STZ TMP0
+                STZ TMP0+1
+vdp_setaddr_pattern_table_offset:   ;; add TMP0+1*256 to pattern table address
                 LDA VDP_MODE     ;; check mode - mode 2 is different
                 CMP #2
                 BEQ vdp_setaddr_pattern_table_g2
 vdp_setaddr_pattern_table_g1:
-                LDY #00             ;; Set VRAM address to VDP_REG4 * 0x800
+                ;; Set VRAM address to VDP_REG4 * 0x800
                 LDA VDP_REGS+4
                 ASL
                 ASL
                 ASL
                 CLC                 ;; offset
-                ADC TMP0
+                ADC TMP0+1
+                LDY TMP0
                 JSR vdp_set_addr_w
                 RTS
 vdp_setaddr_pattern_table_g2:
@@ -154,8 +155,8 @@ vdp_setaddr_pattern_table_g2:
                 ASL
                 ASL
                 CLC                 ;; offset
-                ADC TMP0
-                LDY #00          
+                ADC TMP0+1
+                LDY TMP0
                 JSR vdp_set_addr_w
                 RTS
 
