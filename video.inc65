@@ -34,3 +34,4 @@
 .import vdp_cc_move_left
 .import vdp_cc_move_right
 .import vdp_define_char
+.import vdp_set_char_col

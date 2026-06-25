@@ -361,11 +361,11 @@ TK_COL  	= TK_HELP+1		; Set text colour
 TK_PLOT  	= TK_COL+1		; Plot X,Y (Mode 4 only)
 TK_GCOL  	= TK_PLOT+1		; Graphics Colour (Mode 4 only)
 TK_LINE  	= TK_GCOL+1		; Line drawing (Mode 4 only)
-TK_CDEF     = TK_LINE+1       ; Redefine character
+TK_VDU      = TK_LINE+1       ; VDU including VDU 23 (redefine char)
 
 ; secondary command tokens, can't start a statement
 
-TK_TAB  	= TK_CDEF+1		; TAB token
+TK_TAB  	= TK_VDU+1		; TAB token
 TK_ELSE  	= TK_TAB+1		; ELSE token
 TK_TO			= TK_ELSE+1		; TO token
 TK_FN			= TK_TO+1		; FN token
@@ -8330,7 +8330,7 @@ MSG_HELP1:
 .byte "COL Fg,Bg     Mode4 col",$0D,$0A
 .byte "CURS X,Y      Move text curs",$0D,$0A,$00
 MSG_HELP2:
-.byte "CDEF C,data.. Redefine char",$0D,$0A
+.byte "VDU 23, C,data.. Redefine char",$0D,$0A
 .byte "A = GETKEY    Wait for KEY",$0D,$0A
 .byte "              Return ASCII code",$0D,$0A
 .byte "DELAY T       Sleep (busy) T ms",$0D,$0A
@@ -9421,6 +9421,62 @@ bres_xd_pos_yd_neg_yd_big:
 ;msg_bres_choose_swap:           .byte "swap",$0d,$0a,$00
 
 ;------------------------------------
+; VDU 0    do nothing
+; VDU 12   CLS
+; VDU 17   Text colour (FG/BG in one byte as per VDP)
+; VDU 23   redefine char, ignore all rest
+; VDU >=32 just print char
+LAB_VDU:
+	JSR  LAB_EVNM		; Eval numeric param
+	JSR  LAB_F2FX		; Float 2 Fixed, result in Integer temp
+	LDA  Itempl			; Get value 
+	CMP #0			; Do nothing
+	BEQ lv_done
+	CMP #12
+	BEQ JMP_LAB_CLS
+	CMP #17
+	BEQ DO_VDU_MORE_PARAMS
+	CMP #32
+	BCS DO_VDU_STREAM		; print char and get next VDU param
+	CMP #23			; redefine char
+	BEQ DO_VDU_MORE_PARAMS
+
+lv_done:
+	RTS
+
+JMP_LAB_CLS:
+	JMP LAB_CLS
+
+DO_VDU_STREAM:
+	JSR LAB_PRNA
+	; if next char is ',' then consume it and go back to VDU for next char
+
+	LDA  #$2C			; load A with ","
+	LDY  #$00			; clear index
+	CMP  (Bpntrl),Y		; check next byte is = A
+	BNE  lv_done		; if not, done
+	JSR  LAB_IGBY		; increment and scan memory then return
+	JMP LAB_VDU
+
+DO_VDU_MORE_PARAMS:
+	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
+	LDA  Itempl			; Get VDU value 
+	CMP #17
+	BEQ LAB_CCOL
+	CMP #23
+	BEQ LAB_CDEF
+	RTS
+
+; Set colour at current character pos
+LAB_CCOL:
+	JSR  LAB_EVNM
+	JSR  LAB_F2FX
+	LDA  Itempl			; Get colour
+	STA  ZP_TMP0
+	JSR  vdp_set_char_col
+	RTS
+
+;------------------------------------
 ; expect 9 parameters. 1 char num and 8 bytes of def
 LAB_CDEF:
 	; Do 9 times for char and parameters
@@ -9429,7 +9485,7 @@ LAB_CDEF:
 	PHY
 	JSR  LAB_EVNM
 	JSR  LAB_F2FX
-	LDA  Itempl			; Get value (Y1)
+	LDA  Itempl			; Get value
 	PLY
 	STA  char_def_buff,Y
 	INY
@@ -9725,7 +9781,7 @@ LAB_CTBL:
 	.word LAB_PLOT-1		; Plot X,Y in Mode 4
 	.word LAB_GCOL-1		; Set new plot colour (FG,BG)
 	.word LAB_LINE-1		; Line drawing in Mode 4
-	.word LAB_CDEF-1		; Redefine char
+	.word LAB_VDU-1		; BBC style VDU commands
 
 ; function pre process routine table
 
@@ -9968,8 +10024,6 @@ LBB_BITTST:
 					; BITTST(
 	.byte	$00
 TAB_ASCC:
-LBB_CDEF:
-	.byte "DEF",TK_CDEF	; CDEF
 LBB_CLS:
 	.byte	"LS",TK_CLS  	; CLS (VDP)
 LBB_CALL:
@@ -10216,6 +10270,8 @@ LBB_USR:
 TAB_ASCV:
 LBB_VAL:
 	.byte	"AL(",TK_VAL  ; VAL(
+LBB_VDU:
+	.byte "DU",TK_VDU	; VDU
 LBB_VPTR:
 	.byte	"ARPTR(",TK_VPTR  ; VARPTR(
 	.byte	$00
@@ -10366,8 +10422,8 @@ LAB_KEYT:
 	.word	LBB_GCOL  	; 
 	.byte	4,'L'
 	.word	LBB_LINE  	; 
-	.byte	4,'C'
-	.word	LBB_CDEF  	; 
+	.byte	3,'V'
+	.word	LBB_VDU  	; 
 
 ; secondary commands (can't start a statement)
 

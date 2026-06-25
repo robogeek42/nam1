@@ -49,7 +49,7 @@
 		.export vdp_cc_move_left
 		.export vdp_cc_move_right
         .export vdp_define_char
-
+        .export vdp_set_char_col
 
 .bss
 page_buffer:	.res 256, 0
@@ -322,6 +322,22 @@ vdp_define_char:
 
         RTS
 
+
+;----------------------------------------------------------------
+; Set colour under cursor position
+; VDP_CURS,VDP_CURS+1 has cursor position in name table
+; COl is passed in ZP_TMP2
+vdp_set_char_col:
+            LDA VDP_MODE
+            CMP #1
+            BEQ vscc_mode1
+            CMP #2
+            BEQ vscc_mode2
+            RTS
+vscc_mode1:
+            RTS
+vscc_mode2:
+            RTS
 
 ;================================================================
 ; Load color table - only for modes 1 & 2
