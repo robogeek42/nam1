@@ -9456,31 +9456,49 @@ DO_VDU_STREAM:
 	CMP  (Bpntrl),Y		; check next byte is = A
 	BNE  lv_done		; if not, done
 	JSR  LAB_IGBY		; increment and scan memory then return
-	JMP LAB_VDU
+	JMP  LAB_VDU
 
 DO_VDU_MORE_PARAMS:
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
 	LDA  Itempl			; Get VDU value 
-	CMP #17
-	BEQ LAB_CCOL
-	CMP #23
-	BEQ LAB_CDEF
+	CMP  #17
+	BEQ  LAB_CCOL
+	CMP  #23
+	BEQ  LAB_CDEF
 	RTS
 
-; Set colour at current character pos
 LAB_CCOL:
 	JSR  LAB_EVNM
 	JSR  LAB_F2FX
 	LDA  Itempl			; Get colour
-	STA  ZP_TMP0
-	JSR  vdp_set_char_col
+	STA  ZP_TMP2
+	LDA  VDP_MODE
+	CMP  #4 
+	BEQ  @LC_MODE4
+	CMP  #2 
+	BEQ  @LC_MODE2
 	RTS
+; M4 Set colour at current character pos
+@LC_MODE4:
+	STZ  ZP_TMP2+1
+	JSR  vdp_set_char_col_m4
+	RTS
+@LC_MODE2:
+	; get another parameter (CHAR)
+	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
+	JSR  LAB_EVNM
+	JSR  LAB_F2FX
+	LDA  Itempl			; Get colour
+	STA  ZP_TMP2+1
+	JSR  vdp_set_char_col_m2
+	RTS
+	
 
 ;------------------------------------
 ; expect 9 parameters. 1 char num and 8 bytes of def
 LAB_CDEF:
 	; Do 9 times for char and parameters
-	LDY #0
+	LDY  #0
 @paramloop:
 	PHY
 	JSR  LAB_EVNM
@@ -9489,8 +9507,8 @@ LAB_CDEF:
 	PLY
 	STA  char_def_buff,Y
 	INY
-	CPY #9
-	BEQ @no_comma
+	CPY  #9
+	BEQ  @no_comma
 	PHY
 	; ","
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
@@ -9499,7 +9517,7 @@ LAB_CDEF:
 	BNE  @paramloop
 @no_comma:
 	; have 9 parameters
-	JSR vdp_define_char
+	JSR  vdp_define_char
 	RTS
 
 ;=================================================================

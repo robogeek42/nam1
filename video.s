@@ -49,7 +49,8 @@
 		.export vdp_cc_move_left
 		.export vdp_cc_move_right
         .export vdp_define_char
-        .export vdp_set_char_col
+        .export vdp_set_char_col_m2
+        .export vdp_set_char_col_m4
 
 .bss
 page_buffer:	.res 256, 0
@@ -324,19 +325,87 @@ vdp_define_char:
 
 
 ;----------------------------------------------------------------
-; Set colour under cursor position
-; VDP_CURS,VDP_CURS+1 has cursor position in name table
-; COl is passed in ZP_TMP2
-vdp_set_char_col:
-            LDA VDP_MODE
-            CMP #1
-            BEQ vscc_mode1
-            CMP #2
-            BEQ vscc_mode2
+; Set colour for char (M2) or char under cursor position (M4)
+; Only MODE2 and MODE4 are supported
+; COl is passed in ZP_TMP2. Char in ZP_TMP2+1 (M4 only)
+; Mode 4: VDP_CURS,VDP_CURS+1 has cursor position in name table
+
+vdp_set_char_col_m2:
+            ; VRAM addr of Col table in ZP_TMP0
+            STZ ZP_TMP0
+            LDA #$20	
+            STA ZP_TMP0+1
+
+            ; Mode 2 sets colour for a given character
+            LDA ZP_TMP2
+            STA TMP1
+            STZ TMP1+1
+            ; * 8
+            ASL TMP1
+            ROL TMP1+1
+            ASL TMP1
+            ROL TMP1+1
+            ASL TMP1
+            ROL TMP1+1
+
+            ; add colour table addr to char offset
+            add16 TMP1, ZP_TMP0, ZP_TMP0
+
+            LDX #3          ; write colour 3 times to cover each 1/3 of screen
+
+        @colpageloop:
+            LDA ZP_TMP0+1
+            LDY ZP_TMP0
+            JSR vdp_set_addr_w
+            
+            ; write col 8 times
+            PHX
+            LDX #8
+            LDA ZP_TMP2+1
+        @col8loop:
+            JSR vdp_write
+            DEX
+            BNE @col8loop
+            PLX
+            
+            CLC
+            LDA ZP_TMP0+1
+            ADC #8
+            STA ZP_TMP0+1
+            DEX
+            BNE @colpageloop
+            
             RTS
-vscc_mode1:
-            RTS
-vscc_mode2:
+
+vdp_set_char_col_m4:
+    ; MODE 4 has a cursor position for pattern/col
+            ; get 8* curs pos
+            LDA VDP_CURS
+            STA ZP_TMP0
+            LDA VDP_CURS+1
+            STA ZP_TMP0+1
+            LDX #3
+        @times2:
+            ASL ZP_TMP0
+            ROL ZP_TMP0+1
+            DEX
+            BNE @times2
+
+            LDA VDP_REGS+3	;; Set VRAM address to VDP_REG3 * 0x40
+            AND #$80
+            LSR 
+            LSR 
+            CLC
+            ADC ZP_TMP0+1  ;; hi byte : add curs hi byte
+            LDY ZP_TMP0
+            JSR vdp_set_addr_w
+            ; write col 8 times
+            LDX #8
+            LDA ZP_TMP2
+        @col8loop:
+            JSR vdp_write
+            DEX
+            BNE @col8loop
             RTS
 
 ;================================================================
