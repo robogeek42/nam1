@@ -158,8 +158,8 @@ main_welcome:
                 STA RES+1
 
                 ; Set Scroll flag == ON
-                LDA #1
-                STA ENABLE_SCROLL
+                LDA #0
+                STA DISABLE_SCROLL
 
 ; Go straight to BASIC!
                 LDA #<LAB_COLD

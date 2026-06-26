@@ -337,7 +337,7 @@ vdp_set_char_col_m2:
             STA ZP_TMP0+1
 
             ; Mode 2 sets colour for a given character
-            LDA ZP_TMP2
+            LDA ZP_TMP2+1   ; Char
             STA TMP1
             STZ TMP1+1
             ; * 8
@@ -361,7 +361,7 @@ vdp_set_char_col_m2:
             ; write col 8 times
             PHX
             LDX #8
-            LDA ZP_TMP2+1
+            LDA ZP_TMP2     ; Colour
         @col8loop:
             JSR vdp_write
             DEX
@@ -734,13 +734,16 @@ vdp_move_line_down:
 				RTS
 				
 @bottom_row:	;; scroll screen
-                LDA ENABLE_SCROLL
-                BEQ @skip_scroll
+                LDA DISABLE_SCROLL
+                BNE @skip_scroll
 				JSR vdp_scroll_up_line
             @skip_scroll:
 				;; move to begining of row
 				JSR vdp_move_to_start_line
 				;; clear line
+                LDA DISABLE_SCROLL
+                CMP #2
+                BEQ @skip_scroll2
 				JSR vdp_start_str_w
 				TYA
 				PHA
@@ -752,6 +755,7 @@ vdp_move_line_down:
 				JSR vdp_move_to_start_line
 				PLA
 				TAY
+            @skip_scroll2:
 				PLA
 				RTS
 
@@ -993,8 +997,8 @@ vdp_move_line_down_m4:
 				RTS
 				
 @bottom_row_m4:	;; scroll screen
-                LDA ENABLE_SCROLL
-                BEQ @skip_scroll
+                LDA DISABLE_SCROLL
+                BNE @skip_scroll
 				JSR vdp_scroll_up_line_m4
             @skip_scroll:
 				;; move to begining of row

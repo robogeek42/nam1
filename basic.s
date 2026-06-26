@@ -9488,7 +9488,7 @@ LAB_CCOL:
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
 	JSR  LAB_EVNM
 	JSR  LAB_F2FX
-	LDA  Itempl			; Get colour
+	LDA  Itempl			; Get char
 	STA  ZP_TMP2+1
 	JSR  vdp_set_char_col_m2
 	RTS
