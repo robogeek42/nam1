@@ -9430,27 +9430,38 @@ LAB_VDU:
 	JSR  LAB_EVNM		; Eval numeric param
 	JSR  LAB_F2FX		; Float 2 Fixed, result in Integer temp
 	LDA  Itempl			; Get value 
+
 	CMP #0			; Do nothing
 	BEQ lv_done
-	CMP #12
+	CMP #10			; LF
+	BEQ DO_VDU_STREAM_PRN
+	CMP #12			; CLS
 	BEQ JMP_LAB_CLS
+	CMP #13			; CR
+	BEQ DO_VDU_STREAM_PRN
 	CMP #17
 	BEQ DO_VDU_MORE_PARAMS
-	CMP #32
-	BCS DO_VDU_STREAM		; print char and get next VDU param
+	CMP #22			; MODE
+	BEQ DO_VDU_MORE_PARAMS
 	CMP #23			; redefine char
 	BEQ DO_VDU_MORE_PARAMS
+	CMP #31			; CURS X,Y
+	BEQ DO_VDU_MORE_PARAMS
+	CMP #32			; print char and get next VDU param
+	BCS DO_VDU_STREAM_PRN
 
 lv_done:
 	RTS
 
 JMP_LAB_CLS:
-	JMP LAB_CLS
+	JSR LAB_CLS
+	JMP DO_VDU_STREAM
 
-DO_VDU_STREAM:
+DO_VDU_STREAM_PRN:
 	JSR LAB_PRNA
 	; if next char is ',' then consume it and go back to VDU for next char
 
+DO_VDU_STREAM:
 	LDA  #$2C			; load A with ","
 	LDY  #$00			; clear index
 	CMP  (Bpntrl),Y		; check next byte is = A
@@ -9462,10 +9473,27 @@ DO_VDU_MORE_PARAMS:
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
 	LDA  Itempl			; Get VDU value 
 	CMP  #17
-	BEQ  LAB_CCOL
+	BEQ  JMP_LAB_CCOL
+	CMP  #22
+	BEQ  JMP_LAB_MODE
 	CMP  #23
-	BEQ  LAB_CDEF
+	BEQ  JMP_LAB_CDEF
+	CMP  #31
+	BEQ  JMP_LAB_CURS
 	RTS
+
+JMP_LAB_CCOL:
+	JSR LAB_CCOL
+	JMP DO_VDU_STREAM
+JMP_LAB_MODE:
+	JSR LAB_MODE
+	JMP DO_VDU_STREAM
+JMP_LAB_CDEF:
+	JSR LAB_CDEF
+	JMP DO_VDU_STREAM
+JMP_LAB_CURS:
+	JSR LAB_CURS
+	JMP DO_VDU_STREAM
 
 LAB_CCOL:
 	JSR  LAB_EVNM
@@ -9483,6 +9511,7 @@ LAB_CCOL:
 	STZ  ZP_TMP2+1
 	JSR  vdp_set_char_col_m4
 	RTS
+
 @LC_MODE2:
 	; get another parameter (CHAR)
 	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
