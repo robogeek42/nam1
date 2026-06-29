@@ -18,7 +18,7 @@ SCOL <FG>,<BG>
 	based screen (modes 0,1,2) (whole screen)
 	FG and BG are integers 0-15
 
-PRINT SSTATUS
+PRINT SPS
 	reads VDP status register (for sprite info: collison, 5th sprite)
 
 CURS <X>,<Y>
@@ -28,8 +28,12 @@ CURS <X>,<Y>
         FUNCTION - no brackets
         Wait for a Key Press and return ASCII value
 
-CDEF CH,data...
-        Redefine character CH with 8 bytes of data
+VDU C,... 
+        VDU commands BBC style. See vdu.txt
+
+C=SCHAR(X,Y)
+        Read Character at pos X,Y on screen
+        Currently Mode 2 only
 
 General Commands
 ----------------

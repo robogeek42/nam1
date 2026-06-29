@@ -430,12 +430,12 @@ TK_VPTR  	= TK_TWOPI+1	; VARPTR token
 TK_LEFTS  	= TK_VPTR+1		; LEFT$ token
 TK_RIGHTS  	= TK_LEFTS+1	; RIGHT$ token
 TK_MIDS  	= TK_RIGHTS+1	; MID$ token
-TK_ISKEY 	= TK_MIDS+1		; ISKEY
-TK_SCHAR    = TK_ISKEY+1	; SCHAR(
+TK_SCHAR    = TK_MIDS+1	      ; SCHAR(
 TK_GETKEY 	= TK_SCHAR+1	; GETKEY
 TK_HIMEM    = TK_GETKEY+1
 TK_LOMEM    = TK_HIMEM+1
 TK_TOP    	= TK_LOMEM+1
+TK_SPS    	= TK_TOP+1
 
 ; offsets from a base of X or Y
 
@@ -8060,7 +8060,7 @@ MSG_SHELP:  .byte "sprite help:",$0D,$0A
 .byte " SPR L <Addr>,<P>  load pat",$0D,$0A
 .byte " SPR P <S>,<P>     set pat",$0D,$0A
 .byte " SPR X <S>,<X>,<Y> pos X,Y",$0D,$0A
-.byte " SSTATUS       VDP status reg",$0D,$0A,$00
+.byte " SPS     read VDP status reg",$0D,$0A,$00
 MSG_SPR: .byte "SPR ", $00
 SPR_HELP:
 	;ld16	R0,MSG_SHELP
@@ -8968,8 +8968,6 @@ LAB_PLAY:
 .endif ; SOUND
 	RTS
 
-LAB_ISKEY:
-	RTS
 LAB_GETKEY:
 .ifdef PS2K
 	JSR KBFLUSH
@@ -8993,7 +8991,7 @@ LAB_TOP:
 	LDA Earryh
 	JMP LAB_AYFC
    
-LAB_SSTATUS:
+LAB_SPS:
 	JSR  LAB_IGBY
 	JSR  vdp_getstatus
 	TAY
@@ -9913,12 +9911,12 @@ LAB_FTPM  = LAB_FTPL+$01
 	.word	LAB_LRMS-1		; LEFT$()	process string expression
 	.word	LAB_LRMS-1		; RIGHT$()		"
 	.word	LAB_LRMS-1		; MID$()		"
-	.word	LAB_PPFN-1		; ISKEY()   process numeric expression in ()
 	.word $0000        ; SCHAR()
 	.word	LAB_PPBI-1		; GETKEY  advance pointer
 	.word	LAB_PPBI-1		; HIMEM         "
 	.word	LAB_PPBI-1		; LOMEM         "
 	.word	LAB_PPBI-1		; TOP           "
+	.word $0000        ; SPS()
 
 ; action addresses for functions
 
@@ -9959,12 +9957,12 @@ LAB_FTBM  = LAB_FTBL+$01
 	.word	LAB_LEFT-1		; LEFT$()
 	.word	LAB_RIGHT-1		; RIGHT$()
 	.word	LAB_MIDS-1		; MID$()
-	.word	LAB_ISKEY-1		; ISKEY
 	.word LAB_SCHAR-1       ; SCCHAR()  get char at screen pos
 	.word	LAB_GETKEY-1	; GETKEY
 	.word	LAB_HIMEM-1	; 
 	.word	LAB_LOMEM-1	; 
 	.word	LAB_TOP-1	; 
+	.word LAB_SPS-1         ; SPS Sprite status
 
 ; hierarchy and action addresses for operator
 
@@ -10208,8 +10206,6 @@ LBB_INT:
 	.byte	"NT(",TK_INT  ; INT(
 LBB_IRQ:
 	.byte	"RQ",TK_IRQ  	; IRQ
-LBB_ISKEY:
-	.byte	"SKEY(",TK_ISKEY  	; ISKEY
 	.byte	$00
 TAB_ASCL:
 LBB_LCASES:
@@ -10325,6 +10321,8 @@ LBB_SPC:
 	.byte	"PC(",TK_SPC  ; SPC(
 LBB_SPR:
 	.byte	"PR",TK_SPR  	; SPR
+LBB_SPS:
+	.byte	"PS",TK_SPS  ; SPC
 LBB_SQR:
 	.byte	"QR(",TK_SQR  ; SQR(
 LBB_STEP:
@@ -10643,8 +10641,6 @@ LAB_KEYT:
 	.word	LBB_RIGHTS  	; RIGHT$
 	.byte	5,'M'			;
 	.word	LBB_MIDS  	; MID$
-	.byte	6,'I'
-	.word	LBB_ISKEY  ; ISKEY(
 	.byte	5,'S'
 	.word	LBB_SCHAR  ; SCHAR(
 	.byte	6,'G'
@@ -10655,6 +10651,8 @@ LAB_KEYT:
 	.word	LBB_HIMEM  ; HIMEM
 	.byte	3,'T'
 	.word	LBB_TOP  ; TOP
+	.byte	3,'S'
+	.word	LBB_SPS  ; SPS
 
 ; BASIC messages, mostly error messages
 
