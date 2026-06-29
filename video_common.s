@@ -43,12 +43,12 @@
 .export vdp_setaddr_pattern_table
 .export vdp_setaddr_pattern_table_g1
 .export vdp_setaddr_pattern_table_g2
+.export vdp_setaddr_pattern_table_offset
 .export vdp_setaddr_color_table_g1
 .export vdp_setaddr_color_table_g2
 .export vdp_setaddr_color_table_offset_g2
 .export vdp_setaddr_sprite_attribute_table
 .export vdp_setaddr_sprite_pattern_table
-.export vdp_setaddr_pattern_table_offset
 .export vdp_write
 .export vdp_read
 .export vdp_writex

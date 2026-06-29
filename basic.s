@@ -430,12 +430,12 @@ TK_VPTR  	= TK_TWOPI+1	; VARPTR token
 TK_LEFTS  	= TK_VPTR+1		; LEFT$ token
 TK_RIGHTS  	= TK_LEFTS+1	; RIGHT$ token
 TK_MIDS  	= TK_RIGHTS+1	; MID$ token
-TK_ISKEY 	= TK_MIDS+1			; ISKEY
-TK_GETKEY 	= TK_ISKEY+1			; GETKEY
+TK_ISKEY 	= TK_MIDS+1		; ISKEY
+TK_SCHAR    = TK_ISKEY+1	; SCHAR(
+TK_GETKEY 	= TK_SCHAR+1	; GETKEY
 TK_HIMEM    = TK_GETKEY+1
 TK_LOMEM    = TK_HIMEM+1
 TK_TOP    	= TK_LOMEM+1
-TK_SSTATUS  = TK_TOP+1
 
 ; offsets from a base of X or Y
 
@@ -9000,6 +9000,50 @@ LAB_SSTATUS:
 	LDA  #0
 	JMP  LAB_AYFC
 
+LAB_SCHAR:
+	JSR  LAB_IGBY		; increment BASIC pointer
+	JSR  LAB_GADB		; get two parameters for POKE or WAIT
+	LDA  Itempl
+	STA  ZP_TMP2		; first param, X
+	STX  ZP_TMP2+1		; second param, Y
+
+	JSR  LAB_GBYT		; get next BASIC byte
+	CMP  #')'			; is next character ")"
+	BEQ  SCHAR_OK		; if ")" go do rest of function
+
+	JMP  LAB_SNER		; do syntax error then warm start
+
+SCHAR_OK:
+	JSR  LAB_IGBY		; update BASIC execute pointer (to character past ")")
+	LDA  VDP_MODE
+	CMP  #2
+	BEQ  SCHAR_DO_M2READ
+	LDY  #0
+	LDA  #0
+	JMP  LAB_AYFC		; save and convert integer AY to FAC1 and return
+
+SCHAR_DO_M2READ:
+	; Calculate Y*32+X
+	STZ  TMP0+1
+	LDA  ZP_TMP2+1
+	ASL
+	ROL  TMP0+1
+	ASL
+	ROL  TMP0+1
+	ASL
+	ROL  TMP0+1
+	ASL
+	ROL  TMP0+1
+	ASL
+	ROL  TMP0+1
+	STA  TMP0
+	add8To16 ZP_TMP2, TMP0
+	JSR  vdp_setaddr_name_table_offset_g2_read
+	JSR  vdp_read
+	TAY				; Y=low byte - has result of read
+	LDA  #0			; A=hi byte
+	JMP  LAB_AYFC		; save and convert integer AY to FAC1 and return
+
 ;-----------------------------------------------------------------
 reinstate_ouput_vector:
 	PHA
@@ -9870,6 +9914,7 @@ LAB_FTPM  = LAB_FTPL+$01
 	.word	LAB_LRMS-1		; RIGHT$()		"
 	.word	LAB_LRMS-1		; MID$()		"
 	.word	LAB_PPFN-1		; ISKEY()   process numeric expression in ()
+	.word $0000        ; SCHAR()
 	.word	LAB_PPBI-1		; GETKEY  advance pointer
 	.word	LAB_PPBI-1		; HIMEM         "
 	.word	LAB_PPBI-1		; LOMEM         "
@@ -9915,11 +9960,11 @@ LAB_FTBM  = LAB_FTBL+$01
 	.word	LAB_RIGHT-1		; RIGHT$()
 	.word	LAB_MIDS-1		; MID$()
 	.word	LAB_ISKEY-1		; ISKEY
+	.word LAB_SCHAR-1       ; SCCHAR()  get char at screen pos
 	.word	LAB_GETKEY-1	; GETKEY
 	.word	LAB_HIMEM-1	; 
 	.word	LAB_LOMEM-1	; 
 	.word	LAB_TOP-1	; 
-	.word	LAB_SSTATUS-1	; 
 
 ; hierarchy and action addresses for operator
 
@@ -10268,6 +10313,8 @@ LBB_SADD:
 	.byte	"ADD(",TK_SADD  ; SADD(
 LBB_SAVE:
 	.byte	"AVE",TK_SAVE  ; SAVE (SD Card)
+LBB_SCHAR:
+	.byte	"CHAR(",TK_SCHAR ; SSCHAR
 LBB_SCOL:
 	.byte	"COL",TK_SCOL 	; SCOL
 LBB_SGN:
@@ -10280,8 +10327,6 @@ LBB_SPR:
 	.byte	"PR",TK_SPR  	; SPR
 LBB_SQR:
 	.byte	"QR(",TK_SQR  ; SQR(
-LBB_SSTATUS:
-	.byte	"STATUS",TK_SSTATUS ; SSTATUS
 LBB_STEP:
 	.byte	"TEP",TK_STEP  ; STEP
 LBB_STOP:
@@ -10600,6 +10645,8 @@ LAB_KEYT:
 	.word	LBB_MIDS  	; MID$
 	.byte	6,'I'
 	.word	LBB_ISKEY  ; ISKEY(
+	.byte	5,'S'
+	.word	LBB_SCHAR  ; SCHAR(
 	.byte	6,'G'
 	.word	LBB_GETKEY  ; GETKEY
 	.byte	5,'L'
@@ -10608,8 +10655,6 @@ LAB_KEYT:
 	.word	LBB_HIMEM  ; HIMEM
 	.byte	3,'T'
 	.word	LBB_TOP  ; TOP
-	.byte	7,'S'
-	.word	LBB_SSTATUS  ; 
 
 ; BASIC messages, mostly error messages
 
