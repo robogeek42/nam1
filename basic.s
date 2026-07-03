@@ -8954,7 +8954,10 @@ lb_eof:
 	RTS
 
 LAB_PLAY:
-.ifdef SOUND
+	CMP  #'N'
+	BEQ lp_do_note
+	CMP  #'E'
+	BEQ lp_do_envelope
 	JSR  LAB_EVNM		; evaluate expression and check is numeric,
 	    				; else do type mismatch
 	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
@@ -8963,9 +8966,23 @@ LAB_PLAY:
 	STA R2
 	LDA Itemph
 	STA R2+1
+.ifdef SOUND
 	JSR snd_play_vgmdata
 	JSR snd_all_off
 .endif ; SOUND
+	RTS
+
+lp_do_note:
+	JSR  LAB_IGBY
+	; get Freq and Duration
+	JSR  LAB_GADB		; get 2 integers seperated by comma
+					; 1st integer (F) in Itempl/h, 2nd in X
+.ifdef SOUND
+.endif ; SOUND
+	
+	RTS
+lp_do_envelope:
+	JSR  LAB_IGBY
 	RTS
 
 LAB_GETKEY:
@@ -8991,6 +9008,7 @@ LAB_TOP:
 	LDA Earryh
 	JMP LAB_AYFC
    
+; function returns VDP sprite status
 LAB_SPS:
 	JSR  LAB_IGBY
 	JSR  vdp_getstatus
@@ -8998,6 +9016,7 @@ LAB_SPS:
 	LDA  #0
 	JMP  LAB_AYFC
 
+; redefine character - use via VDU 23
 LAB_SCHAR:
 	JSR  LAB_IGBY		; increment BASIC pointer
 	JSR  LAB_GADB		; get two parameters for POKE or WAIT
@@ -9853,8 +9872,6 @@ LAB_CTBL:
 	.word	LAB_MODE-1		; MODE  	VDP command
 	.word	LAB_CLS-1		; CLS  		VDP command
 	.word	LAB_SCOL-1		; SCOL  		VDP command
-;	.word	LAB_LOAD-1		; LOAD  	SD command
-;	.word	LAB_SAVE-1		; SAVE  	SD command
 	.word	LAB_DEL-1		; DEL  		SD command
 	.word	LAB_DIR-1		; DIR  		SD command
 	.word	LAB_CAT-1		; CAT  		SD command
