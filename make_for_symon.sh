@@ -44,3 +44,11 @@ then
     make clean all
     cd -
 fi
+
+if [ "X$APP_STREAMER" != "X" ]
+then
+    echo "============= Make App Streamer ==================="
+    cd streamer
+    make clean install
+    cd -
+fi
