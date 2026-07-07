@@ -22,20 +22,19 @@ game_state      = svars+4	   ; 1 byte
                                ; 1 byte blank
 TIMER1_COUNT    = svars+6      ; 2 bytes
 
-CHAN = svars+8
+CHAN            = svars+8
+MAX_ATTN        = svars+9
+MAX_ATTN_CHAN   = svars+10
 
 sndvars = $7010
-snd_attn:
 SND0ATTN        = sndvars+0
 SND1ATTN        = sndvars+1
 SND2ATTN        = sndvars+2
 SND3ATTN        = sndvars+3
-snd_freql:
 SND0FREQL       = sndvars+4
 SND1FREQL       = sndvars+5
 SND2FREQL       = sndvars+6
 SND3FREQL       = sndvars+7
-snd_freqh:
 SND0FREQH       = sndvars+8
 SND1FREQH       = sndvars+9
 SND2FREQH       = sndvars+10
@@ -189,6 +188,8 @@ gi_do_QUIT:
 		STA game_state
 		rts
 
+; A has current key pressed
+; find key in mn_keys and use index into mnotes to play a note
 check_keys:
         LDX #0
     ck_key_loop:
@@ -203,7 +204,7 @@ check_keys:
 
     ck_play:
         INX
-        PHA             ; PHA_PLA_1
+        PHA             ; PHA_PLA_1 (key pressed)
         LDA mn_keys,X   ; get offset into notes table
         TAY
 LDA mnotes,Y
@@ -234,34 +235,48 @@ jsr acia_puts
 jsr acia_put_newline
 
         ; find channel to play on
-        ; check if any channel doesn't have anything playing
+        ; get quietest channel - ie the on with the greatest attn
 
-        PHX             ; PHX_PLX_1
-        LDX #0
+        ; X currently has lookup into mn_keys table, save it
+        JSR get_quietest_chan   ; return in CHAN
+        JSR play_vals   ; play freq in ZP_TMP0 on chan CHAN
+        PLA             ; PHA_PLA_1  - get back key pressed
+        INX             ; move on to next byte in mn_leys table - i.e. next key to check
+        JMP ck_loop_over
+
+;-----------------------------------------------------
+; Scan channel attenuations and get quietest ( greatest value of attn)
+; Save in CHAN
+get_quietest_chan:
+        PHX
+        ; Use X to check channels
+        LDX #$FF
+        STZ MAX_ATTN
+        STZ MAX_ATTN_CHAN
     @find_chan_loop:
-        LDA snd_attn,X      ; current atten on Chan X
+        INX
+        CPX #3              ; only check chans 0-2
+        BEQ @find_chan_done
+        LDA SND0ATTN,X      ; current atten on Chan X
 pha
 lda #'a'
 jsr acia_putc
-ld16 R0, strbuff
 pla
+ld16 R0, strbuff
 jsr fmt_hex_string
 jsr acia_puts
 jsr acia_put_newline
-        CMP #$0E            ; FIXME I don't know why this has to be 0E instead of 0F
-                            ; if I set 0F it always skips chan 2 
-        BCS @play_on_chan   ; if off play on chan X
-        INX                 ; check next chan
-        CPX #3              ; can't play on 3=noise
-        BNE @find_chan_loop
-        LDX #0
-    @play_on_chan:
-        STX CHAN            ; X will be 0 if we couldn't find anything
-        JSR play_vals
-        PLX             ; PHX_PLX_1
-        PLA             ; PHA_PLA_1
-        INX             ; move on to next byte in mn_leys table - i.e. next key to check
-        JMP ck_loop_over
+        CMP MAX_ATTN        ; is atten on chan X quieter than current MAX
+        BCC @find_chan_loop ; chan X is loader ( < attn ) than current max, check next
+        STA MAX_ATTN        ; found one that is quieter. Save the attn level
+        STX MAX_ATTN_CHAN   ; and channel
+        JMP @find_chan_loop 
+    @find_chan_done:
+        LDA MAX_ATTN_CHAN
+        STA CHAN
+
+        PLX
+        RTS
 
 ;----------------------------------------------------------------------
 ; Sound functions
@@ -271,13 +286,13 @@ sound_attenuate:
         PHA
         PHX
         LDX CHAN
-        LDA snd_attn,X      ; current sound volume (attenuation) on chan X
+        LDA SND0ATTN,X      ; current sound volume (attenuation) on chan X
 		CMP #$0F
         BCS @over           ; full attn 
-        INC snd_attn,X      ; increase attn on chan X
+        INC SND0ATTN,X      ; increase attn on chan X
         ; build byte to send to SN76489
         LDA snd_reg_att,X   ; get base byte value for attenuating reg X
-        ORA snd_attn,X      ; put in attn level
+        ORA SND0ATTN,X      ; put in attn level
         ; send it
 ;pha
 ;lda #'v'
@@ -293,6 +308,7 @@ sound_attenuate:
         PLA
 		RTS
 
+;------------------------------------------------------------------
 ; set frequency on channel CHAN
 ; Set chan ccc 10-bit frequency DDDDDDAAAA as 2 bytes [#1cccAAAA,#00DDDDDD]
 ; ZP_TMP0,ZP_TMP0+1 have the two parts of freq
@@ -329,10 +345,11 @@ jsr acia_put_newline
     @skip_second_byte:
         LDA snd_reg_att,X   ; chan n vol = full (0)
 		JSR snd_write
-        STZ snd_attn,X
+        STZ SND0ATTN,X
         PLX
         PLA
         RTS
+
 
 ;-----------------------------------------------------
 ; Timer setup
