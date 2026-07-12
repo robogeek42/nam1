@@ -408,11 +408,6 @@ msg_pressq:
 ;msg_newline:		   ; defined in basic.s
 ;	.byte $0D,$0A,$00
 
-snd_reg_freq:
-    .byte %10000000, %10100000, %11000000, %11100000
-snd_reg_att:
-    .byte %10010000, %10110000, %11010000, %11110000
-
 NKEYS=37
 mn_keys:
     .byte SC_Q,12*5

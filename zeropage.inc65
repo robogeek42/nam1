@@ -59,6 +59,7 @@ sd_sect        = $E2        ; 4 SD Card sector address
 sd_addr        = $E6        ; 4 SD Card byte address
 ; max $ED
 ;-----------------------------------------------------------
+MYIRQ_COUNT     = $ED
 DISABLE_SCROLL	= $EE		; Scroll Disable flag : 0=Enabled,1=Disabled,2=Disabled, don't clear bottom line
 
 plotX   = $14		; Plot X or X1

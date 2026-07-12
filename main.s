@@ -50,7 +50,7 @@
 ;-----------------------------------------------------
 ; buffer for monitor
 ;-----------------------------------------------------
-                BUFFER_LENGTH = 60
+                BUFFER_LENGTH = 40
 buffer:         .res BUFFER_LENGTH+1, 0
 basicvars:      .res 1,0
                 PAGECNT = basicvars+0
@@ -59,7 +59,7 @@ bresenam_vars:  .res 8,0
                 LINE_Y1 = bresenam_vars+2
                 LINE_X2 = bresenam_vars+4
                 LINE_Y2 = bresenam_vars+6
-
+                
 .code
 
 RES_vec:
@@ -97,6 +97,12 @@ LAB_stlp:
 .ifdef SOUND
                 JSR snd_all_off
 .endif ; SOUND
+                LDA #$0F    ;   MAX attenuation
+                LDX #0
+            @lloop1:
+                STA SND_ATTN0, X
+                DEX
+                BNE @lloop1
 
 main_welcome:
                 ; display welcome message in the Serial Console
@@ -799,6 +805,43 @@ IRQ_CODE:
         LSR                ; shift the set b7 to b6, and on down ...
         ORA    IrqBase        ; OR the original back in
         STA    IrqBase        ; save the new IRQ flag byte
+
+        LDA #'.'
+        JSR acia_putc
+
+        ; was this a timer1 event?
+        LDA #$40                ; mask
+        BIT VIA1+VIA_IFR
+        BEQ @ic_end_irq
+
+        LDA VIA1+VIA_T1C_L      ; clear interupt flag
+        DEC SND_TIMER1_CNT
+        BNE @ic_end_irq
+        
+        ; reset timer count
+        LDA SND_TIMER1_CNT+1
+        STA SND_TIMER1_CNT
+
+        ; Do the interval function: attenuate all signals
+
+        PHX
+        LDX #0
+        STX SND_TEMP0
+    @chan_loop:
+        JSR snd_attenuate       ; gradually attenuate any playing sound on channel
+        ROL SND_TEMP0           ; carry will be set if the channel was at max attn
+        INX
+        CPX #4
+        BNE @chan_loop
+        LDA SND_TEMP0
+        CMP #%00001111          ; all channels are off
+        BNE @ic_done
+        JSR snd_stop_timer
+
+    @ic_done:
+        PLX
+        
+    @ic_end_irq:
         PLA                ; restore A
         RTI
 
@@ -920,3 +963,4 @@ TEST_VGM_DATA:
 ; .include "BankPanic_GameStart.inc65"
 ;.include "KingsOfTheBeach_MatchSummary.inc65"
 ;.include "PingPong_Game_Entry.inc65"
+

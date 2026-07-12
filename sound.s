@@ -7,16 +7,23 @@
         .include "string.inc65"
         .include "macros.inc65"
         .include "io.inc65"
+        .include "sound_vars.inc65"
 
 .export snd_all_off
 .export snd_hello
 .export snd_write
 .export snd_play_vgmdata
 .export snd_beep
+.export snd_attenuate
+.export snd_play_vals
+.export snd_setup_timer
+.export snd_stop_timer
 
 .bss
-strbuf: .res 16, 0
+strbuf: .res 8, 0
+snd_vars: .res 8, 0
 
+.export snd_vars
 .code
 
 ;--------------------------------------------------------------
@@ -341,6 +348,132 @@ spv_end:
 		ply
 		plx
 		RTS
+ 
+;----------------------------------------------------------------------
+; Sound functions
+;
+; set reducing attenuation level for channel CHAN passed as X
+snd_attenuate: 
+        PHA
+        LDA SND_ATTN0,X      ; current sound volume (attenuation) on chan X
+		CMP #$0F
+        BCS @over           ; full attn 
+        INC SND_ATTN0,X      ; increase attn on chan X
+        ; build byte to send to SN76489
+        LDA snd_reg_att,X   ; get base byte value for attenuating reg X
+        ORA SND_ATTN0,X      ; put in attn level
+        ; send it
+;pha
+;lda #'v'
+;jsr acia_putc
+;ld16 R0, strbuf
+;pla
+;jsr fmt_bin_string
+;jsr acia_puts
+;jsr acia_put_newline
+		JSR snd_write
+        CLC
+@over:
+        PLA
+		RTS
+
+;------------------------------------------------------------------
+; set frequency on channel CHAN passed as X reg
+; Set chan ccc 10-bit frequency DDDDDDAAAA as 2 bytes [#1cccAAAA,#00DDDDDD]
+; ZP_TMP0,ZP_TMP0+1 have the two parts of freq
+snd_play_vals:
+        PHA
+lda #'c'
+jsr acia_putc
+ld16 R0, strbuf
+TXA
+jsr fmt_hex_string
+jsr acia_puts
+lda #' '
+jsr acia_putc
+        LDA snd_reg_freq,X  ; Freq Channel CHAN - get base byte
+        ORA ZP_TMP0         ; data = AAAA
+ld16 R0, strbuf
+jsr fmt_bin_string
+jsr acia_puts
+pha
+lda #' '
+jsr acia_putc
+pla
+		JSR snd_write
+        CPX #3
+        BEQ @skip_second_byte ; chan 3 is noise, it doesn't have an extra byte
+        LDA ZP_TMP0+1         ; Freq DDDDDD into second byte
+ld16 R0, strbuf
+jsr fmt_bin_string
+jsr acia_puts
+jsr acia_put_newline
+		JSR snd_write
+    @skip_second_byte:
+        LDA snd_reg_att,X   ; chan n vol = full (0)
+		JSR snd_write
+        STZ SND_ATTN0,X
+
+        PLA
+        RTS
+
+;-----------------------------------------------------
+; Timer setup for attenuation
+snd_setup_timer:
+        pha
+        lda VIA1+VIA_IER        ; Check if timer1 (bit 6) is enabled
+        and #%01000000
+        beq sst_enable          ; branch if timer1 not enabled
+        pla
+        rts
+
+    sst_enable:
+ld16 R0, msg_setuptimer
+jsr acia_puts
+        pla
+        ; Set up Timer1 on 65C22 VIA in free run mode to generate an interrupt every 10ms (0.01s).
+        ; and then a further counter to count a number of these interrupts before attenuating
+        ;lda #$62                        ; Sets the counter to track number of interrupts (100)
+        sta SND_TIMER1_CNT + 1           ; Hold this as a constant to reset to. Like a latch.
+        sta SND_TIMER1_CNT               ; This will decrement then be reset with the above value.
+        lda #%01000000
+        sta VIA1+VIA_ACR                ; Places Timer1 into continuous interrupts (free run mode).
+        ; write counters
+        lda #$FE                        ; 0.01s @ 2.4576 Mhz (-2 cycles) = 24,574 ($5FFE).
+        sta VIA1+VIA_T1C_L
+        lda #$5F
+        sta VIA1+VIA_T1C_H
+        ; write latches
+        lda #$FE                        ; 0.01s @ 2.4576 Mhz (-2 cycles) = 24,574 ($5FFE).
+        sta VIA1+VIA_T1L_L
+        lda #$5F
+        sta VIA1+VIA_T1L_H
+
+        lda #%11000000                  ; Sets interrupts for Timer1.
+        sta VIA1+VIA_IER
+
+        CLI                             ; Clear Interrupt Disable = allow interrupts
+
+        RTS
+
+snd_stop_timer:
+ld16 R0, msg_stoptimer
+jsr acia_puts
+        SEI                             ; Set Interrupt Disable
+        lda #%01000000                  ; disable interrupts for Timer1
+        sta VIA1+VIA_IER
+        RTS
+
+msg_setuptimer:
+    .byte "start timer",$0d,$0a,$00
+msg_stoptimer:
+    .byte "stop timer",$0d,$0a,$00
+;-----------------------------------------------------
+
+snd_reg_freq:
+    .byte %10000000, %10100000, %11000000, %11100000
+snd_reg_att:
+    .byte %10010000, %10110000, %11010000, %11110000
 
 snd_data_msg: .byte "SND:",$00
 

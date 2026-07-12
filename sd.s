@@ -93,7 +93,7 @@ fh_dir:		.tag FileHandle
 
 ;filesize_32bit:
 ;  .res 4,0    ; 4 bytes for a 32-bit number (file size)
-str_buf:    .res 32,0
+str_buf:    .res 16,0
 
 .export fh_handle
 .export fh_dir

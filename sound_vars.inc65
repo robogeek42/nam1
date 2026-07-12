@@ -1,0 +1,6 @@
+SND_TIMER1_CNT  = snd_vars+0    ; 2 bytes
+SND_TEMP0       = snd_vars+2    ; 2 bytes
+SND_ATTN0       = snd_vars+4    ; 4 bytes
+SND_ATTN1       = snd_vars+5    ; 
+SND_ATTN2       = snd_vars+6    ; 
+SND_ATTN3       = snd_vars+7    ; 

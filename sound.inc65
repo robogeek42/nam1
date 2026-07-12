@@ -3,3 +3,11 @@
 .import snd_write
 .import snd_play_vgmdata
 .import snd_beep
+.import snd_attenuate
+.import snd_play_vals
+.import snd_setup_timer
+.import snd_stop_timer
+
+.import snd_vars
+
+.include "sound_vars.inc65"

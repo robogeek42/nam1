@@ -463,7 +463,8 @@ VEC_OUT  	= VEC_IN+2	; output vector
 ;VEC_SV		= VEC_LD+2	; save vector
 MY_IRQ_vec = VEC_OUT+2
 IRQ_vec    = VEC_OUT+2+3    ; IRQ code vector (points to IRQ_CODE in main.s65)
-NMI_vec    = IRQ_vec+$0A    ; NMI code vector
+;NMI_vec    = IRQ_vec+$0A    ; NMI code vector
+NMI_vec    = IRQ_vec+$40    ; NMI code vector
 
 
 ; Ibuffs can now be anywhere in RAM, ensure that the max length is < $80
@@ -8953,37 +8954,136 @@ lb_eof:
 .endif	; SDIO
 	RTS
 
+MSG_PLAY_HELP1:
+	.byte "PLAY S <addr>",$0d,$0a
+	.byte "  - play sample",$0d,$0a
+	.byte "PLAY T <tone>,<chan>,<dur>",$0d,$0a
+	.byte "  - play tone",$0d,$0a,$00
+; HELP for PLAY command
+lp_play_help:
+	JSR  LAB_IGBY	; consume the 'H'
+	LDA #<MSG_PLAY_HELP1
+	LDY #>MSG_PLAY_HELP1
+	JSR LAB_18C3
+	LDX   #$2A
+	JMP   LAB_XERR
+	RTS
+
 LAB_PLAY:
-	CMP  #'N'
-	BEQ lp_do_note
+	CMP  #'T'
+	BEQ  lp_play_tone
 	CMP  #'E'
-	BEQ lp_do_envelope
+	BEQ  lp_do_envelope
+	CMP  #'S'
+	BEQ  lp_play_sample
+	CMP  #'H'
+	BEQ  lp_play_help
+	JMP  LAB_SNER
+
+lp_play_sample:
+	JSR  LAB_IGBY	; consume the 'S'
+
 	JSR  LAB_EVNM		; evaluate expression and check is numeric,
 	    				; else do type mismatch
 	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
 	          		    ; temp integer in ZP Itemph, Itempl
-	LDA Itempl
-	STA R2
-	LDA Itemph
-	STA R2+1
+	LDA  Itempl
+	STA  R2
+	LDA  Itemph
+	STA  R2+1
 .ifdef SOUND
-	JSR snd_play_vgmdata
-	JSR snd_all_off
+	JSR  snd_play_vgmdata
+	JSR  snd_all_off
 .endif ; SOUND
 	RTS
 
-lp_do_note:
-	JSR  LAB_IGBY
-	; get Freq and Duration
-	JSR  LAB_GADB		; get 2 integers seperated by comma
-					; 1st integer (F) in Itempl/h, 2nd in X
-.ifdef SOUND
-.endif ; SOUND
-	
-	RTS
 lp_do_envelope:
 	JSR  LAB_IGBY
 	RTS
+
+; PLAY T Tone,Chan,Duration 
+;   Play a sound based on a frequency tone
+;   Tone is 10-bit number n = 115200/F where F is freq of note to be played (A=440)
+;        e.g. A 440Hz, n=261
+lp_play_tone:
+	JSR  LAB_IGBY	; consume the 'T'
+
+	; get Tone and Channel
+	JSR  LAB_GADB		; get 2 integers seperated by comma
+					; 1st integer (Tone) in Itempl/h, Channel is in X
+	TXA			; save channel in ZP_TMP2
+	AND #$03		; 0-3 only
+	STA ZP_TMP2
+
+	; save tone in format suitable for sound chip
+	; 10-bit frequency DDDDDDAAAA as 2 bytes [#1cccAAAA,#00DDDDDD]
+	LDA Itempl
+	AND #$0F			; Lower 4-bits go into first word
+	STA ZP_TMP0
+	LDA Itempl
+	AND #$F0			; Upper 4-bits go into second word
+	LSR
+	LSR
+	LSR
+	LSR
+	STA ZP_TMP0+1
+	LDA Itemph
+	AND #$03			; bits 8/9 go into the second word too
+	ASL
+	ASL
+	ASL
+	ASL
+	ORA ZP_TMP0+1
+	STA ZP_TMP0+1
+	
+	; Get duration
+	JSR  LAB_1C01		; scan for "," , else do syntax error then warm start
+	JSR  LAB_EVNM		; evaluate expression and check is numeric,
+	    				; else do type mismatch
+	JSR  LAB_F2FX		; save integer part of FAC1 in temporary integer
+
+; debug
+;phx
+;ld16 R0,msg_play_tone
+;jsr acia_puts
+;ld16 R0,buffer
+;lda ZP_TMP0		; 4bit
+;jsr fmt_bin_string
+;jsr acia_puts
+;lda #'/'
+;jsr acia_putc
+;lda ZP_TMP0+1	; 6bit
+;jsr fmt_bin_string
+;jsr acia_puts
+;lda #' '
+;jsr acia_putc
+;lda ZP_TMP2		; chan
+;jsr fmt_hex_string
+;jsr acia_puts
+;lda #' '
+;jsr acia_putc
+;lda Itempl		; duration
+;jsr fmt_hex_string
+;jsr acia_puts
+;jsr acia_put_newline
+;plx
+
+	
+.ifdef SOUND
+	; start playing a sound
+	LDX ZP_TMP2			; Channel
+	JSR snd_play_vals		; Tone passed as ZP_TMP0/+1
+	
+	; Set up Timer1 on 65C22 VIA in free run mode to generate an interrupt every 0.01s * Duration
+	LDX Itempl			; duration in X for timer function
+	JSR snd_setup_timer
+	
+.endif ; SOUND
+
+	RTS
+
+;msg_play_tone:
+;	.byte "tone ",$00
 
 LAB_GETKEY:
 .ifdef PS2K
